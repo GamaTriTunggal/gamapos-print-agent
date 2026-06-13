@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "jobId": "rcpt-2026-0001-a1b2",
+  "jobType": "cashier_receipt",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {
+    "name": "TOKO CONTOH",
+    "address": "Jl. Contoh No. 1, Kota",
+    "contact": "0812-xxxx"
+  },
+  "payload": {
+    "rcptNo": "2026-0001",
+    "date": "2026-06-13",
+    "time": "14:05",
+    "customer": { "name": "", "address": "", "contact": "", "poNo": "" },
+    "items": [
+      { "name": "Cat Tembok 5kg", "qty": 2, "unit": "pcs", "price": 75000, "total": 150000 }
+    ],
+    "shoppingTotal": 150000,
+    "discount": 0,
+    "serviceCharge": 0,
+    "grandTotal": 150000,
+    "paymentMethod": "CASH",
+    "isReceipt": true
+  }
+}

@@ -1,0 +1,36 @@
+## .NET build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.dll
+*.exe
+*.pdb
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## JetBrains Rider
+.idea/
+
+## NuGet
+packages/
+*.nupkg
+
+## Agent runtime output (spike menyimpan job ke sini)
+jobs/
+**/jobs/
+
+## OS
+Thumbs.db
+.DS_Store
+
+## Vendored assemblies (mis. Microsoft.VisualBasic.PowerPacks) — kecualikan dari *.dll global
+!lib/
+!lib/*.dll

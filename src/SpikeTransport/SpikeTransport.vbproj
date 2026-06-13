@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>GamaPrintAgent.SpikeTransport</RootNamespace>
+    <AssemblyName>GamaPrintAgent.SpikeTransport</AssemblyName>
+    <StartupObject>GamaPrintAgent.SpikeTransport.Program</StartupObject>
+    <LangVersion>latest</LangVersion>
+    <OptionStrict>On</OptionStrict>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Memungkinkan 'dotnet build' lintas-platform (CI/Linux) tanpa targeting pack net48 lokal.
+         Tidak mengubah runtime: exe net48 tetap butuh Windows untuk dijalankan. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>
