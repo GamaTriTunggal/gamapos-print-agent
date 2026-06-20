@@ -86,3 +86,15 @@ Public Class ReturnReceiptPayload
     Public Property items As List(Of ReceiptItem)
     Public Property total As Double
 End Class
+
+' Tanda terima bayar bon (piutang): layout sendiri (tanpa header toko/daftar item); nama toko & operator di bawah.
+Public Class ReceivableProofPayload
+    Public Property printDate As String
+    Public Property custId As String
+    Public Property custName As String
+    Public Property custHP As String
+    Public Property totalReceivable As Double
+    Public Property nominal As Double
+    Public Property serviceCharge As Double
+    <JsonProperty("operator")> Public Property operatorName As String   ' 'operator' keyword VB → map via JsonProperty
+End Class
