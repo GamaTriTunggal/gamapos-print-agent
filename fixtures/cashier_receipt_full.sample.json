@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "jobId": "rcpt-2026-0042-full",
+  "jobType": "cashier_receipt",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {
+    "name": "TOKO CONTOH JAYA",
+    "address": "Jl. Raya Industri No. 88, Kawasan Pergudangan Blok A",
+    "contact": "0812-1111-2222 / 0813-3333-4444"
+  },
+  "payload": {
+    "rcptNo": "2026-0042",
+    "date": "2026-06-20",
+    "time": "09:15",
+    "customer": {
+      "name": "BUDI SANTOSO",
+      "address": "Jl. Melati Raya No. 123 Blok C5 RT04 RW02 Kel. Sukamaju",
+      "contact": "0812-3456-7890",
+      "poNo": "PO-2026-0042"
+    },
+    "items": [
+      { "name": "Cat Tembok 5kg", "qty": 2, "unit": "pcs", "price": 75000, "total": 150000 },
+      { "name": "Kuas 3 inch", "qty": 1, "unit": "pcs", "price": 25000, "total": 25000 },
+      { "name": "Dempul Tembok Putih Aica 1kg", "qty": 3, "unit": "pcs", "price": 18000, "total": 54000 },
+      { "name": "Thinner ND Super", "qty": 0.5, "unit": "ltr", "price": 30000, "total": 15000 },
+      { "name": "Cat Kayu Avian Anti Karat Premium Gloss 1 Liter Merah Maroon", "qty": 1, "unit": "pcs", "price": 95000, "total": 95000 }
+    ],
+    "shoppingTotal": 339000,
+    "discount": 14000,
+    "serviceCharge": 5000,
+    "grandTotal": 330000,
+    "paymentMethod": "CASH",
+    "isReceipt": true
+  }
+}
