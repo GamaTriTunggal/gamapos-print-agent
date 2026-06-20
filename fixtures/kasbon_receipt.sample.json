@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "jobId": "rcpt-2026-0050-kasbon",
+  "jobType": "kasbon_receipt",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {
+    "name": "TOKO CONTOH JAYA",
+    "address": "Jl. Raya Industri No. 88, Kawasan Pergudangan Blok A",
+    "contact": "0812-1111-2222 / 0813-3333-4444"
+  },
+  "payload": {
+    "rcptNo": "2026-0050",
+    "date": "2026-06-20",
+    "time": "10:30",
+    "customer": {
+      "name": "SITI AMINAH",
+      "address": "Jl. Anggrek No. 45 RT01 RW03",
+      "contact": "0856-7777-8888",
+      "poNo": ""
+    },
+    "items": [
+      { "name": "Semen Gresik 40kg", "qty": 5, "unit": "sak", "price": 65000, "total": 325000 },
+      { "name": "Pasir Pasang 1 colt", "qty": 1, "unit": "rit", "price": 850000, "total": 850000 }
+    ],
+    "shoppingTotal": 1175000,
+    "serviceCharge": 0,
+    "payment": 500000
+  }
+}

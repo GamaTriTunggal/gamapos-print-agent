@@ -143,6 +143,20 @@ Module Program
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
                 End Try
 
+            Case "kasbon_receipt"
+                If job.payload Is Nothing Then
+                    Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
+                End If
+                Try
+                    Dim p As KasbonReceiptPayload = job.payload.ToObject(Of KasbonReceiptPayload)()
+                    PrintKasbonReceipt(job.store, p)
+                    Console.WriteLine("   printed kasbon_receipt " & If(p.rcptNo, ""))
+                    Return "{""ok"":true,""jobType"":""kasbon_receipt"",""rcptNo"":" & JsonString(If(p.rcptNo, "")) & "}"
+                Catch ex As Exception
+                    Console.WriteLine("   PRINT_FAILED: " & ex.Message)
+                    Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
+                End Try
+
             Case Else
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":" & JsonString(job.jobType) & "}"
 

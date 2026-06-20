@@ -52,3 +52,15 @@ Public Class CashierReceiptPayload
     Public Property paymentMethod As String
     Public Property isReceipt As Boolean
 End Class
+
+' Kasbon: tanpa diskon; menampilkan BAYAR & SISA. Selalu nota (selalu cetak blok customer).
+Public Class KasbonReceiptPayload
+    Public Property rcptNo As String
+    <JsonProperty("date")> Public Property [date] As String
+    Public Property time As String
+    Public Property customer As CustomerInfo
+    Public Property items As List(Of ReceiptItem)
+    Public Property shoppingTotal As Double
+    Public Property serviceCharge As Double
+    Public Property payment As Double
+End Class
