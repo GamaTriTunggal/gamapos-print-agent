@@ -117,7 +117,7 @@ Module ReceiptCommon
     ' DEVIASI SENGAJA dari VB.NET lama (disetujui user 2026-06-20): kode asli me-reset k=0 tiap
     ' baris → baris ke-2 header toko yang >col char mengulang dari awal. Di sini k diakumulasi
     ' supaya wrap header toko panjang benar (lanjut ke karakter berikutnya). Header ≤col char tak terpengaruh.
-    Private Sub PrintCentered(printer As Printer, text As String, col As Integer)
+    Friend Sub PrintCentered(printer As Printer, text As String, col As Integer)
         Dim s As String = If(text, "")
         Dim intCharLen As Integer = s.Length()
         Dim row As Integer = (intCharLen \ col) + 1

@@ -118,3 +118,17 @@ Public Class ReceivableProofPayload
     Public Property serviceCharge As Double
     <JsonProperty("operator")> Public Property operatorName As String   ' 'operator' keyword VB → map via JsonProperty
 End Class
+
+' Tanda terima bayar bon — bayar beberapa nota terpilih (ada nama toko atas, ALAMAT, potongan TF/materai/diskon).
+Public Class ReceivableSelectedPayload
+    Public Property printDate As String
+    Public Property custId As String
+    Public Property custName As String
+    Public Property custAddr As String
+    Public Property custHP As String
+    Public Property totalSelected As Double
+    Public Property feeTransfer As Double
+    Public Property feeMaterai As Double
+    Public Property discount As Double
+    <JsonProperty("operator")> Public Property operatorName As String
+End Class
