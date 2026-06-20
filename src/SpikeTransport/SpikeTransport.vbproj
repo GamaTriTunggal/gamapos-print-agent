@@ -16,11 +16,17 @@
     <!-- Memungkinkan 'dotnet build' lintas-platform (CI/Linux) tanpa targeting pack net48 lokal.
          Tidak mengubah runtime: exe net48 tetap butuh Windows untuk dijalankan. -->
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- 2a: PrintDocument (System.Drawing.Printing) untuk cetak. Tidak auto-direferensi di SDK-style net48. -->
     <Reference Include="System.Drawing" />
+    <!-- 2b: PowerPacks Printer (VB6 compat) untuk port printReceipt; DLL di-vendor di lib/. -->
+    <Reference Include="Microsoft.VisualBasic.PowerPacks">
+      <HintPath>..\..\lib\Microsoft.VisualBasic.PowerPacks.dll</HintPath>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
   </ItemGroup>
 
 </Project>

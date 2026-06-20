@@ -18,6 +18,8 @@ Imports System
 Imports System.IO
 Imports System.Net
 Imports System.Text
+Imports Newtonsoft.Json
+Imports Newtonsoft.Json.Linq
 
 Module Program
 
@@ -98,9 +100,8 @@ Module Program
 
             Case "POST /print"
                 Dim body As String = ReadBody(req)
-                Dim saved As String = SaveJob(body)
-                Console.WriteLine("   saved -> " & saved)
-                WriteJson(ctx, 200, $"{{""ok"":true,""saved"":{JsonString(saved)},""bytes"":{body.Length}}}")
+                SaveJob(body)   ' simpan body mentah utk debug (jobs/)
+                WriteJson(ctx, 200, Dispatch(body))
 
             Case "POST /print/test"
                 Dim pdf As String = PrintTestPage()
@@ -112,6 +113,41 @@ Module Program
 
         End Select
     End Sub
+
+    ' Deserialize amplop job JSON lalu dispatch sesuai jobType. Mengembalikan body JSON response.
+    Private Function Dispatch(body As String) As String
+        Dim job As PrintJob = Nothing
+        Try
+            job = JsonConvert.DeserializeObject(Of PrintJob)(body)
+        Catch ex As Exception
+            Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":" & JsonString(ex.Message) & "}"
+        End Try
+
+        If job Is Nothing OrElse String.IsNullOrEmpty(job.jobType) Then
+            Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""jobType kosong""}"
+        End If
+
+        Select Case job.jobType.ToLowerInvariant()
+
+            Case "cashier_receipt"
+                If job.payload Is Nothing Then
+                    Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
+                End If
+                Try
+                    Dim p As CashierReceiptPayload = job.payload.ToObject(Of CashierReceiptPayload)()
+                    PrintCashierReceipt(job.store, p)
+                    Console.WriteLine("   printed cashier_receipt " & If(p.rcptNo, ""))
+                    Return "{""ok"":true,""jobType"":""cashier_receipt"",""rcptNo"":" & JsonString(If(p.rcptNo, "")) & "}"
+                Catch ex As Exception
+                    Console.WriteLine("   PRINT_FAILED: " & ex.Message)
+                    Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
+                End Try
+
+            Case Else
+                Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":" & JsonString(job.jobType) & "}"
+
+        End Select
+    End Function
 
     Private Function ReadBody(req As HttpListenerRequest) As String
         If Not req.HasEntityBody Then Return ""
