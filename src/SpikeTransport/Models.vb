@@ -76,3 +76,13 @@ Public Class SplitReceiptPayload
     Public Property discount As Double
     Public Property serviceCharge As Double
 End Class
+
+' Retur "NOTA KEMBALI BARANG": tanpa header toko, customer tanpa PO, 1 total (TOTAL BELANJA), footer khusus.
+Public Class ReturnReceiptPayload
+    Public Property rcptNo As String
+    <JsonProperty("date")> Public Property [date] As String
+    Public Property time As String
+    Public Property customer As CustomerInfo
+    Public Property items As List(Of ReceiptItem)
+    Public Property total As Double
+End Class

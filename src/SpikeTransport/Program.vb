@@ -171,6 +171,20 @@ Module Program
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
                 End Try
 
+            Case "return_note"
+                If job.payload Is Nothing Then
+                    Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
+                End If
+                Try
+                    Dim p As ReturnReceiptPayload = job.payload.ToObject(Of ReturnReceiptPayload)()
+                    PrintReturnReceipt(p)
+                    Console.WriteLine("   printed return_note " & If(p.rcptNo, ""))
+                    Return "{""ok"":true,""jobType"":""return_note"",""rcptNo"":" & JsonString(If(p.rcptNo, "")) & "}"
+                Catch ex As Exception
+                    Console.WriteLine("   PRINT_FAILED: " & ex.Message)
+                    Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
+                End Try
+
             Case Else
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":" & JsonString(job.jobType) & "}"
 
