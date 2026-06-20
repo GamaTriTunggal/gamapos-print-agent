@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "jobId": "exp-2026-0090-salary",
+  "jobType": "salary_slip",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {
+    "name": "TOKO CONTOH JAYA",
+    "address": "Jl. Raya Industri No. 88, Kawasan Pergudangan Blok A",
+    "contact": "0812-1111-2222"
+  },
+  "payload": {
+    "header": "",
+    "printDate": "20-06-2026",
+    "employees": [
+      { "name": "ANDI PRATAMA", "salary": 3500000 },
+      { "name": "BUDI SETIAWAN", "salary": 4000000 },
+      { "name": "CITRA (cuti, tdk digaji)", "salary": 0 }
+    ],
+    "grandTotal": 7500000
+  }
+}

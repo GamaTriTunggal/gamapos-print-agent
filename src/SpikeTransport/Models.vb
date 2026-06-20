@@ -87,6 +87,19 @@ Public Class ReturnReceiptPayload
     Public Property total As Double
 End Class
 
+' Slip gaji: header (kosong di asli) → tanggal → daftar nama+gaji (gaji>0) → Total. Tanpa header toko/footer.
+Public Class SalaryEmployee
+    Public Property name As String
+    Public Property salary As Double
+End Class
+
+Public Class SalarySlipPayload
+    Public Property header As String
+    Public Property printDate As String
+    Public Property employees As List(Of SalaryEmployee)
+    Public Property grandTotal As Double
+End Class
+
 ' Tanda terima bayar bon (piutang): layout sendiri (tanpa header toko/daftar item); nama toko & operator di bawah.
 Public Class ReceivableProofPayload
     Public Property printDate As String
