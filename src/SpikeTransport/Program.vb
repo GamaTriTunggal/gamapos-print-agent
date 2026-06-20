@@ -157,6 +157,20 @@ Module Program
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
                 End Try
 
+            Case "split_receipt"
+                If job.payload Is Nothing Then
+                    Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
+                End If
+                Try
+                    Dim p As SplitReceiptPayload = job.payload.ToObject(Of SplitReceiptPayload)()
+                    PrintSplitReceipt(job.store, p)
+                    Console.WriteLine("   printed split_receipt " & If(p.rcptNo, ""))
+                    Return "{""ok"":true,""jobType"":""split_receipt"",""rcptNo"":" & JsonString(If(p.rcptNo, "")) & "}"
+                Catch ex As Exception
+                    Console.WriteLine("   PRINT_FAILED: " & ex.Message)
+                    Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
+                End Try
+
             Case Else
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":" & JsonString(job.jobType) & "}"
 

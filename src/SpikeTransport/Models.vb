@@ -64,3 +64,15 @@ Public Class KasbonReceiptPayload
     Public Property serviceCharge As Double
     Public Property payment As Double
 End Class
+
+' Split payment: total spt nota kasir tapi urutan BIAYA LAYANAN→DISKON & nilai rata-kolom shopping-total.
+Public Class SplitReceiptPayload
+    Public Property rcptNo As String
+    <JsonProperty("date")> Public Property [date] As String
+    Public Property time As String
+    Public Property customer As CustomerInfo
+    Public Property items As List(Of ReceiptItem)
+    Public Property shoppingTotal As Double
+    Public Property discount As Double
+    Public Property serviceCharge As Double
+End Class
