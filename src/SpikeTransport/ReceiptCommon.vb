@@ -113,8 +113,10 @@ Module ReceiptCommon
         printer.Print()
     End Sub
 
-    ' Cetak teks di tengah lebar `col`, wrap bila panjang. Reproduksi persis logika asli
-    ' (termasuk reset k=0 tiap iterasi — perilaku asli; nyaris tak pernah terpicu krn header pendek).
+    ' Cetak teks di tengah lebar `col`, wrap bila panjang.
+    ' DEVIASI SENGAJA dari VB.NET lama (disetujui user 2026-06-20): kode asli me-reset k=0 tiap
+    ' baris → baris ke-2 header toko yang >col char mengulang dari awal. Di sini k diakumulasi
+    ' supaya wrap header toko panjang benar (lanjut ke karakter berikutnya). Header ≤col char tak terpengaruh.
     Private Sub PrintCentered(printer As Printer, text As String, col As Integer)
         Dim s As String = If(text, "")
         Dim intCharLen As Integer = s.Length()
@@ -129,8 +131,8 @@ Module ReceiptCommon
                 printer.Print(T(left + 1), s)
             End If
         Else
+            Dim k As Integer = 0
             For i As Integer = 1 To row
-                Dim k As Integer = 0
                 If i = row Then
                     Dim left As Integer = (col - intRemainder) \ 2
                     printer.Print(T(left + 1), s.Substring(k, intRemainder))
