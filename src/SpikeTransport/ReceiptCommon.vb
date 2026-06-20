@@ -310,6 +310,20 @@ Module ReceiptCommon
                       T(TotCol - value.Length() + 1), value)
     End Sub
 
+    ' Total standar — dipakai nota kasir & split: TOTAL BELANJA, DISKON(≠0), BIAYA LAYANAN(≠0),
+    ' lalu line1 + GRAND TOTAL bila ada diskon/biaya layanan. Nilai rata-kanan ke kolom 40.
+    Friend Sub PrintStandardTotals(printer As Printer, shoppingTotal As Double, discount As Double, serviceCharge As Double)
+        Dim strShoppingTotal As String = Fmt(shoppingTotal)
+        Dim stLen As Integer = strShoppingTotal.Length()
+        PrintTotalLine(printer, stLen, CapTransTS, strShoppingTotal)
+        If discount <> 0 Then PrintTotalLine(printer, stLen, CapTransDS, Fmt(discount))
+        If serviceCharge <> 0 Then PrintTotalLine(printer, stLen, CapTransSC, Fmt(serviceCharge))
+        If serviceCharge <> 0 OrElse discount <> 0 Then
+            printer.Print(T(1), Line1())
+            PrintTotalLine(printer, stLen, CapTransGT, Fmt(shoppingTotal - discount + serviceCharge))
+        End If
+    End Sub
+
     Friend Sub PrintFooter(printer As Printer)
         printer.Print(T(1), Line1())
         printer.Print(T(6), Foot1, T(25), Foot2)

@@ -30,20 +30,7 @@ Module CashierReceipt
         printer.Print(Line2())
         PrintItems(printer, p.items)
 
-        Dim dblDiscount As Double = p.discount
-        Dim dblServiceCharge As Double = p.serviceCharge
-        Dim dblShoppingTotal As Double = p.shoppingTotal
-        Dim dblGrandTotal As Double = dblShoppingTotal - dblDiscount + dblServiceCharge
-        Dim strShoppingTotal As String = Fmt(dblShoppingTotal)
-        Dim stLen As Integer = strShoppingTotal.Length()
-
-        PrintTotalLine(printer, stLen, CapTransTS, strShoppingTotal)
-        If dblDiscount <> 0 Then PrintTotalLine(printer, stLen, CapTransDS, Fmt(dblDiscount))
-        If dblServiceCharge <> 0 Then PrintTotalLine(printer, stLen, CapTransSC, Fmt(dblServiceCharge))
-        If dblServiceCharge <> 0 OrElse dblDiscount <> 0 Then
-            printer.Print(T(1), Line1())
-            PrintTotalLine(printer, stLen, CapTransGT, Fmt(dblGrandTotal))
-        End If
+        PrintStandardTotals(printer, p.shoppingTotal, p.discount, p.serviceCharge)
 
         PrintFooter(printer)
         printer.EndDoc()
