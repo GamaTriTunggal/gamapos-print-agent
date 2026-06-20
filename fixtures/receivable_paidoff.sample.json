@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "jobId": "rcpt-2026-0083-paidoff",
+  "jobType": "receivable_paidoff",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {
+    "name": "TOKO CONTOH JAYA",
+    "address": "Jl. Raya Narogong, Cileungsi",
+    "contact": "0812-1111-2222"
+  },
+  "payload": {
+    "custId": "C-0123",
+    "custName": "TOKO MAKMUR JAYA",
+    "printDate": "2026-06-20",
+    "payTotal": 2500000
+  }
+}

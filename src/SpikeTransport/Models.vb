@@ -138,3 +138,26 @@ Public Class ReceivableSelectedCardPayload
     Inherits ReceivableSelectedPayload
     Public Property serviceCharge As Double
 End Class
+
+' "AMBIL BON" pelunasan (nominal tunggal). Font Lucida; nama/alamat toko dari store envelope.
+Public Class ReceivablePaidOffPayload
+    Public Property custId As String
+    Public Property custName As String
+    Public Property printDate As String
+    Public Property payTotal As Double
+End Class
+
+' Satu baris bon (utk redeem): nomor nota, tanggal, total.
+Public Class BonRow
+    Public Property rcptNo As String
+    Public Property rcptDate As String
+    Public Property total As Double
+End Class
+
+' "AMBIL BON" — daftar bon yang diambil pelanggan.
+Public Class ReceivableRedeemPayload
+    Public Property custId As String
+    Public Property custName As String
+    Public Property printDate As String
+    Public Property bons As List(Of BonRow)
+End Class

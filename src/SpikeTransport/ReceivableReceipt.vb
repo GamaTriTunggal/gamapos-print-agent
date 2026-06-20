@@ -12,9 +12,13 @@
 Option Strict On
 Option Explicit On
 
+Imports System.Collections.Generic
 Imports Microsoft.VisualBasic.PowerPacks.Printing.Compatibility.VB6  ' Printer
 
 Module ReceivableReceipt
+
+    ' Typo "Typwriter" SENGAJA dipertahankan (faithful ke aplikasi lama → fallback font Windows yang sama).
+    Private Const FontLucida As String = "Lucida Sans Typwriter"
 
     Public Sub PrintReceivableProof(store As StoreInfo, p As ReceivableProofPayload)
         RunSta(Sub() RenderReceivableProof(store, p))
@@ -179,6 +183,63 @@ Module ReceivableReceipt
         printer.Print()
         printer.Print(T(1), If(store Is Nothing, "", If(store.name, "")))
         printer.Print(T(1), If(p.operatorName, ""))
+        printer.EndDoc()
+    End Sub
+
+    ' Header bersama "AMBIL BON" (PaidOff & Redeem). Font Lucida (typo faithful). Nama/alamat toko
+    ' digeneralisasi dari hardcode aplikasi lama → store.name/store.address (centered) agar multi-toko.
+    Private Sub PrintAmbilBonHeader(printer As Printer, store As StoreInfo, custId As String, custName As String, printDate As String)
+        printer.FontName = FontLucida
+        printer.FontBold = True
+        printer.CurrentX = 0
+        printer.CurrentY = 0
+        printer.FontSize = 18
+        printer.Print(T(1), "     AMBIL  BON     ")
+        printer.FontSize = 10
+        printer.Print()
+        PrintCentered(printer, If(store Is Nothing, "", If(store.name, "")), TotCol)
+        PrintCentered(printer, If(store Is Nothing, "", If(store.address, "")), TotCol)
+        printer.Print()
+        printer.Print(T(1), "Kode Pelanggan : ", T(18), If(custId, ""))
+        printer.Print(T(1), "Nama Pelanggan : ", T(18), If(custName, ""))
+        printer.Print(T(1), "Tanggal        : ", T(18), If(printDate, ""))
+        printer.Print()
+    End Sub
+
+    ' Port faithful dari frmReceivable.printReceipt_PaidOff ("AMBIL BON" — pelunasan, nominal tunggal).
+    Public Sub PrintReceivablePaidOff(store As StoreInfo, p As ReceivablePaidOffPayload)
+        RunSta(Sub() RenderReceivablePaidOff(store, p))
+    End Sub
+
+    Private Sub RenderReceivablePaidOff(store As StoreInfo, p As ReceivablePaidOffPayload)
+        Dim printer As New Printer
+        PrintAmbilBonHeader(printer, store, p.custId, p.custName, p.printDate)
+        printer.Print(T(1), "Melunasi pembayaran bon sebesar, ")
+        Dim strPay As String = Fmt(p.payTotal)
+        printer.Print(T(40 - 3 - strPay.Length() + 1), "Rp ", T(40 - strPay.Length() + 1), strPay)
+        printer.Print()
+        printer.Print("              TERIMA KASIH              ")
+        printer.EndDoc()
+    End Sub
+
+    ' Port faithful dari frmReceivable.printReceipt_Redeem ("AMBIL BON" — daftar bon yang diambil).
+    Public Sub PrintReceivableRedeem(store As StoreInfo, p As ReceivableRedeemPayload)
+        RunSta(Sub() RenderReceivableRedeem(store, p))
+    End Sub
+
+    Private Sub RenderReceivableRedeem(store As StoreInfo, p As ReceivableRedeemPayload)
+        Dim printer As New Printer
+        PrintAmbilBonHeader(printer, store, p.custId, p.custName, p.printDate)
+        printer.Print("Mengambil bon-bon berikut, ")
+        printer.Print(Line2())
+        Dim bons As List(Of BonRow) = If(p.bons, New List(Of BonRow)())
+        For Each b As BonRow In bons
+            Dim strTotal As String = Fmt(b.total)
+            printer.Print(T(1), If(b.rcptNo, ""), T(15), If(b.rcptDate, ""), T(40 - strTotal.Length() + 1), strTotal)
+        Next
+        printer.Print(Line2())
+        printer.Print()
+        printer.Print("              TERIMA KASIH              ")
         printer.EndDoc()
     End Sub
 

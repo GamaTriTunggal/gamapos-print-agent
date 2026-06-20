@@ -242,6 +242,34 @@ Module Program
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
                 End Try
 
+            Case "receivable_paidoff"
+                If job.payload Is Nothing Then
+                    Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
+                End If
+                Try
+                    Dim p As ReceivablePaidOffPayload = job.payload.ToObject(Of ReceivablePaidOffPayload)()
+                    PrintReceivablePaidOff(job.store, p)
+                    Console.WriteLine("   printed receivable_paidoff " & If(p.custId, ""))
+                    Return "{""ok"":true,""jobType"":""receivable_paidoff"",""custId"":" & JsonString(If(p.custId, "")) & "}"
+                Catch ex As Exception
+                    Console.WriteLine("   PRINT_FAILED: " & ex.Message)
+                    Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
+                End Try
+
+            Case "receivable_redeem"
+                If job.payload Is Nothing Then
+                    Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
+                End If
+                Try
+                    Dim p As ReceivableRedeemPayload = job.payload.ToObject(Of ReceivableRedeemPayload)()
+                    PrintReceivableRedeem(job.store, p)
+                    Console.WriteLine("   printed receivable_redeem " & If(p.custId, ""))
+                    Return "{""ok"":true,""jobType"":""receivable_redeem"",""custId"":" & JsonString(If(p.custId, "")) & "}"
+                Catch ex As Exception
+                    Console.WriteLine("   PRINT_FAILED: " & ex.Message)
+                    Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
+                End Try
+
             Case Else
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":" & JsonString(job.jobType) & "}"
 
