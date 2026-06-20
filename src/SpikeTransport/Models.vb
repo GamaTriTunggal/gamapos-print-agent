@@ -87,16 +87,17 @@ Public Class ReturnReceiptPayload
     Public Property total As Double
 End Class
 
-' Slip gaji: header (kosong di asli) → tanggal → daftar nama+gaji (gaji>0) → Total. Tanpa header toko/footer.
-Public Class SalaryEmployee
+' Slip daftar-nominal — dipakai slip gaji & pembayaran BPJS (template VB.NET identik, beda hanya teks header):
+' header → tanggal → garis → baris "nama ... nominal" (hanya nominal>0, rata-kanan) → garis → Total. Tanpa header toko/footer.
+Public Class AmountRow
     Public Property name As String
-    Public Property salary As Double
+    Public Property amount As Double
 End Class
 
-Public Class SalarySlipPayload
+Public Class AmountListSlipPayload
     Public Property header As String
     Public Property printDate As String
-    Public Property employees As List(Of SalaryEmployee)
+    Public Property rows As List(Of AmountRow)
     Public Property grandTotal As Double
 End Class
 

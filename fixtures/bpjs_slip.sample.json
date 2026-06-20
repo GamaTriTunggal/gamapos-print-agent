@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "jobId": "exp-2026-0090-salary",
-  "jobType": "salary_slip",
+  "jobId": "exp-2026-0091-bpjs",
+  "jobType": "bpjs_slip",
   "printerRole": "CASHIER",
   "copies": 1,
   "store": {
@@ -10,13 +10,13 @@
     "contact": "0812-1111-2222"
   },
   "payload": {
-    "header": "",
+    "header": "PEMBAYARAN BPJS",
     "printDate": "20-06-2026",
     "rows": [
-      { "name": "ANDI PRATAMA", "amount": 3500000 },
-      { "name": "BUDI SETIAWAN", "amount": 4000000 },
-      { "name": "CITRA (cuti, tdk digaji)", "amount": 0 }
+      { "name": "ANDI PRATAMA", "amount": 175000 },
+      { "name": "BUDI SETIAWAN", "amount": 200000 },
+      { "name": "CITRA WULANDARI", "amount": 175000 }
     ],
-    "grandTotal": 7500000
+    "grandTotal": 550000
   }
 }

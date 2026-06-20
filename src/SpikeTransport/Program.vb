@@ -199,15 +199,16 @@ Module Program
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
                 End Try
 
-            Case "salary_slip"
+            Case "salary_slip", "bpjs_slip"
+                ' Template slip daftar-nominal identik; beda hanya teks header (dikirim web di payload).
                 If job.payload Is Nothing Then
                     Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
                 End If
                 Try
-                    Dim p As SalarySlipPayload = job.payload.ToObject(Of SalarySlipPayload)()
-                    PrintSalarySlip(p)
-                    Console.WriteLine("   printed salary_slip")
-                    Return "{""ok"":true,""jobType"":""salary_slip""}"
+                    Dim p As AmountListSlipPayload = job.payload.ToObject(Of AmountListSlipPayload)()
+                    PrintAmountListSlip(p)
+                    Console.WriteLine("   printed " & job.jobType)
+                    Return "{""ok"":true,""jobType"":" & JsonString(job.jobType) & "}"
                 Catch ex As Exception
                     Console.WriteLine("   PRINT_FAILED: " & ex.Message)
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
