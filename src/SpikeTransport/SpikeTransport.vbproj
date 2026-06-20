@@ -18,4 +18,9 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 2a: PrintDocument (System.Drawing.Printing) untuk cetak. Tidak auto-direferensi di SDK-style net48. -->
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
 </Project>

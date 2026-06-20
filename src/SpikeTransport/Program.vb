@@ -103,7 +103,9 @@ Module Program
                 WriteJson(ctx, 200, $"{{""ok"":true,""saved"":{JsonString(saved)},""bytes"":{body.Length}}}")
 
             Case "POST /print/test"
-                WriteJson(ctx, 200, "{""ok"":true,""note"":""spike: no real print""}")
+                Dim pdf As String = PrintTestPage()
+                Console.WriteLine("   printed -> " & pdf)
+                WriteJson(ctx, 200, $"{{""ok"":true,""printed"":{JsonString(pdf)}}}")
 
             Case Else
                 WriteJson(ctx, 404, "{""ok"":false,""error"":""NOT_FOUND""}")
