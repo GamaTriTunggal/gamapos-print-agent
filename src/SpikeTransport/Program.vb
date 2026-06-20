@@ -228,6 +228,20 @@ Module Program
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
                 End Try
 
+            Case "receivable_selected_card"
+                If job.payload Is Nothing Then
+                    Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
+                End If
+                Try
+                    Dim p As ReceivableSelectedCardPayload = job.payload.ToObject(Of ReceivableSelectedCardPayload)()
+                    PrintReceivableSelectedCard(job.store, p)
+                    Console.WriteLine("   printed receivable_selected_card " & If(p.custId, ""))
+                    Return "{""ok"":true,""jobType"":""receivable_selected_card"",""custId"":" & JsonString(If(p.custId, "")) & "}"
+                Catch ex As Exception
+                    Console.WriteLine("   PRINT_FAILED: " & ex.Message)
+                    Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
+                End Try
+
             Case Else
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":" & JsonString(job.jobType) & "}"
 

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "jobId": "rcpt-2026-0082-recvselcard",
+  "jobType": "receivable_selected_card",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {
+    "name": "TOKO CONTOH JAYA",
+    "address": "Jl. Raya Industri No. 88, Kawasan Pergudangan Blok A",
+    "contact": "0812-1111-2222"
+  },
+  "payload": {
+    "printDate": "2026-06-20 15:40",
+    "custId": "C-0123",
+    "custName": "TOKO MAKMUR JAYA",
+    "custAddr": "Jl. Pasar Baru No. 5",
+    "custHP": "0878-1111-2222",
+    "totalSelected": 5000000,
+    "feeTransfer": 0,
+    "feeMaterai": 10000,
+    "discount": 50000,
+    "serviceCharge": 73350,
+    "operator": "kasir01"
+  }
+}

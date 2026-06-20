@@ -132,3 +132,9 @@ Public Class ReceivableSelectedPayload
     Public Property discount As Double
     <JsonProperty("operator")> Public Property operatorName As String
 End Class
+
+' Varian kartu: = selected + serviceCharge (BIAYA EDC) → GRAND TOTAL. Inherits agar tak duplikasi field.
+Public Class ReceivableSelectedCardPayload
+    Inherits ReceivableSelectedPayload
+    Public Property serviceCharge As Double
+End Class
