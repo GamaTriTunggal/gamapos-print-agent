@@ -182,13 +182,15 @@ Module ReceiptCommon
         End If
     End Sub
 
-    ' Baris NO. Bila reprintDate/reprintTime diisi → tambah baris "CETAK ULANG: <date> <time>"
-    ' (sejajar kolom tgl/jam baris NO). Reprint = reuse nota asli + penanda ini (Opsi B, disetujui user 2026-06-20).
+    ' Baris NO (tgl di kolom 19, JAM rata-kanan ke kolom 40). Bila reprintDate/reprintTime diisi →
+    ' tambah baris "CETAK ULANG: <date> <time>" (kolom sama). Reprint = reuse nota asli + penanda ini
+    ' (Opsi B). DEVIASI SENGAJA (disetujui user 2026-06-20): jam rata-kanan kolom 40 (aplikasi lama: kolom 33).
     Friend Sub PrintReceiptNoLine(printer As Printer, rcptNo As String, rcptDate As String, rcptTime As String,
                                   Optional reprintDate As String = Nothing, Optional reprintTime As String = Nothing)
-        printer.Print(T(1), CapRcptNo, T(4), rcptNo, T(19), rcptDate, T(33), rcptTime)
+        printer.Print(T(1), CapRcptNo, T(4), rcptNo, T(19), rcptDate, T(40 - rcptTime.Length() + 1), rcptTime)
         If Not String.IsNullOrEmpty(reprintDate) OrElse Not String.IsNullOrEmpty(reprintTime) Then
-            printer.Print(T(1), "CETAK ULANG:", T(19), If(reprintDate, ""), T(33), If(reprintTime, ""))
+            Dim rt As String = If(reprintTime, "")
+            printer.Print(T(1), "CETAK ULANG:", T(19), If(reprintDate, ""), T(40 - rt.Length() + 1), rt)
         End If
     End Sub
 
