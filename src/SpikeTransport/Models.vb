@@ -51,6 +51,8 @@ Public Class CashierReceiptPayload
     Public Property grandTotal As Double
     Public Property paymentMethod As String
     Public Property isReceipt As Boolean
+    Public Property reprintDate As String   ' opsional: bila diisi → cetak baris "CETAK ULANG: <date> <time>"
+    Public Property reprintTime As String
 End Class
 
 ' Kasbon: tanpa diskon; menampilkan BAYAR & SISA. Selalu nota (selalu cetak blok customer).
@@ -63,6 +65,8 @@ Public Class KasbonReceiptPayload
     Public Property shoppingTotal As Double
     Public Property serviceCharge As Double
     Public Property payment As Double
+    Public Property reprintDate As String   ' opsional: penanda CETAK ULANG
+    Public Property reprintTime As String
 End Class
 
 ' Split payment: total spt nota kasir tapi urutan BIAYA LAYANAN→DISKON & nilai rata-kolom shopping-total.
@@ -75,6 +79,8 @@ Public Class SplitReceiptPayload
     Public Property shoppingTotal As Double
     Public Property discount As Double
     Public Property serviceCharge As Double
+    Public Property reprintDate As String   ' opsional: penanda CETAK ULANG
+    Public Property reprintTime As String
 End Class
 
 ' Retur "NOTA KEMBALI BARANG": tanpa header toko, customer tanpa PO, 1 total (TOTAL BELANJA), footer khusus.

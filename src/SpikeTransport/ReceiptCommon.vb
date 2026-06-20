@@ -182,8 +182,14 @@ Module ReceiptCommon
         End If
     End Sub
 
-    Friend Sub PrintReceiptNoLine(printer As Printer, rcptNo As String, rcptDate As String, rcptTime As String)
+    ' Baris NO. Bila reprintDate/reprintTime diisi → tambah baris "CETAK ULANG: <date> <time>"
+    ' (sejajar kolom tgl/jam baris NO). Reprint = reuse nota asli + penanda ini (Opsi B, disetujui user 2026-06-20).
+    Friend Sub PrintReceiptNoLine(printer As Printer, rcptNo As String, rcptDate As String, rcptTime As String,
+                                  Optional reprintDate As String = Nothing, Optional reprintTime As String = Nothing)
         printer.Print(T(1), CapRcptNo, T(4), rcptNo, T(19), rcptDate, T(33), rcptTime)
+        If Not String.IsNullOrEmpty(reprintDate) OrElse Not String.IsNullOrEmpty(reprintTime) Then
+            printer.Print(T(1), "CETAK ULANG:", T(19), If(reprintDate, ""), T(33), If(reprintTime, ""))
+        End If
     End Sub
 
     ' Daftar item: 4 varian format (v1s/v1/v2/vm) + separator antar baris. Port faithful.

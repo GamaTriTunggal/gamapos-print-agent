@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "jobId": "rcpt-2026-0001-reprint",
+  "jobType": "cashier_receipt",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {
+    "name": "TOKO CONTOH JAYA",
+    "address": "Jl. Raya Industri No. 88, Kawasan Pergudangan Blok A",
+    "contact": "0812-1111-2222 / 0813-3333-4444 / 0814-5555-6666"
+  },
+  "payload": {
+    "rcptNo": "2026-0042",
+    "date": "2026-06-20",
+    "time": "09:15",
+    "reprintDate": "2026-06-21",
+    "reprintTime": "08:30",
+    "customer": {
+      "name": "BUDI SANTOSO",
+      "address": "Jl. Melati Raya No. 123 Blok C5 RT04 RW02 Kel. Sukamaju",
+      "contact": "0812-3456-7890",
+      "poNo": "PO-2026-0042"
+    },
+    "items": [
+      { "name": "Cat Tembok 5kg", "qty": 2, "unit": "pcs", "price": 75000, "total": 150000 },
+      { "name": "Kuas 3 inch", "qty": 1, "unit": "pcs", "price": 25000, "total": 25000 }
+    ],
+    "shoppingTotal": 175000,
+    "discount": 0,
+    "serviceCharge": 0,
+    "grandTotal": 175000,
+    "paymentMethod": "CASH",
+    "isReceipt": true
+  }
+}

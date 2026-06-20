@@ -22,7 +22,7 @@ Module CashierReceipt
 
         If p.isReceipt Then
             PrintCustomerBlock(printer, p.customer)
-            PrintReceiptNoLine(printer, If(p.rcptNo, ""), If(p.date, ""), If(p.time, ""))
+            PrintReceiptNoLine(printer, If(p.rcptNo, ""), If(p.date, ""), If(p.time, ""), p.reprintDate, p.reprintTime)
         Else
             PrintQuoteNotes(printer)
         End If

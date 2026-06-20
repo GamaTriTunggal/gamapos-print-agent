@@ -22,7 +22,7 @@ Module SplitReceipt
         Dim printer As New Printer
         PrintStoreHeader(printer, store)
         PrintCustomerBlock(printer, p.customer)
-        PrintReceiptNoLine(printer, If(p.rcptNo, ""), If(p.date, ""), If(p.time, ""))
+        PrintReceiptNoLine(printer, If(p.rcptNo, ""), If(p.date, ""), If(p.time, ""), p.reprintDate, p.reprintTime)
 
         printer.Print(Line2())
         PrintItems(printer, p.items)
