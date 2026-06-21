@@ -17,9 +17,6 @@ Imports Microsoft.VisualBasic.PowerPacks.Printing.Compatibility.VB6  ' Printer
 
 Module ReceivableReceipt
 
-    ' Typo "Typwriter" SENGAJA dipertahankan (faithful ke aplikasi lama → fallback font Windows yang sama).
-    Private Const FontLucida As String = "Lucida Sans Typwriter"
-
     Public Sub PrintReceivableProof(store As StoreInfo, p As ReceivableProofPayload)
         RunSta(Sub() RenderReceivableProof(store, p))
     End Sub
@@ -87,10 +84,11 @@ Module ReceivableReceipt
         Dim strPayment As String = Fmt(p.totalSelected - p.feeTransfer - p.feeMaterai - p.discount)
 
         printer.FontName = FontCourier
+        printer.FontBold = True
         printer.CurrentX = 0
         printer.CurrentY = 0
         printer.FontSize = 18
-        PrintCentered(printer, If(store Is Nothing, "", If(store.name, "")), StoreNameCol)   ' nama toko FS18 (tak bold)
+        PrintCentered(printer, If(store Is Nothing, "", If(store.name, "")), StoreNameCol)   ' nama toko FS18 bold
         printer.FontSize = 9
         printer.Print(T(1), "         TANDA TERIMA BAYAR BON         ")
         printer.Print(T(16), If(p.printDate, ""))
@@ -143,6 +141,7 @@ Module ReceivableReceipt
         Dim strGrandTotal As String = Fmt(dblTotal + p.serviceCharge)
 
         printer.FontName = FontCourier
+        printer.FontBold = True
         printer.CurrentX = 0
         printer.CurrentY = 0
         printer.FontSize = 18
@@ -186,10 +185,12 @@ Module ReceivableReceipt
         printer.EndDoc()
     End Sub
 
-    ' Header bersama "AMBIL BON" (PaidOff & Redeem). Font Lucida (typo faithful). Nama/alamat toko
-    ' digeneralisasi dari hardcode aplikasi lama → store.name/store.address (centered) agar multi-toko.
+    ' Header bersama "AMBIL BON" (PaidOff & Redeem). Font Courier New bold (dot-matrix).
+    ' Aplikasi lama pakai "Lucida Sans Typwriter" — nama font SALAH KETIK (kurang 'e') → font tak ada →
+    ' Windows fallback ke font proporsional (tidak rapi). Diganti Courier (disetujui user 2026-06-21).
+    ' Nama/alamat toko digeneralisasi dari hardcode single-store → store.name/store.address (centered) agar multi-toko.
     Private Sub PrintAmbilBonHeader(printer As Printer, store As StoreInfo, custId As String, custName As String, printDate As String)
-        printer.FontName = FontLucida
+        printer.FontName = FontCourier
         printer.FontBold = True
         printer.CurrentX = 0
         printer.CurrentY = 0

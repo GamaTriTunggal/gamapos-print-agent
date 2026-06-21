@@ -139,7 +139,7 @@ Public Class ReceivableSelectedCardPayload
     Public Property serviceCharge As Double
 End Class
 
-' "AMBIL BON" pelunasan (nominal tunggal). Font Lucida; nama/alamat toko dari store envelope.
+' "AMBIL BON" pelunasan (nominal tunggal). Font Courier bold (dot-matrix); nama/alamat toko dari store envelope.
 Public Class ReceivablePaidOffPayload
     Public Property custId As String
     Public Property custName As String
