@@ -63,6 +63,20 @@ Module Printers
         End Try
     End Function
 
+    ' Ringkasan config utk log saat start (apakah printers.json kebaca + peta role).
+    Public Function ConfigSummary() As String
+        Dim dir As String = AppDomain.CurrentDomain.BaseDirectory
+        Dim path As String = IO.Path.Combine(dir, "printers.json")
+        Dim parts As New List(Of String)()
+        For Each role As String In New String() {"CASHIER", "DELIVERY", "QRLABEL", "REPORT"}
+            Dim n As String = Resolve(role)
+            parts.Add(role & "=" & If(n = "", "(default)", n))
+        Next
+        Return "Config dir : " & dir & Environment.NewLine &
+               "printers.json: " & If(File.Exists(path), "FOUND", "TIDAK ADA") & "  |  " & String.Join("  ", parts) & Environment.NewLine &
+               "Default printer: " & CurrentDefault()
+    End Function
+
     ' JSON utk GET /printers: daftar printer terpasang + peta role saat ini + default Windows.
     Public Function StatusJson() As String
         Dim roles As New Dictionary(Of String, Object)()
@@ -94,6 +108,8 @@ Module Printers
         End If
         Dim prev As String = CurrentDefault()
         Dim switched As Boolean = SetDefaultPrinter(target)
+        Console.WriteLine("   targeting role '" & role & "' → '" & target & "' | setOk=" & switched &
+                          " | default skrg='" & CurrentDefault() & "' (sebelumnya '" & prev & "')")
         Try
             body()
         Finally

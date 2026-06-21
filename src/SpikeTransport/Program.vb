@@ -45,6 +45,7 @@ Module Program
 
         Console.WriteLine("Gama Print Agent (transport spike) listening on " & Prefix)
         Console.WriteLine("Endpoints: GET /health | GET /printers | POST /print | POST /print/test")
+        Console.WriteLine(Printers.ConfigSummary())
         Console.WriteLine("Ctrl+C untuk berhenti.")
 
         While listener.IsListening
