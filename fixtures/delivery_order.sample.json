@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "jobId": "do-2026-0001",
+  "jobType": "delivery_order",
+  "printerRole": "DELIVERY",
+  "copies": 1,
+  "store": {
+    "name": "TOKO CONTOH JAYA",
+    "address": "Jl. Raya Narogong, Cileungsi",
+    "contact": "8230373 / 8235054 / 0812-9081-6737"
+  },
+  "payload": {
+    "printDate": "2026-06-21",
+    "ref": "INV-2026-0042",
+    "customer": {
+      "name": "BUDI SANTOSO",
+      "address": "Jl. Melati Raya No. 123 Cileungsi",
+      "contact": "0812-3456-7890"
+    },
+    "items": [
+      { "name": "Cat Tembok 5kg", "qty": 10, "unit": "pcs" },
+      { "name": "Semen Gresik 40kg", "qty": 25, "unit": "sak" },
+      { "name": "Pasir Pasang", "qty": 2, "unit": "rit" },
+      { "name": "Besi Beton 10mm", "qty": 50, "unit": "btg" },
+      { "name": "Cat Kayu Avian Anti Karat 1L", "qty": 6, "unit": "kaleng" }
+    ]
+  }
+}

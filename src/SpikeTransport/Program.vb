@@ -264,6 +264,20 @@ Module Program
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
                 End Try
 
+            Case "delivery_order"
+                If job.payload Is Nothing Then
+                    Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
+                End If
+                Try
+                    Dim p As DeliveryOrderPayload = job.payload.ToObject(Of DeliveryOrderPayload)()
+                    WithRolePrinter(job.printerRole, Sub() PrintDeliveryOrder(job.store, p))
+                    Console.WriteLine("   printed delivery_order")
+                    Return "{""ok"":true,""jobType"":""delivery_order""}"
+                Catch ex As Exception
+                    Console.WriteLine("   PRINT_FAILED: " & ex.Message)
+                    Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
+                End Try
+
             Case Else
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":" & JsonString(job.jobType) & "}"
 

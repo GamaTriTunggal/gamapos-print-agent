@@ -161,3 +161,11 @@ Public Class ReceivableRedeemPayload
     Public Property printDate As String
     Public Property bons As List(Of BonRow)
 End Class
+
+' Surat jalan (DELIVERY, 82 kolom). items pakai ReceiptItem (qty/qtyDisplay/unit/name; price/total diabaikan).
+Public Class DeliveryOrderPayload
+    Public Property printDate As String
+    Public Property ref As String
+    Public Property customer As CustomerInfo
+    Public Property items As List(Of ReceiptItem)
+End Class
