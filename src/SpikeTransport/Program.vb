@@ -278,6 +278,34 @@ Module Program
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
                 End Try
 
+            Case "qr_item_label"
+                If job.payload Is Nothing Then
+                    Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
+                End If
+                Try
+                    Dim p As QrItemLabelPayload = job.payload.ToObject(Of QrItemLabelPayload)()
+                    PrintQrItemLabel(p)   ' targeting via PrinterSettings.PrinterName (QRLABEL), bukan WithRolePrinter
+                    Console.WriteLine("   printed qr_item_label " & If(p.itemId, ""))
+                    Return "{""ok"":true,""jobType"":""qr_item_label"",""itemId"":" & JsonString(If(p.itemId, "")) & "}"
+                Catch ex As Exception
+                    Console.WriteLine("   PRINT_FAILED: " & ex.Message)
+                    Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
+                End Try
+
+            Case "qr_invoice"
+                If job.payload Is Nothing Then
+                    Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""payload kosong""}"
+                End If
+                Try
+                    Dim p As QrInvoicePayload = job.payload.ToObject(Of QrInvoicePayload)()
+                    PrintQrInvoice(p)
+                    Console.WriteLine("   printed qr_invoice " & If(p.invoiceNo, ""))
+                    Return "{""ok"":true,""jobType"":""qr_invoice"",""invoiceNo"":" & JsonString(If(p.invoiceNo, "")) & "}"
+                Catch ex As Exception
+                    Console.WriteLine("   PRINT_FAILED: " & ex.Message)
+                    Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
+                End Try
+
             Case Else
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":" & JsonString(job.jobType) & "}"
 

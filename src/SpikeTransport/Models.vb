@@ -169,3 +169,15 @@ Public Class DeliveryOrderPayload
     Public Property customer As CustomerInfo
     Public Property items As List(Of ReceiptItem)
 End Class
+
+' Label QR barang (QRLABEL/thermal): itemId + harga + QR(itemId), `copies` salinan.
+Public Class QrItemLabelPayload
+    Public Property itemId As String
+    Public Property salesPrice As Double
+    Public Property copies As Integer
+End Class
+
+' Label QR invoice: invoiceNo + QR(invoiceNo).
+Public Class QrInvoicePayload
+    Public Property invoiceNo As String
+End Class

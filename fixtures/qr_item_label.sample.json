@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "jobId": "qr-2026-0001",
+  "jobType": "qr_item_label",
+  "printerRole": "QRLABEL",
+  "copies": 2,
+  "store": { "name": "TOKO CONTOH JAYA", "address": "Jl. Contoh No. 1", "contact": "0812-1111-2222" },
+  "payload": {
+    "itemId": "BRG-00123",
+    "salesPrice": 75000,
+    "copies": 2
+  }
+}

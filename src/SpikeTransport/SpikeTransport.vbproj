@@ -17,6 +17,8 @@
          Tidak mengubah runtime: exe net48 tetap butuh Windows untuk dijalankan. -->
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <!-- QR (label barang/invoice). 0.16.9 = versi aplikasi lama; build net4x menyertakan BarcodeWriter→Bitmap (System.Drawing). -->
+    <PackageReference Include="ZXing.Net" Version="0.16.9" />
   </ItemGroup>
 
   <ItemGroup>

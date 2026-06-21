@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "jobId": "qrinv-2026-0001",
+  "jobType": "qr_invoice",
+  "printerRole": "QRLABEL",
+  "copies": 1,
+  "store": { "name": "TOKO CONTOH JAYA", "address": "Jl. Contoh No. 1", "contact": "0812-1111-2222" },
+  "payload": {
+    "invoiceNo": "INV-2026-0042"
+  }
+}
