@@ -78,6 +78,16 @@ fetch('http://localhost:9111/health').then(r => r.json()).then(console.log)
 > Catatan: `/health` versi spike menghilangkan `uptimeSec` (ada di kontrak) dan menambah
 > `mode:"spike"` — divergensi sengaja, direkonsiliasi saat kontrak di-lock (M0).
 
+## Targeting printer per-role (printers.json)
+
+Tiap job punya `printerRole` (CASHIER/DELIVERY/QRLABEL/REPORT). Agent memetakan role → nama printer Windows
+lewat **`printers.json` di samping exe** (mis. `bin\Debug\net48\printers.json`). Lihat `printers.example.json`.
+
+- Copy `printers.example.json` → `printers.json` di folder exe, sesuaikan nama printer (lihat nama persis via `GET /printers`).
+- Role **tidak dipetakan** atau `printers.json` tak ada → job dicetak ke **printer default Windows** (jadi tes di VM/PDF tetap jalan tanpa setup).
+- Nota teks (PowerPacks) → agent mengganti default Windows **sesaat** saat cetak lalu dikembalikan. Label QR (PrintDocument) → target printer langsung.
+- `printers.json` **tidak** di-commit (per-PC; ada di folder `bin/` yang gitignored). Yang di-commit hanya `printers.example.json`.
+
 ## Next — Step 2 (silent print)
 
 Port `frmCashier.printReceipt` ke handler `cashier_receipt`, lepaskan dari kontrol form

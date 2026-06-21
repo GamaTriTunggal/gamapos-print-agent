@@ -88,15 +88,8 @@ Module Program
                 WriteJson(ctx, 200, $"{{""ok"":true,""agentVersion"":""{AgentVersion}"",""schemaVersion"":{SchemaVersion},""mode"":""spike""}}")
 
             Case "GET /printers"
-                ' SPIKE: enumerasi di-stub agar tak butuh System.Drawing.
-                ' Versi nyata (uncomment + tambah <Reference Include="System.Drawing" /> di .vbproj):
-                '   Dim sb As New StringBuilder()
-                '   For Each p As String In System.Drawing.Printing.PrinterSettings.InstalledPrinters
-                '       If sb.Length > 0 Then sb.Append(",")
-                '       sb.Append(JsonString(p))
-                '   Next
-                '   WriteJson(ctx, 200, "{""ok"":true,""installed"":[" & sb.ToString() & "]}")
-                WriteJson(ctx, 200, "{""ok"":true,""installed"":[],""roles"":{""CASHIER"":null,""DELIVERY"":null,""QRLABEL"":null,""REPORT"":null},""note"":""spike: printer enumeration deferred""}")
+                ' Printer terpasang + peta role (printers.json) + default Windows.
+                WriteJson(ctx, 200, Printers.StatusJson())
 
             Case "POST /print"
                 Dim body As String = ReadBody(req)
@@ -135,7 +128,7 @@ Module Program
                 End If
                 Try
                     Dim p As CashierReceiptPayload = job.payload.ToObject(Of CashierReceiptPayload)()
-                    PrintCashierReceipt(job.store, p)
+                    WithRolePrinter(job.printerRole, Sub() PrintCashierReceipt(job.store, p))
                     Console.WriteLine("   printed cashier_receipt " & If(p.rcptNo, ""))
                     Return "{""ok"":true,""jobType"":""cashier_receipt"",""rcptNo"":" & JsonString(If(p.rcptNo, "")) & "}"
                 Catch ex As Exception
@@ -149,7 +142,7 @@ Module Program
                 End If
                 Try
                     Dim p As KasbonReceiptPayload = job.payload.ToObject(Of KasbonReceiptPayload)()
-                    PrintKasbonReceipt(job.store, p)
+                    WithRolePrinter(job.printerRole, Sub() PrintKasbonReceipt(job.store, p))
                     Console.WriteLine("   printed kasbon_receipt " & If(p.rcptNo, ""))
                     Return "{""ok"":true,""jobType"":""kasbon_receipt"",""rcptNo"":" & JsonString(If(p.rcptNo, "")) & "}"
                 Catch ex As Exception
@@ -163,7 +156,7 @@ Module Program
                 End If
                 Try
                     Dim p As SplitReceiptPayload = job.payload.ToObject(Of SplitReceiptPayload)()
-                    PrintSplitReceipt(job.store, p)
+                    WithRolePrinter(job.printerRole, Sub() PrintSplitReceipt(job.store, p))
                     Console.WriteLine("   printed split_receipt " & If(p.rcptNo, ""))
                     Return "{""ok"":true,""jobType"":""split_receipt"",""rcptNo"":" & JsonString(If(p.rcptNo, "")) & "}"
                 Catch ex As Exception
@@ -177,7 +170,7 @@ Module Program
                 End If
                 Try
                     Dim p As ReturnReceiptPayload = job.payload.ToObject(Of ReturnReceiptPayload)()
-                    PrintReturnReceipt(p)
+                    WithRolePrinter(job.printerRole, Sub() PrintReturnReceipt(p))
                     Console.WriteLine("   printed return_note " & If(p.rcptNo, ""))
                     Return "{""ok"":true,""jobType"":""return_note"",""rcptNo"":" & JsonString(If(p.rcptNo, "")) & "}"
                 Catch ex As Exception
@@ -191,7 +184,7 @@ Module Program
                 End If
                 Try
                     Dim p As ReceivableProofPayload = job.payload.ToObject(Of ReceivableProofPayload)()
-                    PrintReceivableProof(job.store, p)
+                    WithRolePrinter(job.printerRole, Sub() PrintReceivableProof(job.store, p))
                     Console.WriteLine("   printed receivable_proof " & If(p.custId, ""))
                     Return "{""ok"":true,""jobType"":""receivable_proof"",""custId"":" & JsonString(If(p.custId, "")) & "}"
                 Catch ex As Exception
@@ -206,7 +199,7 @@ Module Program
                 End If
                 Try
                     Dim p As AmountListSlipPayload = job.payload.ToObject(Of AmountListSlipPayload)()
-                    PrintAmountListSlip(p)
+                    WithRolePrinter(job.printerRole, Sub() PrintAmountListSlip(p))
                     Console.WriteLine("   printed " & job.jobType)
                     Return "{""ok"":true,""jobType"":" & JsonString(job.jobType) & "}"
                 Catch ex As Exception
@@ -220,7 +213,7 @@ Module Program
                 End If
                 Try
                     Dim p As ReceivableSelectedPayload = job.payload.ToObject(Of ReceivableSelectedPayload)()
-                    PrintReceivableSelected(job.store, p)
+                    WithRolePrinter(job.printerRole, Sub() PrintReceivableSelected(job.store, p))
                     Console.WriteLine("   printed receivable_selected " & If(p.custId, ""))
                     Return "{""ok"":true,""jobType"":""receivable_selected"",""custId"":" & JsonString(If(p.custId, "")) & "}"
                 Catch ex As Exception
@@ -234,7 +227,7 @@ Module Program
                 End If
                 Try
                     Dim p As ReceivableSelectedCardPayload = job.payload.ToObject(Of ReceivableSelectedCardPayload)()
-                    PrintReceivableSelectedCard(job.store, p)
+                    WithRolePrinter(job.printerRole, Sub() PrintReceivableSelectedCard(job.store, p))
                     Console.WriteLine("   printed receivable_selected_card " & If(p.custId, ""))
                     Return "{""ok"":true,""jobType"":""receivable_selected_card"",""custId"":" & JsonString(If(p.custId, "")) & "}"
                 Catch ex As Exception
@@ -248,7 +241,7 @@ Module Program
                 End If
                 Try
                     Dim p As ReceivablePaidOffPayload = job.payload.ToObject(Of ReceivablePaidOffPayload)()
-                    PrintReceivablePaidOff(job.store, p)
+                    WithRolePrinter(job.printerRole, Sub() PrintReceivablePaidOff(job.store, p))
                     Console.WriteLine("   printed receivable_paidoff " & If(p.custId, ""))
                     Return "{""ok"":true,""jobType"":""receivable_paidoff"",""custId"":" & JsonString(If(p.custId, "")) & "}"
                 Catch ex As Exception
@@ -262,7 +255,7 @@ Module Program
                 End If
                 Try
                     Dim p As ReceivableRedeemPayload = job.payload.ToObject(Of ReceivableRedeemPayload)()
-                    PrintReceivableRedeem(job.store, p)
+                    WithRolePrinter(job.printerRole, Sub() PrintReceivableRedeem(job.store, p))
                     Console.WriteLine("   printed receivable_redeem " & If(p.custId, ""))
                     Return "{""ok"":true,""jobType"":""receivable_redeem"",""custId"":" & JsonString(If(p.custId, "")) & "}"
                 Catch ex As Exception
