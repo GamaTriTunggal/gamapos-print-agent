@@ -249,7 +249,7 @@ Module ReceiptCommon
                                 printer.Print(T(len_qty_max + 2), strItemName.Substring(colIndex, itemNameLenMax))
                             Else
                                 Dim remainingChar As Integer = strItemName.Length() - ((rowCount - 1) * itemNameLenMax)
-                                printer.Print(T(len_qty_max + 2), strItemName.Substring(colIndex, (itemNameLenMax - colIndex + remainingChar)))
+                                printer.Print(T(len_qty_max + 2), strItemName.Substring(colIndex, remainingChar))
                             End If
                             colIndex = colIndex + itemNameLenMax
                         Next
@@ -292,7 +292,7 @@ Module ReceiptCommon
                                 printer.Print(T(len_qty_max + 2), strItemName.Substring(colIndex, itemNameLenMax))
                             Else
                                 Dim remainingChar As Integer = strItemName.Length() - ((rowCount - 1) * itemNameLenMax)
-                                printer.Print(T(len_qty_max + 2), strItemName.Substring(colIndex, (itemNameLenMax - colIndex + remainingChar)))
+                                printer.Print(T(len_qty_max + 2), strItemName.Substring(colIndex, remainingChar))
                             End If
                             colIndex = colIndex + itemNameLenMax
                         Next
