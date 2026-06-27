@@ -100,22 +100,85 @@ Module Printers
     ' Jalankan body() dgn default printer Windows di-set ke printer role, lalu dikembalikan.
     ' Role tak dipetakan → jalankan apa adanya (default sekarang). Dipakai utk nota PowerPacks.
     ' body() dijalankan SINKRON (mis. RunSta yg join) → default tetap ter-set selama cetak, baru dikembalikan.
+    Private ReadOnly PrintLock As New Object()
+
     Public Sub WithRolePrinter(role As String, body As Action)
-        Dim target As String = Resolve(role)
-        If String.IsNullOrEmpty(target) Then
-            body()
-            Return
-        End If
-        Dim prev As String = CurrentDefault()
-        Dim switched As Boolean = SetDefaultPrinter(target)
-        Console.WriteLine("   targeting role '" & role & "' → '" & target & "' | setOk=" & switched &
-                          " | default skrg='" & CurrentDefault() & "' (sebelumnya '" & prev & "')")
-        Try
-            body()
-        Finally
-            If switched AndAlso Not String.IsNullOrEmpty(prev) Then
-                If Not SetDefaultPrinter(prev) Then Console.WriteLine("WARN: gagal kembalikan default printer ke " & prev)
+        SyncLock PrintLock   ' serialize pencetakan → lindungi default printer Windows global dari race antar-request
+            Dim target As String = Resolve(role)
+            If String.IsNullOrEmpty(target) Then
+                body()
+                Return
             End If
+            ' Validasi printer target ADA → jangan cetak diam-diam ke printer SALAH.
+            If Not PrinterInstalled(target) Then
+                Throw New Exception("PRINTER_NOT_FOUND: printer '" & target & "' (role " & role & ") tidak terpasang.")
+            End If
+            Dim prev As String = CurrentDefault()
+            WriteRestoreMarker(prev)   ' catat default lama → dipulihkan saat startup bila proses mati di tengah
+            Dim switched As Boolean = SetDefaultPrinter(target)
+            If Not switched Then
+                ClearRestoreMarker()
+                Throw New Exception("PRINTER_SET_FAILED: gagal set default printer ke '" & target & "'.")
+            End If
+            Console.WriteLine("   targeting role '" & role & "' → '" & target & "' | default skrg='" & CurrentDefault() & "' (sebelumnya '" & prev & "')")
+            Try
+                body()
+            Finally
+                If Not String.IsNullOrEmpty(prev) Then
+                    If Not SetDefaultPrinter(prev) Then Console.WriteLine("WARN: gagal kembalikan default printer ke " & prev)
+                End If
+                ClearRestoreMarker()
+            End Try
+        End SyncLock
+    End Sub
+
+    ' Serialize sembarang aksi cetak (mis. label QR / test yg set PrinterName sendiri, tak lewat default
+    ' Windows) di bawah lock yg sama → cegah dua PrintDocument.Print() konkuren saat request paralel.
+    Public Sub Serialize(body As Action)
+        SyncLock PrintLock
+            body()
+        End SyncLock
+    End Sub
+
+    Private Function PrinterInstalled(name As String) As Boolean
+        For Each p As String In PrinterSettings.InstalledPrinters
+            If String.Equals(p, name, StringComparison.OrdinalIgnoreCase) Then Return True
+        Next
+        Return False
+    End Function
+
+    Private Function RestoreMarkerPath() As String
+        Return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "default-printer-restore.txt")
+    End Function
+
+    Private Sub WriteRestoreMarker(prev As String)
+        Try
+            File.WriteAllText(RestoreMarkerPath(), If(prev, ""))
+        Catch
+        End Try
+    End Sub
+
+    Private Sub ClearRestoreMarker()
+        Try
+            Dim p As String = RestoreMarkerPath()
+            If File.Exists(p) Then File.Delete(p)
+        Catch
+        End Try
+    End Sub
+
+    ' Dipanggil di Main() startup: bila proses sebelumnya mati saat cetak (default printer belum
+    ' dikembalikan), pulihkan dari penanda agar default printer user tidak berubah permanen.
+    Public Sub RestoreDefaultPrinterIfNeeded()
+        Try
+            Dim p As String = RestoreMarkerPath()
+            If Not File.Exists(p) Then Return
+            Dim prev As String = File.ReadAllText(p).Trim()
+            If Not String.IsNullOrEmpty(prev) Then
+                SetDefaultPrinter(prev)
+                Console.WriteLine("Pulihkan default printer ke '" & prev & "' (proses sebelumnya mati saat cetak).")
+            End If
+            File.Delete(p)
+        Catch
         End Try
     End Sub
 

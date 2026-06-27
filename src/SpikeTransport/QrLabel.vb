@@ -34,7 +34,7 @@ Module QrLabel
     Private Sub RenderQrItem(p As QrItemLabelPayload)
         Dim itemId As String = If(p.itemId, "")
         Dim priceStr As String = Fmt(p.salesPrice)
-        Dim copies As Integer = Math.Max(1, p.copies)
+        Dim copies As Integer = Math.Min(20, Math.Max(1, p.copies))   ' clamp [1..20]: cegah cetak massal + CShort overflow
         PrintViaDoc(Sub(e As PrintPageEventArgs) DrawTwoLineQr(e, itemId, priceStr, itemId, 17), copies)
     End Sub
 

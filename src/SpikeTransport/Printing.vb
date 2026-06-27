@@ -30,9 +30,12 @@ Module Printing
         ' Jalankan print di thread STA; marshal exception kembali ke pemanggil.
         Dim printEx As Exception = Nothing
         Dim worker As New Thread(Sub() printEx = DoPrintToPdf(pdfPath))
+        worker.IsBackground = True
         worker.SetApartmentState(ApartmentState.STA)
         worker.Start()
-        worker.Join()
+        If Not worker.Join(30000) Then
+            Throw New TimeoutException("PRINT_TIMEOUT: cetak tes melebihi batas waktu (printer offline / dialog?).")
+        End If
         If printEx IsNot Nothing Then Throw printEx
 
         ' Deteksi kegagalan diam: driver "sukses" tapi file tidak terbentuk / 0 byte.

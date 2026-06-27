@@ -18,6 +18,7 @@ Imports System
 Imports System.IO
 Imports System.Net
 Imports System.Text
+Imports System.Threading
 Imports Newtonsoft.Json
 Imports Newtonsoft.Json.Linq
 
@@ -46,6 +47,8 @@ Module Program
         Console.WriteLine("Gama Print Agent (transport spike) listening on " & Prefix)
         Console.WriteLine("Endpoints: GET /health | GET /printers | POST /print | POST /print/test")
         Console.WriteLine(Printers.ConfigSummary())
+        ' Bila proses sebelumnya mati saat cetak (default printer Windows belum dikembalikan), pulihkan.
+        Printers.RestoreDefaultPrinterIfNeeded()
         Console.WriteLine("Ctrl+C untuk berhenti.")
 
         While listener.IsListening
@@ -56,17 +59,29 @@ Module Program
                 Exit While
             End Try
 
-            Try
-                HandleRequest(ctx)
-            Catch ex As Exception
-                Console.WriteLine("ERROR: " & ex.Message)
-                Try
-                    WriteJson(ctx, 500, "{""ok"":false,""error"":""INTERNAL"",""message"":" & JsonString(ex.Message) & "}")
-                Catch
-                    ' abaikan kegagalan saat menulis response error
-                End Try
-            End Try
+            ' GET /health & /printers + OPTIONS (ringan, tanpa cetak) → layani INLINE agar SELALU responsif
+            ' walau printer sibuk. POST /print & /print/test (berpotensi lambat/hang) → thread terpisah;
+            ' pencetakan nyata tetap di-serialize via lock di Printers.
+            If ctx.Request.HttpMethod.ToUpperInvariant() = "POST" Then
+                ThreadPool.QueueUserWorkItem(Sub() SafeHandle(ctx))
+            Else
+                SafeHandle(ctx)
+            End If
         End While
+    End Sub
+
+    ' Bungkus HandleRequest + penangan error (dipakai inline & di thread pool).
+    Private Sub SafeHandle(ctx As HttpListenerContext)
+        Try
+            HandleRequest(ctx)
+        Catch ex As Exception
+            Console.WriteLine("ERROR: " & ex.Message)
+            Try
+                WriteJson(ctx, 500, "{""ok"":false,""error"":""INTERNAL"",""message"":" & JsonString(ex.Message) & "}")
+            Catch
+                ' abaikan kegagalan saat menulis response error
+            End Try
+        End Try
     End Sub
 
     Private Sub HandleRequest(ctx As HttpListenerContext)
@@ -93,12 +108,25 @@ Module Program
                 WriteJson(ctx, 200, Printers.StatusJson())
 
             Case "POST /print"
-                Dim body As String = ReadBody(req)
-                SaveJob(body)   ' simpan body mentah utk debug (jobs/)
+                Dim body As String
+                Try
+                    body = ReadBody(req)
+                Catch ex As Exception
+                    WriteJson(ctx, 413, "{""ok"":false,""error"":""PAYLOAD_TOO_LARGE""}")
+                    Return
+                End Try
+                ' Payload berisi PII tenant → JANGAN persist by default. Hanya bila debug di-opt-in.
+                If DebugJobsEnabled() Then
+                    Try
+                        SaveJob(body)   ' debug-only; gagal-tulis tak menggagalkan cetak
+                    Catch
+                    End Try
+                End If
                 WriteJson(ctx, 200, Dispatch(body))
 
             Case "POST /print/test"
-                Dim pdf As String = PrintTestPage()
+                Dim pdf As String = Nothing
+                Printers.Serialize(Sub() pdf = PrintTestPage())
                 Console.WriteLine("   printed -> " & pdf)
                 WriteJson(ctx, 200, $"{{""ok"":true,""printed"":{JsonString(pdf)}}}")
 
@@ -284,7 +312,7 @@ Module Program
                 End If
                 Try
                     Dim p As QrItemLabelPayload = job.payload.ToObject(Of QrItemLabelPayload)()
-                    PrintQrItemLabel(p)   ' targeting via PrinterSettings.PrinterName (QRLABEL), bukan WithRolePrinter
+                    Printers.Serialize(Sub() PrintQrItemLabel(p))   ' serialize cetak; targeting via PrinterSettings.PrinterName (QRLABEL)
                     Console.WriteLine("   printed qr_item_label " & If(p.itemId, ""))
                     Return "{""ok"":true,""jobType"":""qr_item_label"",""itemId"":" & JsonString(If(p.itemId, "")) & "}"
                 Catch ex As Exception
@@ -298,7 +326,7 @@ Module Program
                 End If
                 Try
                     Dim p As QrInvoicePayload = job.payload.ToObject(Of QrInvoicePayload)()
-                    PrintQrInvoice(p)
+                    Printers.Serialize(Sub() PrintQrInvoice(p))
                     Console.WriteLine("   printed qr_invoice " & If(p.invoiceNo, ""))
                     Return "{""ok"":true,""jobType"":""qr_invoice"",""invoiceNo"":" & JsonString(If(p.invoiceNo, "")) & "}"
                 Catch ex As Exception
@@ -312,21 +340,59 @@ Module Program
         End Select
     End Function
 
+    Private Const MaxBodyBytes As Long = 1024L * 1024L   ' 1 MB — cukup utk nota terbesar; cegah OOM/DoS
+
+    ' Baca body dengan BATAS ukuran (buffered) → tolak body raksasa walau Content-Length berbohong.
     Private Function ReadBody(req As HttpListenerRequest) As String
         If Not req.HasEntityBody Then Return ""
-        Using reader As New StreamReader(req.InputStream, req.ContentEncoding)
-            Return reader.ReadToEnd()
+        If req.ContentLength64 > MaxBodyBytes Then Throw New Exception("PAYLOAD_TOO_LARGE")
+        Dim buf(8191) As Byte
+        Dim total As Long = 0
+        Using ms As New MemoryStream()
+            Dim n As Integer
+            Do
+                n = req.InputStream.Read(buf, 0, buf.Length)
+                If n <= 0 Then Exit Do
+                total += n
+                If total > MaxBodyBytes Then Throw New Exception("PAYLOAD_TOO_LARGE")
+                ms.Write(buf, 0, n)
+            Loop
+            Return req.ContentEncoding.GetString(ms.ToArray())
         End Using
+    End Function
+
+    ' Penyimpanan payload mentah ke jobs/ berisi PII tenant → DEFAULT OFF. Aktifkan HANYA utk
+    ' diagnostik via env GAMA_AGENT_DEBUG_JOBS=1 atau file 'debug.flag' di samping exe.
+    Private Function DebugJobsEnabled() As Boolean
+        If String.Equals(Environment.GetEnvironmentVariable("GAMA_AGENT_DEBUG_JOBS"), "1", StringComparison.Ordinal) Then Return True
+        Return File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug.flag"))
     End Function
 
     Private Function SaveJob(body As String) As String
         Dim dir As String = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "jobs")
         Directory.CreateDirectory(dir)
-        Dim name As String = "job-" & DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") & ".json"
+        PruneJobs(dir, 200)   ' rotasi: sisakan ~200 file debug terbaru (cegah tumbuh tanpa batas)
+        Dim name As String = "job-" & DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") & "-" & Guid.NewGuid().ToString("N").Substring(0, 4) & ".json"
         Dim full As String = Path.Combine(dir, name)
         File.WriteAllText(full, body, New UTF8Encoding(False))
         Return full
     End Function
+
+    ' Hapus file job lama, sisakan 'keep' terbaru.
+    Private Sub PruneJobs(dir As String, keep As Integer)
+        Try
+            Dim files() As FileInfo = New DirectoryInfo(dir).GetFiles("job-*.json")
+            If files.Length <= keep Then Return
+            Array.Sort(files, Function(a As FileInfo, b As FileInfo) b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc))   ' terbaru dulu
+            For i As Integer = keep To files.Length - 1
+                Try
+                    files(i).Delete()
+                Catch
+                End Try
+            Next
+        Catch
+        End Try
+    End Sub
 
     Private Sub WriteJson(ctx As HttpListenerContext, status As Integer, json As String)
         WriteResponse(ctx, status, json, "application/json")
@@ -334,13 +400,17 @@ Module Program
 
     Private Sub WriteResponse(ctx As HttpListenerContext, status As Integer, body As String, contentType As String)
         Dim res As HttpListenerResponse = ctx.Response
-        ' CORS — spike: izinkan semua origin. Di produksi, batasi ke domain toko (lihat README).
-        res.Headers("Access-Control-Allow-Origin") = "*"
-        res.Headers("Access-Control-Allow-Methods") = "GET, POST, OPTIONS"
-        res.Headers("Access-Control-Allow-Headers") = "Content-Type"
-        ' Private Network Access (Chrome): origin PUBLIK (mis. https://staging.gamapos.id) yang
-        ' mengakses localhost butuh opt-in ini di preflight, jika tidak request DIBLOKIR.
-        res.Headers("Access-Control-Allow-Private-Network") = "true"
+        ' CORS: HANYA izinkan origin domain toko (gamapos.id) + localhost (dev) — BUKAN '*' →
+        ' cegah situs web sembarang men-drive agent (drive-by print / enumerasi printer).
+        Dim origin As String = ctx.Request.Headers("Origin")
+        If IsOriginAllowed(origin) Then
+            res.Headers("Access-Control-Allow-Origin") = origin
+            res.Headers("Access-Control-Allow-Methods") = "GET, POST, OPTIONS"
+            res.Headers("Access-Control-Allow-Headers") = "Content-Type"
+            ' Private Network Access (Chrome): origin PUBLIK HTTPS → localhost butuh opt-in ini.
+            res.Headers("Access-Control-Allow-Private-Network") = "true"
+            res.Headers("Vary") = "Origin"
+        End If
         res.StatusCode = status
 
         ' 204 (mis. CORS preflight): tanpa body / Content-Type.
@@ -355,6 +425,18 @@ Module Program
         res.OutputStream.Write(buffer, 0, buffer.Length)
         res.OutputStream.Close()
     End Sub
+
+    ' Origin yang boleh akses agent: subdomain gamapos.id (HTTPS) + localhost/127.0.0.1 (dev).
+    Private Function IsOriginAllowed(origin As String) As Boolean
+        If String.IsNullOrEmpty(origin) Then Return False
+        Dim u As Uri = Nothing
+        If Not Uri.TryCreate(origin.Trim(), UriKind.Absolute, u) Then Return False
+        Dim host As String = u.Host.ToLowerInvariant()
+        ' Cocokkan HOST persis (bukan StartsWith) → cegah bypass 'localhost.evil.com' / 'gamapos.id.evil.com'.
+        If u.Scheme = "https" AndAlso (host = "gamapos.id" OrElse host.EndsWith(".gamapos.id", StringComparison.Ordinal)) Then Return True
+        If host = "localhost" OrElse host = "127.0.0.1" Then Return True
+        Return False
+    End Function
 
     ' JSON string escaper minimal (cukup untuk path / pesan).
     Private Function JsonString(s As String) As String

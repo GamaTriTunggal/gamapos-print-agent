@@ -84,6 +84,8 @@ Module ReceiptCommon
         Return v.ToString(inv)
     End Function
 
+    Friend Const PrintTimeoutMs As Integer = 30000   ' batas waktu satu render/cetak (cegah hang permanen)
+
     ' Jalankan render di thread STA (PowerPacks Printer / GDI butuh STA; thread loop HttpListener MTA).
     Friend Sub RunSta(body As Action)
         Dim err As Exception = Nothing
@@ -94,9 +96,12 @@ Module ReceiptCommon
                                          err = ex
                                      End Try
                                  End Sub)
+        worker.IsBackground = True   ' thread cetak yg hang tak menghalangi proses keluar
         worker.SetApartmentState(ApartmentState.STA)
         worker.Start()
-        worker.Join()
+        If Not worker.Join(PrintTimeoutMs) Then
+            Throw New TimeoutException("PRINT_TIMEOUT: cetak melebihi " & (PrintTimeoutMs \ 1000) & " detik (printer offline / dialog?).")
+        End If
         If err IsNot Nothing Then Throw err
     End Sub
 
