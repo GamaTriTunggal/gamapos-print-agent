@@ -338,6 +338,9 @@ Module Program
         res.Headers("Access-Control-Allow-Origin") = "*"
         res.Headers("Access-Control-Allow-Methods") = "GET, POST, OPTIONS"
         res.Headers("Access-Control-Allow-Headers") = "Content-Type"
+        ' Private Network Access (Chrome): origin PUBLIK (mis. https://staging.gamapos.id) yang
+        ' mengakses localhost butuh opt-in ini di preflight, jika tidak request DIBLOKIR.
+        res.Headers("Access-Control-Allow-Private-Network") = "true"
         res.StatusCode = status
 
         ' 204 (mis. CORS preflight): tanpa body / Content-Type.
