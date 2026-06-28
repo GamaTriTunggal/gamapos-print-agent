@@ -19,21 +19,24 @@ Imports Newtonsoft.Json
 Module Printers
 
     Private _map As Dictionary(Of String, String) = Nothing
+    Private ReadOnly ConfigLock As New Object()
 
     Private Function Map() As Dictionary(Of String, String)
-        If _map IsNot Nothing Then Return _map
-        Dim m As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
-        Try
-            Dim path As String = IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "printers.json")
-            If File.Exists(path) Then
-                Dim d = JsonConvert.DeserializeObject(Of Dictionary(Of String, String))(File.ReadAllText(path))
-                If d IsNot Nothing Then m = New Dictionary(Of String, String)(d, StringComparer.OrdinalIgnoreCase)
-            End If
-        Catch
-            ' abaikan parse/IO error → peta kosong → fallback default Windows
-        End Try
-        _map = m
-        Return _map
+        SyncLock ConfigLock
+            If _map IsNot Nothing Then Return _map
+            Dim m As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+            Try
+                Dim path As String = IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "printers.json")
+                If File.Exists(path) Then
+                    Dim d = JsonConvert.DeserializeObject(Of Dictionary(Of String, String))(File.ReadAllText(path))
+                    If d IsNot Nothing Then m = New Dictionary(Of String, String)(d, StringComparer.OrdinalIgnoreCase)
+                End If
+            Catch
+                ' abaikan parse/IO error → peta kosong → fallback default Windows
+            End Try
+            _map = m
+            Return _map
+        End SyncLock
     End Function
 
     ' Nama printer Windows utk role, atau "" bila tak dipetakan (→ caller pakai default Windows).
@@ -121,8 +124,19 @@ Module Printers
 
         Try
             Dim path As String = IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "printers.json")
-            File.WriteAllText(path, JsonConvert.SerializeObject(outMap, Formatting.Indented))
-            _map = Nothing   ' invalidasi cache → cetak berikutnya pakai config baru
+            Dim json As String = JsonConvert.SerializeObject(outMap, Formatting.Indented)
+            ' Tulis ATOMIK (tmp → replace) di bawah ConfigLock yang sama dgn Map() → cegah torn-read
+            ' oleh cetak konkuren + cegah file korup bila crash di tengah tulis.
+            SyncLock ConfigLock
+                Dim tmp As String = path & ".tmp"
+                File.WriteAllText(tmp, json)
+                If File.Exists(path) Then
+                    File.Replace(tmp, path, Nothing)
+                Else
+                    File.Move(tmp, path)
+                End If
+                _map = Nothing   ' invalidasi cache → cetak berikutnya pakai config baru
+            End SyncLock
             Return JsonConvert.SerializeObject(New Dictionary(Of String, Object) From {{"ok", True}})
         Catch ex As Exception
             Return JsonConvert.SerializeObject(New Dictionary(Of String, Object) From {{"ok", False}, {"error", "WRITE_FAILED"}, {"message", ex.Message}})

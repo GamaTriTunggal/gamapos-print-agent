@@ -98,6 +98,16 @@ Module Program
             Return
         End If
 
+        ' Gerbang Origin SISI-SERVER: CORS hanya memblokir browser MEMBACA respons, bukan mencegah
+        ' request diproses → endpoint state-changing (POST) rentan CSRF lintas-origin. Tolak origin terlarang.
+        If method = "POST" Then
+            Dim reqOrigin As String = req.Headers("Origin")
+            If Not String.IsNullOrEmpty(reqOrigin) AndAlso Not IsOriginAllowed(reqOrigin) Then
+                WriteJson(ctx, 403, "{""ok"":false,""error"":""FORBIDDEN_ORIGIN""}")
+                Return
+            End If
+        End If
+
         Select Case method & " " & path
 
             Case "GET /health"
