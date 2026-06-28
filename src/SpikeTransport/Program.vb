@@ -130,6 +130,9 @@ Module Program
                 Console.WriteLine("   printed -> " & pdf)
                 WriteJson(ctx, 200, $"{{""ok"":true,""printed"":{JsonString(pdf)}}}")
 
+            Case "POST /printers/config"
+                WriteJson(ctx, 200, Printers.SaveConfig(ReadBody(req)))
+
             Case Else
                 WriteJson(ctx, 404, "{""ok"":false,""error"":""NOT_FOUND""}")
 

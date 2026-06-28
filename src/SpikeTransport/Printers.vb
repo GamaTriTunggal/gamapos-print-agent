@@ -93,6 +93,42 @@ Module Printers
         Return JsonConvert.SerializeObject(obj)
     End Function
 
+    ' Tulis printers.json dari body JSON (dict role→nama printer) — POST /printers/config.
+    ' Nilai kosong/absen = role tak dipetakan. Nilai non-kosong WAJIB printer terpasang. Reset cache map.
+    Public Function SaveConfig(body As String) As String
+        Dim incoming As Dictionary(Of String, String) = Nothing
+        Try
+            incoming = JsonConvert.DeserializeObject(Of Dictionary(Of String, String))(body)
+        Catch
+            Return JsonConvert.SerializeObject(New Dictionary(Of String, Object) From {{"ok", False}, {"error", "BAD_PAYLOAD"}, {"message", "JSON tidak valid."}})
+        End Try
+        If incoming Is Nothing Then
+            Return JsonConvert.SerializeObject(New Dictionary(Of String, Object) From {{"ok", False}, {"error", "BAD_PAYLOAD"}, {"message", "Payload kosong."}})
+        End If
+
+        Dim installedSet As New HashSet(Of String)(Installed(), StringComparer.OrdinalIgnoreCase)
+        Dim outMap As New Dictionary(Of String, String)()
+        For Each role As String In New String() {"CASHIER", "DELIVERY", "QRLABEL", "REPORT"}
+            Dim name As String = Nothing
+            If incoming.TryGetValue(role, name) AndAlso Not String.IsNullOrWhiteSpace(name) Then
+                name = name.Trim()
+                If Not installedSet.Contains(name) Then
+                    Return JsonConvert.SerializeObject(New Dictionary(Of String, Object) From {{"ok", False}, {"error", "PRINTER_NOT_FOUND"}, {"message", "Printer '" & name & "' tidak terpasang."}})
+                End If
+                outMap(role) = name
+            End If
+        Next
+
+        Try
+            Dim path As String = IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "printers.json")
+            File.WriteAllText(path, JsonConvert.SerializeObject(outMap, Formatting.Indented))
+            _map = Nothing   ' invalidasi cache → cetak berikutnya pakai config baru
+            Return JsonConvert.SerializeObject(New Dictionary(Of String, Object) From {{"ok", True}})
+        Catch ex As Exception
+            Return JsonConvert.SerializeObject(New Dictionary(Of String, Object) From {{"ok", False}, {"error", "WRITE_FAILED"}, {"message", ex.Message}})
+        End Try
+    End Function
+
     <DllImport("winspool.drv", CharSet:=CharSet.Auto, SetLastError:=True)>
     Private Function SetDefaultPrinter(<MarshalAs(UnmanagedType.LPTStr)> name As String) As Boolean
     End Function
