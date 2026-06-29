@@ -60,8 +60,8 @@ Module AppPaths
     ' Dipanggil sekali di Main — agent tray (WinExe) tak punya jendela console, jadi log ke file.
     Public Sub SetupLogging()
         Try
-            Dim path As String = Path.Combine(LogDir(), "agent-" & DateTime.Now.ToString("yyyyMMdd") & ".log")
-            Dim sw As New StreamWriter(path, append:=True) With {.AutoFlush = True}
+            Dim logPath As String = Path.Combine(LogDir(), "agent-" & DateTime.Now.ToString("yyyyMMdd") & ".log")
+            Dim sw As New StreamWriter(logPath, append:=True) With {.AutoFlush = True}
             Console.SetOut(sw)
             Console.WriteLine(Environment.NewLine & "=== Gama Print Agent start " & DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") & " ===")
             PruneLogs(14)
