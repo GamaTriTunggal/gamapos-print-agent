@@ -22,6 +22,7 @@ Imports System.Threading
 Imports System.Windows.Forms
 Imports Newtonsoft.Json
 Imports Newtonsoft.Json.Linq
+Imports Velopack
 
 Module Program
 
@@ -34,6 +35,10 @@ Module Program
 
     <STAThread()>
     Sub Main()
+        ' Velopack: tangani lifecycle install/update — HARUS paling awal (saat dipanggil installer/updater
+        ' ia memproses arg lalu keluar). Tanpa baris ini, install/auto-update tak berjalan benar.
+        VelopackApp.Build().Run()
+
         ' Single-instance (per sesi user): cegah dua agent rebutan port 9111 + file log.
         Dim createdNew As Boolean = False
         _instanceMutex = New Mutex(True, "GamaPrintAgent_SingleInstance_9111", createdNew)
