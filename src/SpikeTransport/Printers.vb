@@ -1,7 +1,7 @@
 ' Gama Print Agent — Targeting printer per-role
 '
 ' Aplikasi VB.NET lama TIDAK punya targeting (SetDefaultPrinter = stub kosong; semua ke default Windows).
-' Ini infrastruktur BARU: peta role→nama printer dari printers.json (di samping exe; per-PC).
+' Ini infrastruktur BARU: peta role→nama printer dari printers.json (di %LOCALAPPDATA%\GamaPrintAgent; per-PC).
 ' - Nota PowerPacks (teks, hanya bisa cetak ke DEFAULT) → WithRolePrinter ganti default Windows sesaat (P/Invoke).
 ' - Label QR (PrintDocument) → AKAN set PrinterSettings.PrinterName = Resolve(role) langsung (Family B; belum di-wire).
 ' Fallback: role tak dipetakan / printers.json tak ada → pakai default Windows (perilaku sekarang; tes VM tetap jalan).
@@ -26,7 +26,7 @@ Module Printers
             If _map IsNot Nothing Then Return _map
             Dim m As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
             Try
-                Dim path As String = IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "printers.json")
+                Dim path As String = AppPaths.ConfigPath()
                 If File.Exists(path) Then
                     Dim d = JsonConvert.DeserializeObject(Of Dictionary(Of String, String))(File.ReadAllText(path))
                     If d IsNot Nothing Then m = New Dictionary(Of String, String)(d, StringComparer.OrdinalIgnoreCase)
@@ -68,8 +68,8 @@ Module Printers
 
     ' Ringkasan config utk log saat start (apakah printers.json kebaca + peta role).
     Public Function ConfigSummary() As String
-        Dim dir As String = AppDomain.CurrentDomain.BaseDirectory
-        Dim path As String = IO.Path.Combine(dir, "printers.json")
+        Dim dir As String = AppPaths.DataDir()
+        Dim path As String = AppPaths.ConfigPath()
         Dim parts As New List(Of String)()
         For Each role As String In New String() {"CASHIER", "DELIVERY", "QRLABEL", "REPORT"}
             Dim n As String = Resolve(role)
@@ -123,7 +123,7 @@ Module Printers
         Next
 
         Try
-            Dim path As String = IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "printers.json")
+            Dim path As String = AppPaths.ConfigPath()
             Dim json As String = JsonConvert.SerializeObject(outMap, Formatting.Indented)
             ' Tulis ATOMIK (tmp → replace) di bawah ConfigLock yang sama dgn Map() → cegah torn-read
             ' oleh cetak konkuren + cegah file korup bila crash di tengah tulis.
@@ -198,7 +198,7 @@ Module Printers
     End Function
 
     Private Function RestoreMarkerPath() As String
-        Return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "default-printer-restore.txt")
+        Return AppPaths.RestoreMarkerPath()
     End Function
 
     Private Sub WriteRestoreMarker(prev As String)

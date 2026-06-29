@@ -19,48 +19,77 @@ Imports System.IO
 Imports System.Net
 Imports System.Text
 Imports System.Threading
+Imports System.Windows.Forms
 Imports Newtonsoft.Json
 Imports Newtonsoft.Json.Linq
 
 Module Program
 
     Private Const Prefix As String = "http://localhost:9111/"
-    Private Const AgentVersion As String = "0.1.0-spike"
+    Private Const AgentVersion As String = "1.0.0"
     Private Const SchemaVersion As Integer = 1
 
-    Sub Main()
-        Dim listener As New HttpListener()
-        listener.Prefixes.Add(Prefix)
+    Private _listener As HttpListener = Nothing
+    Private _instanceMutex As Mutex = Nothing
 
+    <STAThread()>
+    Sub Main()
+        ' Single-instance (per sesi user): cegah dua agent rebutan port 9111 + file log.
+        Dim createdNew As Boolean = False
+        _instanceMutex = New Mutex(True, "GamaPrintAgent_SingleInstance_9111", createdNew)
+        If Not createdNew Then Return   ' sudah ada instance → keluar diam-diam
+
+        AppPaths.SetupLogging()   ' Console.WriteLine → file log (WinExe tak punya jendela console)
+        Application.EnableVisualStyles()
+        Application.SetCompatibleTextRenderingDefault(False)
+
+        ' Start server DI SINI (bukan di constructor TrayContext) → kalau gagal, keluar BERSIH sebelum
+        ' masuk message loop. (ExitThread di constructor tak ter-hook ThreadExit → zombie.)
+        If Not StartServer() Then
+            MessageBox.Show(
+                "Gagal memulai Gama Print Agent." & Environment.NewLine &
+                "Port 9111 mungkin dipakai aplikasi lain, atau perlu izin." & Environment.NewLine &
+                "Lihat log: " & AppPaths.LogDir(),
+                "Gama Print Agent", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End If
+
+        Application.Run(New TrayContext())   ' message loop + ikon tray; server HTTP di thread BG
+    End Sub
+
+    ' Mulai HttpListener. Return True bila sukses. Tanpa Console.ReadLine (WinExe tak punya console);
+    ' kegagalan dilaporkan via return → TrayContext tampilkan MessageBox + keluar.
+    Friend Function StartServer() As Boolean
         Try
-            listener.Start()
-        Catch ex As HttpListenerException
+            _listener = New HttpListener()
+            _listener.Prefixes.Add(Prefix)
+            _listener.Start()
+        Catch ex As Exception
             Console.WriteLine("Gagal start HttpListener: " & ex.Message)
             Console.WriteLine("Jika 'Access is denied', jalankan sekali sebagai Administrator:")
             Console.WriteLine("  netsh http add urlacl url=" & Prefix & " user=" & Environment.UserName)
-            Console.WriteLine("...atau jalankan agent sebagai Administrator.")
-            Console.WriteLine("Tekan Enter untuk keluar.")
-            Console.ReadLine()
-            Return
+            Return False
         End Try
 
-        Console.WriteLine("Gama Print Agent (transport spike) listening on " & Prefix)
-        Console.WriteLine("Endpoints: GET /health | GET /printers | POST /print | POST /print/test")
+        Console.WriteLine("Gama Print Agent v" & AgentVersion & " listening on " & Prefix)
+        Console.WriteLine("Endpoints: GET /health | GET /printers | POST /print | POST /print/test | POST /printers/config")
         Console.WriteLine(Printers.ConfigSummary())
         ' Bila proses sebelumnya mati saat cetak (default printer Windows belum dikembalikan), pulihkan.
         Printers.RestoreDefaultPrinterIfNeeded()
-        Console.WriteLine("Ctrl+C untuk berhenti.")
+        Return True
+    End Function
 
-        While listener.IsListening
+    ' Loop accept request — dijalankan TrayContext di thread background.
+    Friend Sub RunAcceptLoop()
+        While _listener IsNot Nothing AndAlso _listener.IsListening
             Dim ctx As HttpListenerContext = Nothing
             Try
-                ctx = listener.GetContext()
+                ctx = _listener.GetContext()
             Catch
                 Exit While
             End Try
 
-            ' GET /health & /printers + OPTIONS (ringan, tanpa cetak) → layani INLINE agar SELALU responsif
-            ' walau printer sibuk. POST /print & /print/test (berpotensi lambat/hang) → thread terpisah;
+            ' GET/OPTIONS ringan → inline (selalu responsif). POST (berpotensi lambat/hang) → thread pool;
             ' pencetakan nyata tetap di-serialize via lock di Printers.
             If ctx.Request.HttpMethod.ToUpperInvariant() = "POST" Then
                 ThreadPool.QueueUserWorkItem(Sub() SafeHandle(ctx))
@@ -69,6 +98,24 @@ Module Program
             End If
         End While
     End Sub
+
+    Friend Sub StopServer()
+        Try
+            If _listener IsNot Nothing Then
+                _listener.Stop()
+                _listener.Close()
+            End If
+        Catch
+        End Try
+    End Sub
+
+    ' Ringkasan status untuk menu tray (Status).
+    Friend Function StatusSummary() As String
+        Return "Gama Print Agent v" & AgentVersion & Environment.NewLine &
+               "Listening: " & Prefix & Environment.NewLine &
+               "Data: " & AppPaths.DataDir() & Environment.NewLine & Environment.NewLine &
+               Printers.ConfigSummary()
+    End Function
 
     ' Bungkus HandleRequest + penangan error (dipakai inline & di thread pool).
     Private Sub SafeHandle(ctx As HttpListenerContext)
@@ -375,15 +422,14 @@ Module Program
     End Function
 
     ' Penyimpanan payload mentah ke jobs/ berisi PII tenant → DEFAULT OFF. Aktifkan HANYA utk
-    ' diagnostik via env GAMA_AGENT_DEBUG_JOBS=1 atau file 'debug.flag' di samping exe.
+    ' diagnostik via env GAMA_AGENT_DEBUG_JOBS=1 atau file 'debug.flag' di folder data (%LOCALAPPDATA%).
     Private Function DebugJobsEnabled() As Boolean
         If String.Equals(Environment.GetEnvironmentVariable("GAMA_AGENT_DEBUG_JOBS"), "1", StringComparison.Ordinal) Then Return True
-        Return File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug.flag"))
+        Return File.Exists(AppPaths.DebugFlagPath())
     End Function
 
     Private Function SaveJob(body As String) As String
-        Dim dir As String = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "jobs")
-        Directory.CreateDirectory(dir)
+        Dim dir As String = AppPaths.JobsDir()
         PruneJobs(dir, 200)   ' rotasi: sisakan ~200 file debug terbaru (cegah tumbuh tanpa batas)
         Dim name As String = "job-" & DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") & "-" & Guid.NewGuid().ToString("N").Substring(0, 4) & ".json"
         Dim full As String = Path.Combine(dir, name)

@@ -22,8 +22,7 @@ Module Printing
 
     ' Cetak halaman contoh ke PDF (silent). Mengembalikan path file PDF yang dihasilkan.
     Public Function PrintTestPage() As String
-        Dim outDir As String = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "jobs")
-        Directory.CreateDirectory(outDir)
+        Dim outDir As String = AppPaths.JobsDir()
         Dim pdfPath As String = Path.Combine(outDir,
             "test-" & DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") & "-" & Guid.NewGuid().ToString("N").Substring(0, 4) & ".pdf")
 

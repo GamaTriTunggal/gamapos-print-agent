@@ -1,11 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!-- WinExe = aplikasi tray latar belakang, TANPA jendela console (produksi). -->
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <RootNamespace>GamaPrintAgent.SpikeTransport</RootNamespace>
     <AssemblyName>GamaPrintAgent.SpikeTransport</AssemblyName>
     <StartupObject>GamaPrintAgent.SpikeTransport.Program</StartupObject>
+    <ApplicationIcon>..\..\gamapos.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
     <LangVersion>latest</LangVersion>
     <OptionStrict>On</OptionStrict>
     <OptionExplicit>On</OptionExplicit>
@@ -24,6 +27,8 @@
   <ItemGroup>
     <!-- 2a: PrintDocument (System.Drawing.Printing) untuk cetak. Tidak auto-direferensi di SDK-style net48. -->
     <Reference Include="System.Drawing" />
+    <!-- Tray app: NotifyIcon/ContextMenuStrip/Application/MessageBox. -->
+    <Reference Include="System.Windows.Forms" />
     <!-- 2b: PowerPacks Printer (VB6 compat) untuk port printReceipt; DLL di-vendor di lib/. -->
     <Reference Include="Microsoft.VisualBasic.PowerPacks">
       <HintPath>..\..\lib\Microsoft.VisualBasic.PowerPacks.dll</HintPath>
