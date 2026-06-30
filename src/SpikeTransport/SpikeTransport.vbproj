@@ -19,11 +19,11 @@
     <!-- Memungkinkan 'dotnet build' lintas-platform (CI/Linux) tanpa targeting pack net48 lokal.
          Tidak mengubah runtime: exe net48 tetap butuh Windows untuk dijalankan. -->
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <!-- QR (label barang/invoice). 0.16.9 = versi aplikasi lama; build net4x menyertakan BarcodeWriter→Bitmap (System.Drawing). -->
     <PackageReference Include="ZXing.Net" Version="0.16.9" />
-    <!-- Installer + auto-update. PIN versi terbaru di VM: `dotnet add package Velopack`. -->
-    <PackageReference Include="Velopack" Version="0.0.1053" />
+    <!-- Installer + auto-update. -->
+    <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
 
   <ItemGroup>
