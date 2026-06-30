@@ -45,6 +45,7 @@ Module Program
         If Not createdNew Then Return   ' sudah ada instance → keluar diam-diam
 
         AppPaths.SetupLogging()   ' Console.WriteLine → file log (WinExe tak punya jendela console)
+        AutoStart.Enable()        ' daftar auto-start (HKCU Run) — agent jalan otomatis tiap login user
         Application.EnableVisualStyles()
         Application.SetCompatibleTextRenderingDefault(False)
 
