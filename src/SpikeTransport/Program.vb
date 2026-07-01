@@ -27,7 +27,7 @@ Imports Velopack
 Module Program
 
     Private Const Prefix As String = "http://localhost:9111/"
-    Private Const AgentVersion As String = "1.0.0"
+    Private Const AgentVersion As String = "1.0.1"
     Private Const SchemaVersion As Integer = 1
 
     Private _listener As HttpListener = Nothing
