@@ -22,6 +22,7 @@ Imports System.Diagnostics
 Imports System.IO
 Imports System.Net
 Imports System.Text.RegularExpressions
+Imports System.Threading
 Imports Newtonsoft.Json
 Imports Newtonsoft.Json.Linq
 
@@ -86,23 +87,18 @@ Module PrinterSetup
             ' 1) Unduh paket (skip bila sudah ada di cache).
             Dim pkg As String = EnsurePackage(rec)
 
-            ' 2) Jalankan senyap + baca Result Code.
-            Dim resultCode As Integer = RunApdSilent(pkg)
-            ' 0 = sukses, -3 = sudah terpasang — dua-duanya berarti driver ADA di mesin ini.
-            If resultCode <> 0 AndAlso resultCode <> -3 Then
-                Return ErrJson("INSTALL_FAILED", "Instalasi gagal (Result Code " & resultCode & "). Lihat APD4SilentSetup.log.")
+            ' 2) Jalankan installer + TUNGGU (poll) sampai printer benar-benar muncul.
+            Dim err As String = RunApdAndWait(pkg, rec.PrinterName)
+            If err <> "" Then
+                Console.WriteLine("   INSTALL: " & err)
+                Return ErrJson("INSTALL_FAILED", err)
             End If
 
-            ' 3) Verifikasi printer benar-benar terpasang.
-            If Not IsPrinterInstalled(rec.PrinterName) Then
-                Return ErrJson("PRINTER_NOT_FOUND", "Driver terpasang tapi printer '" & rec.PrinterName & "' tak ditemukan.")
-            End If
-
-            ' 4) Auto-map peran ke printers.json (merge — peran lain tak diubah).
+            ' 3) Auto-map peran ke printers.json (merge — peran lain tak diubah).
             Printers.SetRole(rec.Role, rec.PrinterName)
 
-            Console.WriteLine("   setup OK: " & rec.PrinterName & " → " & rec.Role & " (Result Code " & resultCode & ")")
-            Return "{""ok"":true,""printer"":" & JStr(rec.PrinterName) & ",""role"":" & JStr(rec.Role) & ",""resultCode"":" & resultCode & "}"
+            Console.WriteLine("   setup OK: " & rec.PrinterName & " → " & rec.Role)
+            Return "{""ok"":true,""printer"":" & JStr(rec.PrinterName) & ",""role"":" & JStr(rec.Role) & "}"
         Catch ex As Exception
             Console.WriteLine("   SETUP_FAILED: " & ex.Message)
             Return ErrJson("SETUP_FAILED", ex.Message)
@@ -140,12 +136,14 @@ Module PrinterSetup
         Return dest
     End Function
 
-    ' Jalankan paket APD Silent (senyap, tanpa reboot), lalu baca Result Code dari APD4SilentSetup.log
-    ' yang dibuat APD di folder yang sama dengan paket. UAC muncul (paket minta admin) → user klik Yes.
-    Private Function RunApdSilent(pkg As String) As Integer
+    ' Jalankan paket APD Silent lalu POLL sampai printer muncul (bukti sebenarnya).
+    ' Kenapa poll, bukan WaitForExit: paket minta admin → diluncurkan lewat mekanisme elevasi
+    ' (broker), sehingga proses yang dikembalikan Process.Start langsung "exit" → WaitForExit
+    ' tak berarti. UAC muncul selama poll → user klik Yes → driver terpasang → printer muncul.
+    ' Return "" bila sukses, atau string alasan bila gagal.
+    Private Function RunApdAndWait(pkg As String, expectedPrinter As String) As String
         Dim dir As String = Path.GetDirectoryName(pkg)
         Dim resultLog As String = Path.Combine(dir, "APD4SilentSetup.log")
-        ' Hapus log lama supaya tak salah baca hasil sebelumnya.
         Try
             If File.Exists(resultLog) Then File.Delete(resultLog)
         Catch
@@ -155,36 +153,48 @@ Module PrinterSetup
             .FileName = pkg,
             .Arguments = "/rN",          ' /rN = jangan reboot; TANPA /d = tanpa dialog (senyap)
             .WorkingDirectory = dir,
-            .UseShellExecute = True      ' WAJIB True agar bisa elevasi (UAC). Konsekuensi: tak bisa redirect stdout → hasil dibaca dari log.
+            .UseShellExecute = True      ' WAJIB True agar paket bisa minta elevasi (UAC).
         }
-
-        Dim p As Process = Process.Start(psi)
-        If p Is Nothing Then Throw New Exception("Gagal menjalankan paket installer.")
+        Console.WriteLine("   menjalankan paket (jendela UAC akan muncul — klik Yes)...")
         Try
-            If Not p.WaitForExit(5 * 60 * 1000) Then   ' timeout 5 menit
-                Try
-                    p.Kill()
-                Catch
-                End Try
-                Throw New Exception("Instalasi melewati batas waktu (5 menit).")
-            End If
-        Finally
-            p.Dispose()
+            Process.Start(psi)
+        Catch ex As Exception
+            Return "Gagal menjalankan paket installer: " & ex.Message
         End Try
 
-        Return ParseResultCode(resultLog)
+        ' Poll: SUKSES saat printer muncul. Beri waktu user klik Yes di UAC + instalasi jalan.
+        Const stepMs As Integer = 2000
+        Const maxMs As Integer = 150000    ' 2,5 menit
+        Dim waited As Integer = 0
+        While waited < maxMs
+            Thread.Sleep(stepMs)
+            waited += stepMs
+
+            If IsPrinterInstalled(expectedPrinter) Then Return ""   ' SUKSES (ground truth)
+
+            ' Bila installer sudah menulis log dengan kode GAGAL terminal (bukan 0/-3), berhenti awal.
+            Dim code As Integer
+            If TryParseResultCode(resultLog, code) AndAlso code <> 0 AndAlso code <> -3 Then
+                Return "Instalasi gagal (Result Code " & code & ")."
+            End If
+        End While
+
+        Return "Instalasi tidak terdeteksi dalam 2,5 menit. Pastikan Anda klik 'Yes' saat jendela UAC (izin admin) muncul."
     End Function
 
-    ' Ambil angka "Result Code" (bisa negatif) dari APD4SilentSetup.log.
-    Private Function ParseResultCode(logPath As String) As Integer
-        If Not File.Exists(logPath) Then
-            ' Tak ada log → paket tak jalan (mis. UAC dibatalkan user).
-            Throw New Exception("Log hasil tak ditemukan — kemungkinan izin admin (UAC) dibatalkan.")
-        End If
-        Dim txt As String = File.ReadAllText(logPath)
-        Dim m As Match = Regex.Match(txt, "Result\s*Code\D*(-?\d+)", RegexOptions.IgnoreCase)
-        If Not m.Success Then Throw New Exception("Result Code tak terbaca di log.")
-        Return Integer.Parse(m.Groups(1).Value)
+    ' Baca "Result Code" dari log TANPA melempar. Return False bila log belum ada / tak terbaca.
+    Private Function TryParseResultCode(logPath As String, ByRef code As Integer) As Boolean
+        code = 0
+        Try
+            If Not File.Exists(logPath) Then Return False
+            Dim txt As String = File.ReadAllText(logPath)
+            Dim m As Match = Regex.Match(txt, "Result\s*Code\D*(-?\d+)", RegexOptions.IgnoreCase)
+            If Not m.Success Then Return False
+            code = Integer.Parse(m.Groups(1).Value)
+            Return True
+        Catch
+            Return False
+        End Try
     End Function
 
     Private Function IsPrinterInstalled(name As String) As Boolean
