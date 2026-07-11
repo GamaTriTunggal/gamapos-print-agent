@@ -143,6 +143,42 @@ Module Printers
         End Try
     End Function
 
+    ' Set SATU peran di printers.json tanpa mengubah peran lain (MERGE, bukan replace).
+    ' Dipakai auto-map setelah pemasangan printer (PrinterSetup). Atomik (tmp→replace) + reset cache.
+    Public Sub SetRole(role As String, printerName As String)
+        If String.IsNullOrEmpty(role) Then Return
+        SyncLock ConfigLock
+            ' Muat map saat ini LANGSUNG dari file (bukan cache _map yang mungkin basi).
+            Dim m As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+            Try
+                Dim cur As String = AppPaths.ConfigPath()
+                If File.Exists(cur) Then
+                    Dim d = JsonConvert.DeserializeObject(Of Dictionary(Of String, String))(File.ReadAllText(cur))
+                    If d IsNot Nothing Then m = New Dictionary(Of String, String)(d, StringComparer.OrdinalIgnoreCase)
+                End If
+            Catch
+                ' file korup/tak terbaca → mulai dari map kosong (kita hanya set 1 peran, aman)
+            End Try
+
+            If String.IsNullOrWhiteSpace(printerName) Then
+                m.Remove(role)
+            Else
+                m(role) = printerName.Trim()
+            End If
+
+            Dim path As String = AppPaths.ConfigPath()
+            Dim json As String = JsonConvert.SerializeObject(m, Formatting.Indented)
+            Dim tmp As String = path & ".tmp"
+            File.WriteAllText(tmp, json)
+            If File.Exists(path) Then
+                File.Replace(tmp, path, Nothing)
+            Else
+                File.Move(tmp, path)
+            End If
+            _map = Nothing   ' invalidasi cache → cetak berikutnya pakai config baru
+        End SyncLock
+    End Sub
+
     <DllImport("winspool.drv", CharSet:=CharSet.Auto, SetLastError:=True)>
     Private Function SetDefaultPrinter(<MarshalAs(UnmanagedType.LPTStr)> name As String) As Boolean
     End Function
