@@ -23,6 +23,11 @@ x86/
 packages/
 *.nupkg
 
+## Velopack pack output (installer, update packages, release manifests).
+## Catatan: [Rr]elease/ di atas TIDAK cocok dengan "Releases/" (jamak) — jadi eksplisit di sini.
+Releases/
+publish/
+
 ## Agent runtime output (spike menyimpan job ke sini)
 jobs/
 **/jobs/
