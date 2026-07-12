@@ -78,7 +78,7 @@ Module Program
         End Try
 
         Console.WriteLine("Gama Print Agent v" & AgentVersion & " listening on " & Prefix)
-        Console.WriteLine("Endpoints: GET /health | GET /printers | POST /print | POST /print/test | POST /printers/config | POST /setup/printer")
+        Console.WriteLine("Endpoints: GET /health | GET /printers | POST /print | POST /print/test | POST /printers/config | POST /setup/printer | GET /setup/status")
         Console.WriteLine(Printers.ConfigSummary())
         ' Bila proses sebelumnya mati saat cetak (default printer Windows belum dikembalikan), pulihkan.
         Printers.RestoreDefaultPrinterIfNeeded()
@@ -198,8 +198,12 @@ Module Program
 
             Case "POST /setup/printer"
                 ' Pasang driver + setting printer OTOMATIS (recipe per model). Body: {"model":"TM-U220"}.
-                ' Bisa lambat (unduh + install + UAC) → sudah di thread pool (POST).
+                ' Async: memulai di background & langsung balas {state:"running"}.
                 WriteJson(ctx, 200, PrinterSetup.HandleSetup(ReadBody(req)))
+
+            Case "GET /setup/status"
+                ' Status pemasangan terkini (dipoll web sampai done/failed).
+                WriteJson(ctx, 200, PrinterSetup.StatusJson())
 
             Case Else
                 WriteJson(ctx, 404, "{""ok"":false,""error"":""NOT_FOUND""}")

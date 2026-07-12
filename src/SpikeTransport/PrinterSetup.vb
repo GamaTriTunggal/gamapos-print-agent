@@ -30,6 +30,7 @@ Module PrinterSetup
 
     ' Resep per model. Tambah Xprinter / LX-310 di sini setelah golden config-nya terbukti.
     Private Class Recipe
+        Public Model As String        ' kunci model (mis. "TM-U220") — dilaporkan di status
         Public Url As String          ' paket preset di R2
         Public FileName As String     ' nama file lokal (di folder cache)
         Public PrinterName As String  ' nama printer Windows yang dibuat → untuk verifikasi + map peran
@@ -39,6 +40,7 @@ Module PrinterSetup
 
     Private ReadOnly Recipes As New Dictionary(Of String, Recipe)(StringComparer.OrdinalIgnoreCase) From {
         {"TM-U220", New Recipe With {
+            .Model = "TM-U220",
             .Url = "https://installers.gamapos.id/golden/TM-U220-golden.exe",
             .FileName = "TM-U220-golden.exe",
             .PrinterName = "EPSON TM-U220 Receipt",
@@ -46,8 +48,13 @@ Module PrinterSetup
             .Kind = "apd"}}
     }
 
-    ' Serialize: cegah dua pemasangan konkuren (installer driver tak boleh tumpang tindih).
-    Private ReadOnly SetupLock As New Object()
+    ' Status pemasangan (async). Hanya SATU setup berjalan pada satu waktu (dijaga StatusLock).
+    Private ReadOnly StatusLock As New Object()
+    Private _state As String = "idle"     ' idle | running | done | failed
+    Private _model As String = ""
+    Private _printer As String = ""
+    Private _role As String = ""
+    Private _message As String = ""
 
     ' Folder cache paket preset — di DataDir (%LOCALAPPDATA%) supaya bertahan lintas update Velopack.
     Private Function SetupDir() As String
@@ -59,7 +66,8 @@ Module PrinterSetup
         Return d
     End Function
 
-    ' Handler POST /setup/printer. Body: { "model": "TM-U220" }. Mengembalikan body JSON hasil.
+    ' Handler POST /setup/printer. Body: {"model":"TM-U220"}. Memulai pemasangan di BACKGROUND
+    ' lalu LANGSUNG balas {state:"running"} (tak menggantung). Web memantau via GET /setup/status.
     Public Function HandleSetup(body As String) As String
         Dim model As String = Nothing
         Try
@@ -75,35 +83,83 @@ Module PrinterSetup
             Return ErrJson("UNSUPPORTED_MODEL", "Model tidak dikenal: " & model)
         End If
 
-        SyncLock SetupLock
-            Return InstallRecipe(rec)
+        ' Cek-dan-set atomik: tolak bila sudah ada setup berjalan.
+        SyncLock StatusLock
+            If _state = "running" Then
+                Return "{""ok"":false,""error"":""BUSY"",""message"":""Sedang memasang. Tunggu selesai."",""state"":""running"",""model"":" & JStr(_model) & "}"
+            End If
+            _state = "running"
+            _model = rec.Model
+            _printer = rec.PrinterName
+            _role = rec.Role
+            _message = "Menyiapkan…"
+        End SyncLock
+
+        Dim t As New Thread(Sub() RunSetupBackground(rec))
+        t.IsBackground = True
+        t.Start()
+
+        Return "{""ok"":true,""state"":""running"",""model"":" & JStr(rec.Model) & "}"
+    End Function
+
+    ' JSON untuk GET /setup/status → dipoll web sampai state = done/failed.
+    Public Function StatusJson() As String
+        SyncLock StatusLock
+            Return JsonConvert.SerializeObject(New Dictionary(Of String, Object) From {
+                {"ok", True},
+                {"state", _state},
+                {"model", _model},
+                {"printer", _printer},
+                {"role", _role},
+                {"message", _message}
+            })
         End SyncLock
     End Function
 
-    Private Function InstallRecipe(rec As Recipe) As String
+    Private Sub SetMessage(msg As String)
+        SyncLock StatusLock
+            _message = msg
+        End SyncLock
+    End Sub
+
+    Private Sub SetDone()
+        SyncLock StatusLock
+            _state = "done"
+            _message = "Selesai — printer siap dipakai."
+        End SyncLock
+    End Sub
+
+    Private Sub SetFailed(msg As String)
+        SyncLock StatusLock
+            _state = "failed"
+            _message = msg
+        End SyncLock
+    End Sub
+
+    ' Proses pemasangan di background: unduh → jalankan → verifikasi → auto-map peran → set status.
+    Private Sub RunSetupBackground(rec As Recipe)
         Try
             Console.WriteLine("Setup printer: " & rec.PrinterName & " (" & rec.Kind & ")")
-
-            ' 1) Unduh paket (skip bila sudah ada di cache).
+            SetMessage("Menyiapkan installer…")
             Dim pkg As String = EnsurePackage(rec)
 
-            ' 2) Jalankan installer + TUNGGU (poll) sampai printer benar-benar muncul.
+            SetMessage("Memasang driver — klik 'Yes' saat izin admin (UAC) muncul…")
             Dim err As String = RunApdAndWait(pkg, rec.PrinterName)
             If err <> "" Then
                 Console.WriteLine("   INSTALL: " & err)
-                Return ErrJson("INSTALL_FAILED", err)
+                SetFailed(err)
+                Return
             End If
 
-            ' 3) Auto-map peran ke printers.json (merge — peran lain tak diubah).
+            ' Auto-map peran ke printers.json (merge — peran lain tak diubah).
             Printers.SetRole(rec.Role, rec.PrinterName)
-
             Console.WriteLine("   setup OK: " & rec.PrinterName & " → " & rec.Role)
-            Return "{""ok"":true,""printer"":" & JStr(rec.PrinterName) & ",""role"":" & JStr(rec.Role) & "}"
+            SetDone()
         Catch ex As Exception
             Console.WriteLine("   SETUP_FAILED: " & ex.Message)
-            Return ErrJson("SETUP_FAILED", ex.Message)
+            SetFailed(ex.Message)
         End Try
-    End Function
+    End Sub
 
     ' Unduh paket ke folder cache; skip bila sudah ada & berukuran wajar (>1 MB). Return path lokal.
     Private Function EnsurePackage(rec As Recipe) As String
@@ -142,6 +198,9 @@ Module PrinterSetup
     ' tak berarti. UAC muncul selama poll → user klik Yes → driver terpasang → printer muncul.
     ' Return "" bila sukses, atau string alasan bila gagal.
     Private Function RunApdAndWait(pkg As String, expectedPrinter As String) As String
+        ' Sudah terpasang? Lewati install (idempotent) — hindari UAC ulang; peran tetap di-map di pemanggil.
+        If IsPrinterInstalled(expectedPrinter) Then Return ""
+
         Dim dir As String = Path.GetDirectoryName(pkg)
         Dim resultLog As String = Path.Combine(dir, "APD4SilentSetup.log")
         Try
