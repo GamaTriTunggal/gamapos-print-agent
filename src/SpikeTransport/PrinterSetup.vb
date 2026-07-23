@@ -20,6 +20,7 @@ Imports System
 Imports System.Collections.Generic
 Imports System.Diagnostics
 Imports System.IO
+Imports System.IO.Compression
 Imports System.Net
 Imports System.Text.RegularExpressions
 Imports System.Threading
@@ -35,7 +36,8 @@ Module PrinterSetup
         Public FileName As String     ' nama file lokal (di folder cache)
         Public PrinterName As String  ' nama printer Windows yang dibuat → untuk verifikasi + map peran
         Public Role As String         ' peran printers.json (CASHIER / QRLABEL / DELIVERY / REPORT)
-        Public Kind As String         ' mekanisme jalankan/parse: "apd" (APD Silent Installer)
+        Public Kind As String         ' mekanisme: "apd" (APD Silent Installer .exe) | "seagull" (zip driver + DriverWizard)
+        Public DriverModel As String  ' hanya kind=seagull: string /model: untuk DriverWizard install
     End Class
 
     Private ReadOnly Recipes As New Dictionary(Of String, Recipe)(StringComparer.OrdinalIgnoreCase) From {
@@ -45,7 +47,15 @@ Module PrinterSetup
             .FileName = "TM-U220-golden.exe",
             .PrinterName = "EPSON TM-U220 Receipt",
             .Role = "CASHIER",
-            .Kind = "apd"}}
+            .Kind = "apd"}},
+        {"Xprinter-360B", New Recipe With {
+            .Model = "Xprinter-360B",
+            .Url = "https://installers.gamapos.id/golden/Xprinter-360B-golden.zip",
+            .FileName = "Xprinter-360B-golden.zip",
+            .PrinterName = "Xprinter XP-360B",
+            .Role = "QRLABEL",
+            .Kind = "seagull",
+            .DriverModel = "Xprinter XP-360B"}}
     }
 
     ' Status pemasangan (async). Hanya SATU setup berjalan pada satu waktu (dijaga StatusLock).
@@ -144,7 +154,15 @@ Module PrinterSetup
             Dim pkg As String = EnsurePackage(rec)
 
             SetMessage("Memasang driver — klik 'Yes' saat izin admin (UAC) muncul…")
-            Dim err As String = RunApdAndWait(pkg, rec.PrinterName)
+            Dim err As String
+            Select Case rec.Kind.ToLowerInvariant()
+                Case "apd"
+                    err = RunApdAndWait(pkg, rec.PrinterName)
+                Case "seagull"
+                    err = RunSeagullAndWait(pkg, rec.PrinterName, rec.DriverModel)
+                Case Else
+                    err = "Jenis installer tak dikenal: " & rec.Kind
+            End Select
             If err <> "" Then
                 Console.WriteLine("   INSTALL: " & err)
                 SetFailed(err)
@@ -239,6 +257,66 @@ Module PrinterSetup
         End While
 
         Return "Instalasi tidak terdeteksi dalam 2,5 menit. Pastikan Anda klik 'Yes' saat jendela UAC (izin admin) muncul."
+    End Function
+
+    ' Paket driver Seagull (zip) → extract → jalankan DriverWizard install (unattended) → POLL printer muncul.
+    ' Golden config membawa DAFTAR stock (mis. 40×30) lewat Common\Defaults[SS]_*.sds yang sudah di-bake.
+    ' Default stock TIDAK di-set di sini (batasan Seagull pada install baru) — QrLabel.vb yang memilih 40×30
+    ' saat cetak. /autodetect = deteksi port USB printer yang tercolok (butuh printer fisik saat install).
+    Private Function RunSeagullAndWait(zipPath As String, expectedPrinter As String, driverModel As String) As String
+        ' Sudah terpasang? Lewati (idempotent) — peran tetap di-map di pemanggil.
+        If IsPrinterInstalled(expectedPrinter) Then Return ""
+
+        ' Extract paket ke folder di samping zip.
+        Dim extractDir As String = Path.Combine(Path.GetDirectoryName(zipPath), "xprinter-driver")
+        Try
+            If Directory.Exists(extractDir) Then Directory.Delete(extractDir, True)
+        Catch
+        End Try
+        Try
+            ZipFile.ExtractToDirectory(zipPath, extractDir)
+        Catch ex As Exception
+            Return "Gagal mengekstrak paket driver: " & ex.Message
+        End Try
+
+        Dim dw As String = FindFileRecursive(extractDir, "DriverWizard.exe")
+        If String.IsNullOrEmpty(dw) Then Return "DriverWizard.exe tak ditemukan di paket driver."
+
+        Dim args As String = "install /name:""" & expectedPrinter & """ /model:""" & driverModel & """ /autodetect"
+        Dim psi As New ProcessStartInfo() With {
+            .FileName = dw,
+            .Arguments = args,
+            .WorkingDirectory = Path.GetDirectoryName(dw),
+            .UseShellExecute = True      ' WAJIB True agar bisa minta elevasi (UAC).
+        }
+        Console.WriteLine("   menjalankan DriverWizard (jendela UAC mungkin muncul — klik Yes)...")
+        Try
+            Process.Start(psi)
+        Catch ex As Exception
+            Return "Gagal menjalankan DriverWizard: " & ex.Message
+        End Try
+
+        ' Poll: SUKSES saat printer muncul (bukti). Beri waktu UAC + instalasi.
+        Const stepMs As Integer = 2000
+        Const maxMs As Integer = 150000    ' 2,5 menit
+        Dim waited As Integer = 0
+        While waited < maxMs
+            Thread.Sleep(stepMs)
+            waited += stepMs
+            If IsPrinterInstalled(expectedPrinter) Then Return ""
+        End While
+
+        Return "Instalasi tidak terdeteksi dalam 2,5 menit. Pastikan printer tercolok (USB) & klik 'Yes' saat UAC."
+    End Function
+
+    ' Cari file (nama persis) rekursif di dalam root. "" bila tak ada.
+    Private Function FindFileRecursive(root As String, fileName As String) As String
+        Try
+            Dim hits() As String = Directory.GetFiles(root, fileName, SearchOption.AllDirectories)
+            If hits.Length > 0 Then Return hits(0)
+        Catch
+        End Try
+        Return ""
     End Function
 
     ' Baca "Result Code" dari log TANPA melempar. Return False bila log belum ada / tak terbaca.

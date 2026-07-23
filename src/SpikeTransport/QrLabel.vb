@@ -57,6 +57,7 @@ Module QrLabel
                     Throw New Exception("Printer QRLABEL '" & target & "' tidak ditemukan.")
                 End If
             End If
+            SelectLabelStock(doc)   ' pilih ukuran ~40×30 eksplisit (jangan bergantung default printer)
             doc.PrinterSettings.Copies = CShort(copies)
             Dim handler As PrintPageEventHandler =
                 Sub(sender As Object, e As PrintPageEventArgs)
@@ -99,5 +100,27 @@ Module QrLabel
             End Using
         End Using
     End Sub
+
+    ' Pilih ukuran kertas ~40mm × 30mm agar label tak bergantung DEFAULT printer. (Batasan driver Seagull:
+    ' golden config membawa DAFTAR stock, tapi install baru tak menyetel default terpilih.) PaperSize.Width/
+    ' Height dalam 1/100 inci → 40mm≈157, 30mm≈118 (toleransi ±8; cocokkan kedua orientasi).
+    ' Tak ketemu → biarkan default printer (perilaku lama, aman).
+    Private Sub SelectLabelStock(doc As PrintDocument)
+        Try
+            For Each ps As PaperSize In doc.PrinterSettings.PaperSizes
+                If (NearHundredths(ps.Width, 157) AndAlso NearHundredths(ps.Height, 118)) OrElse
+                   (NearHundredths(ps.Width, 118) AndAlso NearHundredths(ps.Height, 157)) Then
+                    doc.DefaultPageSettings.PaperSize = ps
+                    Return
+                End If
+            Next
+        Catch
+            ' abaikan → pakai default printer
+        End Try
+    End Sub
+
+    Private Function NearHundredths(val As Integer, target As Integer) As Boolean
+        Return Math.Abs(val - target) <= 8
+    End Function
 
 End Module

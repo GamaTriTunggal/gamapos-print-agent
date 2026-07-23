@@ -31,6 +31,8 @@
     <Reference Include="System.Drawing" />
     <!-- Tray app: NotifyIcon/ContextMenuStrip/Application/MessageBox. -->
     <Reference Include="System.Windows.Forms" />
+    <!-- ZipFile.ExtractToDirectory (paket golden Seagull = zip) — tak auto-direferensi di SDK-style net48. -->
+    <Reference Include="System.IO.Compression.FileSystem" />
     <!-- 2b: PowerPacks Printer (VB6 compat) untuk port printReceipt; DLL di-vendor di lib/. -->
     <Reference Include="Microsoft.VisualBasic.PowerPacks">
       <HintPath>..\..\lib\Microsoft.VisualBasic.PowerPacks.dll</HintPath>
