@@ -58,8 +58,10 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
   hanya jalan di Windows). PowerPacks di-vendor di `lib/`.
 - **CI** (`.github/workflows/ci.yml`, `windows-latest`): build + smoke `ci/smoke.ps1` —
   menjalankan exe sebagai proses latar, menunggu `:9111`, memeriksa bentuk `/health`, `/printers`,
-  `/setup/status`, `/print/test`, memutar 18 `fixtures/*.sample.json` ke `POST /print` dengan
-  `printers.json` yang memetakan SEMUA peran ke "Microsoft Print to PDF", lalu mematikan proses.
+  `/setup/status`, `/print/test`, memutar 17 `fixtures/*.sample.json` ke `POST /print` dengan
+  `printers.json` yang memetakan SEMUA peran ke printer virtual "Generic / Text Only" berport
+  berkas (tanpa dialog; "Microsoft Print to PDF" memunculkan Save As pada jalur PowerPacks), lalu
+  mematikan proses.
   Merah = tidak boleh dirilis.
 - **Rilis** = `pack.ps1 -Version X` di VM Windows → unggah isi `Releases\` ke GitHub Release
   `vX`. Ceklis WAJIB di `docs/RELEASE.md`; tiap rilis dicatat di `docs/release-journal.md`

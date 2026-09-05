@@ -15,13 +15,29 @@ $fail = @()
 function Fail($msg) { $script:fail += $msg; Write-Host "FAIL  $msg" -ForegroundColor Red }
 function Ok($msg)   { Write-Host "ok    $msg" -ForegroundColor Green }
 
-# 1) printers.json: semua peran -> PDF (folder data stabil agent, bukan samping exe).
+# 1) Printer virtual TANPA dialog: antrean "Generic / Text Only" berport BERKAS TETAP.
+#    ("Microsoft Print to PDF" memunculkan dialog Save As pada jalur PowerPacks (EndDoc tanpa
+#    PrintToFile) → PRINT_TIMEOUT di runner — insiden run pertama 5 Sep 2026.)
+#    Keluaran nota ditulis ke $outFile; ukurannya = bukti cetak benar-benar terjadi.
+$outDir  = Join-Path $env:RUNNER_TEMP "gama-print-out"
+if (-not $env:RUNNER_TEMP) { $outDir = Join-Path $env:TEMP "gama-print-out" }
+New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+$outFile = Join-Path $outDir "smoke.prn"
+$vp = "Gama Smoke Printer"
+$hasPdf = $false
+try {
+    if (-not (Get-PrinterPort -Name $outFile -ErrorAction SilentlyContinue)) { Add-PrinterPort -Name $outFile }
+    if (-not (Get-Printer -Name $vp -ErrorAction SilentlyContinue)) {
+        Add-Printer -Name $vp -DriverName "Generic / Text Only" -PortName $outFile
+    }
+    $hasPdf = $true
+    Write-Host "printer virtual '$vp' -> $outFile"
+} catch { Write-Host "gagal membuat printer virtual: $($_.Exception.Message)" -ForegroundColor Yellow }
+
+# printers.json: semua peran -> printer virtual (folder data stabil agent, bukan samping exe).
 $dataDir = Join-Path $env:LOCALAPPDATA "GamaPrintAgent"
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
-$pdf = "Microsoft Print to PDF"
-@{ CASHIER = $pdf; DELIVERY = $pdf; QRLABEL = $pdf; REPORT = $pdf } | ConvertTo-Json | Set-Content (Join-Path $dataDir "printers.json") -Encoding UTF8
-$hasPdf = (Get-Printer -ErrorAction SilentlyContinue | Where-Object Name -eq $pdf) -ne $null
-Write-Host "printer '$pdf' tersedia di runner: $hasPdf"
+@{ CASHIER = $vp; DELIVERY = $vp; QRLABEL = $vp; REPORT = $vp } | ConvertTo-Json | Set-Content (Join-Path $dataDir "printers.json") -Encoding UTF8
 
 # 2) Jalankan agent (WinExe tray; mutex single-instance; auto-start HKCU ditulis — runner sekali pakai).
 $proc = Start-Process -FilePath $Exe -PassThru -WindowStyle Hidden
@@ -68,14 +84,15 @@ try {
     try { Invoke-WebRequest "$base/nope" -TimeoutSec 5 | Out-Null; Fail "/nope tidak 404" }
     catch { if ($_.Exception.Response.StatusCode.value__ -eq 404) { Ok "/nope -> 404" } else { Fail "/nope -> $($_.Exception.Message)" } }
 
-    # 8) Cetak: hanya bila printer PDF ada di runner (PowerPacks mencetak ke default Windows yang
-    #    diganti sesaat oleh WithRolePrinter → butuh printer nyata; PDF writer memenuhi).
-    if ($hasPdf) {
-        $t = Invoke-RestMethod "$base/print/test" -Method Post -TimeoutSec 60
-        if ($t.ok -ne $true -or -not $t.printed) { Fail "/print/test gagal: $($t | ConvertTo-Json -Compress)" } else { Ok "/print/test -> $($t.printed)" }
+    # 8) /print/test memakai "Microsoft Print to PDF" + PrintToFile (tanpa dialog) — jalur sendiri.
+    $t = Invoke-RestMethod "$base/print/test" -Method Post -TimeoutSec 60
+    if ($t.ok -ne $true -or -not $t.printed) { Fail "/print/test gagal: $($t | ConvertTo-Json -Compress)" } else { Ok "/print/test -> $($t.printed)" }
 
+    # 9) Cetak 17 fixtures ke printer virtual (PowerPacks → default Windows diganti sesaat oleh
+    #    WithRolePrinter; label QR → PrinterSettings.PrinterName). Bukti = berkas keluaran bertambah.
+    if ($hasPdf) {
         $fixtures = Get-ChildItem (Join-Path $PSScriptRoot "..\fixtures\*.sample.json")
-        if ($fixtures.Count -lt 18) { Fail "fixtures < 18 (ada $($fixtures.Count))" }
+        if ($fixtures.Count -lt 17) { Fail "fixtures < 17 (ada $($fixtures.Count))" }
         foreach ($f in $fixtures) {
             $body = Get-Content $f.FullName -Raw
             try {
@@ -83,11 +100,14 @@ try {
                 if ($r.ok -ne $true) { Fail "$($f.Name): $($r | ConvertTo-Json -Compress)" } else { Ok "$($f.Name) -> $($r.jobType)" }
             } catch { Fail "$($f.Name): $($_.Exception.Message)" }
         }
+        Start-Sleep -Seconds 3
+        $size = (Get-Item $outFile -ErrorAction SilentlyContinue).Length
+        if (-not $size -or $size -lt 1024) { Fail "keluaran printer virtual kosong/kecil ($size byte) — job tidak sampai ke spooler" } else { Ok "keluaran printer virtual $size byte" }
         # Amplop rusak -> BAD_PAYLOAD, bukan 500.
         $bad = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":1}' -TimeoutSec 10
         if ($bad.ok -ne $false -or $bad.error -ne "BAD_PAYLOAD") { Fail "amplop rusak tidak BAD_PAYLOAD: $($bad | ConvertTo-Json -Compress)" } else { Ok "amplop rusak -> BAD_PAYLOAD" }
     } else {
-        Write-Host "SKIP  cetak fixtures: printer '$pdf' tidak ada di runner" -ForegroundColor Yellow
+        Fail "printer virtual tidak bisa dibuat — cetak fixtures tidak teruji"
     }
 }
 finally {
