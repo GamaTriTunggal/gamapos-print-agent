@@ -112,8 +112,11 @@ try {
             } catch { Fail "$($f.Name): $($_.Exception.Message)" }
         }
         Start-Sleep -Seconds 3
+        # Port berkas tetap MENIMPA per job (isi = job terakhir), dan "Generic / Text Only" merender
+        # nota GDI jadi teks polos ratusan byte (run 3: 926 byte untuk split_receipt) → bukti yang
+        # benar = berkas ada dan tidak kosong, bukan ambang ukuran.
         $size = (Get-Item $outFile -ErrorAction SilentlyContinue).Length
-        if (-not $size -or $size -lt 1024) { Fail "keluaran printer virtual kosong/kecil ($size byte) — job tidak sampai ke spooler" } else { Ok "keluaran printer virtual $size byte" }
+        if (-not $size -or $size -le 0) { Fail "keluaran printer virtual kosong — job tidak sampai ke spooler" } else { Ok "keluaran printer virtual $size byte (job terakhir)" }
         # Amplop rusak -> BAD_PAYLOAD, bukan 500.
         $bad = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":1}' -TimeoutSec 10
         if ($bad.ok -ne $false -or $bad.error -ne "BAD_PAYLOAD") { Fail "amplop rusak tidak BAD_PAYLOAD: $($bad | ConvertTo-Json -Compress)" } else { Ok "amplop rusak -> BAD_PAYLOAD" }
