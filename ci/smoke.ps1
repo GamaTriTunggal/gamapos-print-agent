@@ -27,11 +27,22 @@ $vp = "Gama Smoke Printer"
 $hasPdf = $false
 try {
     if (-not (Get-PrinterPort -Name $outFile -ErrorAction SilentlyContinue)) { Add-PrinterPort -Name $outFile }
+    # Driver "Generic / Text Only" ada di driver store Windows tetapi belum terdaftar di runner
+    # (run 2, 5 Sep: "The specified driver does not exist") → daftarkan dulu; cadangan = driver
+    # apa pun yang sudah terdaftar (mis. Microsoft Print To PDF) — tetap tanpa dialog karena port berkas.
+    $drv = "Generic / Text Only"
+    if (-not (Get-PrinterDriver -Name $drv -ErrorAction SilentlyContinue)) {
+        try { Add-PrinterDriver -Name $drv } catch { Write-Host "Add-PrinterDriver '$drv' gagal: $($_.Exception.Message)" -ForegroundColor Yellow }
+    }
+    if (-not (Get-PrinterDriver -Name $drv -ErrorAction SilentlyContinue)) {
+        $drv = (Get-PrinterDriver | Select-Object -First 1).Name
+        Write-Host "memakai driver cadangan: $drv" -ForegroundColor Yellow
+    }
     if (-not (Get-Printer -Name $vp -ErrorAction SilentlyContinue)) {
-        Add-Printer -Name $vp -DriverName "Generic / Text Only" -PortName $outFile
+        Add-Printer -Name $vp -DriverName $drv -PortName $outFile
     }
     $hasPdf = $true
-    Write-Host "printer virtual '$vp' -> $outFile"
+    Write-Host "printer virtual '$vp' (driver '$drv') -> $outFile"
 } catch { Write-Host "gagal membuat printer virtual: $($_.Exception.Message)" -ForegroundColor Yellow }
 
 # printers.json: semua peran -> printer virtual (folder data stabil agent, bukan samping exe).
