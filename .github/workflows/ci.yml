@@ -1,0 +1,34 @@
+# Gerbang minimum repo agent (papan printer PR-03, 5 Sep 2026):
+# build + smoke di Windows. Merah = tidak boleh dirilis (docs/RELEASE.md).
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Larangan uninstall driver (aturan mutlak 2) — hanya boleh muncul di komentar
+        shell: pwsh
+        run: |
+          $hits = Select-String -Path src/SpikeTransport/*.vb -Pattern '/s /uninstall|printui|Remove-Printer|/dl ' |
+                  Where-Object { $_.Line.TrimStart() -notmatch "^'" }
+          if ($hits) { $hits | ForEach-Object { Write-Host $_ }; throw "jalur kode uninstall/hapus printer ditemukan" }
+      - name: Build (Release, net48)
+        run: dotnet build src/SpikeTransport/SpikeTransport.vbproj -c Release --nologo
+      - name: Smoke (listener :9111, bentuk endpoint, 18 fixtures ke PDF)
+        shell: pwsh
+        run: ./ci/smoke.ps1 -Exe (Resolve-Path src/SpikeTransport/bin/Release/net48/GamaPrintAgent.SpikeTransport.exe)
+      - name: Unggah log agent bila gagal
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-logs
+          path: ${{ env.LOCALAPPDATA }}\GamaPrintAgent\logs\
+          if-no-files-found: ignore
