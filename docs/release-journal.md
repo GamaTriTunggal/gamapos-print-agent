@@ -11,3 +11,7 @@ Satu baris per rilis. Kolom: versi · tanggal · commit · pre-release/penuh · 
 
 Catatan: baris 1.0.0–1.0.2 direkonstruksi 5 Sep 2026 dari GitHub Releases + memori sesi; commit
 1.0.0/1.0.1 tidak tercatat.
+
+## Catatan gerbang
+
+- 5 Sep 2026 — CI lahir (PR-03 papan printer): run pertama hijau di c0608bc (https://github.com/GamaTriTunggal/gamapos-print-agent/actions/runs/33968009972) setelah 3 iterasi smoke: "Microsoft Print to PDF" memunculkan Save As di jalur PowerPacks (17× PRINT_TIMEOUT) → printer virtual "Generic / Text Only" berport berkas → driver harus didaftarkan (`Add-PrinterDriver`) → bukti = berkas keluaran tidak kosong (port berkas menimpa per job). Sejak ini: rilis tanpa CI hijau = pelanggaran `docs/RELEASE.md`.
