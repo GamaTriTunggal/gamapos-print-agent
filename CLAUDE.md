@@ -3,7 +3,7 @@
 Gama Print Agent = program tray Windows (.NET Framework 4.8, VB.NET) di tiap PC kasir GamaPOS,
 `http://localhost:9111`. Kontrak dan aturannya DIPUTUSKAN di repo utama `gamapos-go-2`; repo ini
 hanya implementasi. Lahir 5 Sep 2026 lewat item PR-03 papan
-`gamapos-go-2/docs/analisis/printer-onboarding-board.md`.
+`gamapos-go-2/docs/analysis/board-printer-onboarding.md`.
 
 ## Dua fungsi agent — jangan dicampur
 
@@ -17,9 +17,9 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
 ## ATURAN MUTLAK
 
 1. **Amplop `POST /print` v1 + 14 jobType BEKU** (K-02 amandemen 5 Sep 2026). Bentuk nota tidak
-   berubah. Mengubahnya = keputusan pemilik di `gamapos-go-2/docs/keputusan.md` + naikkan
+   berubah. Mengubahnya = keputusan pemilik di `gamapos-go-2/docs/constitution.md` + naikkan
    `schemaVersion`. Sumber kontrak yang boleh ditulis:
-   `gamapos-go-2/docs/referensi/print-agent-contract.md` — setiap rilis yang mengubah endpoint
+   `gamapos-go-2/docs/reference/print-agent-contract.md` — setiap rilis yang mengubah endpoint
    lain WAJIB menambah bagian §C (delta berversi) di sana, di commit repo Go yang menyebut commit
    repo ini (kewajiban dua arah: commit di sini menyebut `P-xxx` register repo Go).
 2. **Agent TIDAK PERNAH menghapus, menurunkan, atau meng-uninstall driver/antrean printer apa
@@ -74,8 +74,8 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
 
 ## Rujukan
 
-- Papan: `gamapos-go-2/docs/analisis/printer-onboarding-board.md` (PR-xx, T-x, tabel skenario).
-- Kontrak: `gamapos-go-2/docs/referensi/print-agent-contract.md`.
-- Keputusan: `gamapos-go-2/docs/keputusan.md` K-02 + amandemen 5 Sep 2026.
-- Register temuan: `gamapos-go-2/docs/register-bug-paritas.md` (`P-xxx`).
+- Papan: `gamapos-go-2/docs/analysis/board-printer-onboarding.md` (PR-xx, T-x, tabel skenario).
+- Kontrak: `gamapos-go-2/docs/reference/print-agent-contract.md`.
+- Keputusan: `gamapos-go-2/docs/constitution.md` K-02 + amandemen 5 Sep 2026.
+- Register temuan: `gamapos-go-2/docs/parity-bug-register.md` (`P-xxx`).
 - Dokumen asal (READ-ONLY): repo Laravel `docs/companion-print-agent/`.

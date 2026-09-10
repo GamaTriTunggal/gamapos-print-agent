@@ -9,7 +9,7 @@ Setiap butir wajib dicentang; hasilnya dicatat di `release-journal.md`.
 - [ ] `<Version>` di `SpikeTransport.vbproj` dinaikkan; `AgentVersion` di `Program.vb` SAMA
       (sampai PR-12 menyatukannya).
 - [ ] Tidak ada jalur kode uninstall/downgrade driver (aturan mutlak 2): `grep -ri "uninstall\|printui\|Remove-Printer" src/` hanya mengenai komentar.
-- [ ] Perubahan endpoint dicatat di `gamapos-go-2/docs/referensi/print-agent-contract.md` §C
+- [ ] Perubahan endpoint dicatat di `gamapos-go-2/docs/reference/print-agent-contract.md` §C
       (delta berversi) + `P-xxx` register — commit repo Go menyebut commit repo ini.
 - [ ] Perubahan perilaku cetak armada (aturan mutlak 3) sudah DIKETOK pemilik dan disebut di
       catatan rilis; bila belum, cabut dari rilis.
