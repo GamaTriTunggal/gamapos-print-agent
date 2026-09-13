@@ -35,8 +35,8 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
    (`idle|running|done|failed`) tetap; endpoint baru yang tidak ada di agent lama = web jatuh
    ke jalur lama.
 5. **Versi SATU sumber**: `<Version>` di `src/SpikeTransport/SpikeTransport.vbproj`. `AgentVersion`
-   yang dilaporkan `/health` WAJIB dibaca dari assembly (PR-12), bukan konstanta terpisah —
-   sampai itu terjadi, ceklis rilis mewajibkan keduanya dinaikkan bersama.
+   yang dilaporkan `/health` dibaca dari assembly (SELESAI PR-12, 13 Sep 2026 — `Program.AssemblyVersionString`);
+   smoke CI memerahkan bila `/health` ≠ `<Version>`.
 6. **Tidak ada telemetri/penyimpanan PII**: body `/print` berisi data pelanggan toko; hanya
    disimpan bila debug di-opt-in (`GAMA_AGENT_DEBUG_JOBS=1` / `debug.flag`). Jangan tambah log
    yang memuat isi nota.
@@ -49,7 +49,10 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
   penanda pulih default printer — bertahan lintas update Velopack. Folder exe (`...\current\`)
   DIGANTI tiap update; jangan simpan apa pun di sana.
 - `device-id` (PR-12) di `%APPDATA%\GamaPrintAgent\` — di LUAR folder instalasi, bertahan
-  lintas uninstall.
+  lintas uninstall. Katalog resep terakhir-berhasil di `%LOCALAPPDATA%\GamaPrintAgent\catalog\`.
+- **Kunci publik katalog** (`RecipeCatalog.PublicKeyHex`) WAJIB sama dengan
+  `gamapos-go-2/internal/features/printagentcatalog/pubkey.go`; kunci privat hanya di `.local/` laptop
+  pemilik. Mengganti kunci = rilis agent.
 
 ## Build, uji, rilis
 

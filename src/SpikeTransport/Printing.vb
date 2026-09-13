@@ -46,6 +46,37 @@ Module Printing
         Return pdfPath
     End Function
 
+    ' Cetak halaman contoh yang SAMA ke printer bernama (peran) — tanpa PrintToFile, tanpa dialog (PR-12/PR-14).
+    Public Sub PrintTestPageTo(printerName As String)
+        Dim printEx As Exception = Nothing
+        Dim worker As New Thread(
+            Sub()
+                Try
+                    Using doc As New PrintDocument()
+                        doc.PrinterSettings.PrinterName = printerName
+                        If Not doc.PrinterSettings.IsValid Then
+                            Throw New Exception("PRINTER_NOT_FOUND: printer '" & printerName & "' tidak terpasang.")
+                        End If
+                        AddHandler doc.PrintPage, AddressOf OnPrintTestPage
+                        Try
+                            doc.Print()
+                        Finally
+                            RemoveHandler doc.PrintPage, AddressOf OnPrintTestPage
+                        End Try
+                    End Using
+                Catch ex As Exception
+                    printEx = ex
+                End Try
+            End Sub)
+        worker.IsBackground = True
+        worker.SetApartmentState(ApartmentState.STA)
+        worker.Start()
+        If Not worker.Join(30000) Then
+            Throw New TimeoutException("PRINT_TIMEOUT: cetak halaman uji melebihi batas waktu (printer offline / dialog?).")
+        End If
+        If printEx IsNot Nothing Then Throw printEx
+    End Sub
+
     ' Dipanggil di thread STA. Mengembalikan Nothing jika sukses, atau Exception jika gagal.
     Private Function DoPrintToPdf(pdfPath As String) As Exception
         Try

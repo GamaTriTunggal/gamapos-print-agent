@@ -7,6 +7,7 @@ Satu baris per rilis. Kolom: versi · tanggal · commit · pre-release/penuh · 
 | 1.0.0 | 30 Jun 2026 | — | penuh | transport + 14 jobType + targeting peran | — | 30 Jun 2026 | pemilik |
 | 1.0.1 | 1 Jul 2026 | — | penuh | perbaikan awal | PC toko Vin Jaya (cetak kasir + QR Inv jalan) | 1 Jul 2026 | pemilik |
 | 1.0.2 | 12 Jul 2026 | 2d184d5 | penuh | Pasang Otomatis TM-U220 (APD4 silent installer), `/setup/*`, `/printers/config` | VM saja (uji fisik ditunda) | 12 Jul 2026 | pemilik |
+| 1.1.0 (belum dirilis; pre-release menyusul PR-13) | — | (commit ini, 13 Sep 2026) | — | PR-12 bagian agent: katalog resep dari server bertanda tangan Ed25519 (benih → disk → server, anti-rollback, SHA-256 paket 3×), `GET /recipes`, `POST /catalog/refresh`, `/health` + deviceId/osArch/versi assembly, `error` terstruktur `/setup/status`, `POST /print/test {printerRole}`, update diterapkan saat menganggur ≥10 mnt. Perilaku CETAK armada TIDAK berubah (aturan 3). | menunggu PC uji pemilik + Vin Jaya | — | — |
 | (belum dirilis) | — | 72fc131 (23 Jul 2026) | — | resep Xprinter Seagull + `SelectLabelStock` 40×30 — MENUNGGU uji fisik XP-360B; `SelectLabelStock` berjalan di SETIAP cetak label = perubahan perilaku armada (aturan mutlak 3) | — | — | — |
 
 Catatan: baris 1.0.0–1.0.2 direkonstruksi 5 Sep 2026 dari GitHub Releases + memori sesi; commit

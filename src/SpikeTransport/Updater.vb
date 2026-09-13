@@ -17,6 +17,28 @@ Module Updater
 
     Private Const RepoUrl As String = "https://github.com/GamaTriTunggal/gamapos-print-agent"
 
+    ' Update yang sudah diunduh & di-stage (menunggu diterapkan). PR-12 (K-16 #7): diterapkan sendiri
+    ' saat agent MENGANGGUR ≥ 10 menit (tak ada cetak/pemasangan), bukan hanya saat PC restart.
+    Private _staged As UpdateInfo = Nothing
+    Private _stagedMgr As UpdateManager = Nothing
+
+    Public Function HasStagedUpdate() As Boolean
+        Return _staged IsNot Nothing
+    End Function
+
+    ' Terapkan update yang sudah di-stage lalu restart agent. Return True bila proses restart dimulai.
+    Public Function ApplyStagedAndRestart() As Boolean
+        Try
+            If _staged Is Nothing OrElse _stagedMgr Is Nothing Then Return False
+            Console.WriteLine("Update: menerapkan " & _staged.TargetFullRelease.Version.ToString() & " saat menganggur — restart agent")
+            _stagedMgr.ApplyUpdatesAndRestart(_staged)
+            Return True
+        Catch ex As Exception
+            Console.WriteLine("Update apply error: " & ex.Message)
+            Return False
+        End Try
+    End Function
+
     ' Cek GitHub Releases. Ada versi baru → download + STAGE (terapkan saat agent KELUAR/restart →
     ' tidak mengganggu cetak yang sedang berjalan). Return pesan untuk balloon tray, atau Nothing.
     Public Async Function CheckAndStageAsync() As Task(Of String)
@@ -31,8 +53,10 @@ Module Updater
 
             Await mgr.DownloadUpdatesAsync(info)
             mgr.WaitExitThenApplyUpdates(info)       ' pasang saat keluar/restart berikutnya
+            _staged = info
+            _stagedMgr = mgr
 
-            Return "Update " & info.TargetFullRelease.Version.ToString() & " siap — dipasang saat restart."
+            Return "Update " & info.TargetFullRelease.Version.ToString() & " siap — dipasang saat agent menganggur."
         Catch ex As Exception
             Console.WriteLine("Update check error: " & ex.Message)
             Return Nothing

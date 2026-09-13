@@ -8,7 +8,7 @@
     <AssemblyName>GamaPrintAgent.SpikeTransport</AssemblyName>
     <StartupObject>GamaPrintAgent.SpikeTransport.Program</StartupObject>
     <ApplicationIcon>..\..\gamapos.ico</ApplicationIcon>
-    <Version>1.0.2</Version>
+    <Version>1.1.0</Version>
     <LangVersion>latest</LangVersion>
     <OptionStrict>On</OptionStrict>
     <OptionExplicit>On</OptionExplicit>
@@ -24,6 +24,8 @@
     <PackageReference Include="ZXing.Net" Version="0.16.9" />
     <!-- Installer + auto-update. -->
     <PackageReference Include="Velopack" Version="1.2.0" />
+    <!-- Verifikasi tanda tangan Ed25519 katalog resep (PR-12) — net48 tidak punya Ed25519 bawaan. -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
   </ItemGroup>
 
   <ItemGroup>

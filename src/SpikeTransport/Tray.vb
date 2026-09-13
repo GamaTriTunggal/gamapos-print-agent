@@ -81,6 +81,7 @@ Friend Class TrayContext
     Private Sub OnExit(sender As Object, e As EventArgs)
         Program.StopServer()
         If _updateTimer IsNot Nothing Then _updateTimer.Stop()
+        If _applyTimer IsNot Nothing Then _applyTimer.Stop()
         If _tray IsNot Nothing Then
             _tray.Visible = False
             _tray.Dispose()
@@ -95,6 +96,12 @@ Friend Class TrayContext
     End Sub
 
     Private Async Function DoUpdateCheck() As Task
+        ' PR-12: katalog resep disegarkan pada jadwal yang sama (15 dtk setelah start, lalu tiap 6 jam).
+        Try
+            Await RecipeCatalog.RefreshAsync()
+        Catch ex As Exception
+            Console.WriteLine("Katalog refresh error: " & ex.Message)
+        End Try
         Dim msg As String = Await Updater.CheckAndStageAsync()
         If msg IsNot Nothing AndAlso _tray IsNot Nothing Then
             Try
@@ -102,6 +109,22 @@ Friend Class TrayContext
             Catch
             End Try
         End If
+        If Updater.HasStagedUpdate() AndAlso _applyTimer Is Nothing Then
+            ' Terapkan sendiri saat menganggur ≥ 10 menit (K-16 #7) — dicek tiap menit.
+            _applyTimer = New System.Windows.Forms.Timer() With {.Interval = 60000}
+            AddHandler _applyTimer.Tick, AddressOf OnApplyTick
+            _applyTimer.Start()
+        End If
     End Function
+
+    Private _applyTimer As System.Windows.Forms.Timer = Nothing
+
+    Private Sub OnApplyTick(sender As Object, e As EventArgs)
+        If Not Updater.HasStagedUpdate() Then Return
+        If Not Program.IdleFor(TimeSpan.FromMinutes(10)) Then Return
+        If PrinterSetup.IsRunning() Then Return
+        If _applyTimer IsNot Nothing Then _applyTimer.Stop()
+        Updater.ApplyStagedAndRestart()
+    End Sub
 
 End Class

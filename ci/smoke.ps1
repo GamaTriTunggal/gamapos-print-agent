@@ -1,7 +1,9 @@
 # Smoke test Gama Print Agent di CI (windows-latest).
 # Menjalankan exe hasil build sebagai proses latar, menunggu :9111, memeriksa bentuk balasan
-# endpoint, memutar semua fixtures ke POST /print dengan semua peran dipetakan ke
-# "Microsoft Print to PDF", lalu mematikan proses. Exit 1 bila ada yang meleset.
+# endpoint, memutar semua fixtures ke POST /print dengan semua peran dipetakan ke printer virtual
+# berport berkas, menguji katalog resep bertanda tangan (PR-12: sah/diubah/rusak/non-loopback),
+# kode galat pemasangan terstruktur, dan /print/test per peran, lalu mematikan proses.
+# Exit 1 bila ada yang meleset.
 #
 # Pakai lokal (PowerShell, Windows): .\ci\smoke.ps1 -Exe .\src\SpikeTransport\bin\Release\net48\GamaPrintAgent.SpikeTransport.exe
 param(
@@ -49,6 +51,18 @@ try {
 $dataDir = Join-Path $env:LOCALAPPDATA "GamaPrintAgent"
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 @{ CASHIER = $vp; DELIVERY = $vp; QRLABEL = $vp; REPORT = $vp } | ConvertTo-Json | Set-Content (Join-Path $dataDir "printers.json") -Encoding UTF8
+
+# 1b) PR-12: server statis katalog uji (fixtures/catalog, ditandatangani kunci pemilik; versi 0) di
+#     loopback :9112 — python bawaan runner. Agent diarahkan ke sana lewat env (override HANYA loopback).
+$catDir = Resolve-Path (Join-Path $PSScriptRoot "..\fixtures\catalog")
+$catSrv = $null
+try {
+    $catSrv = Start-Process python -ArgumentList @("-m", "http.server", "9112", "--bind", "127.0.0.1", "--directory", "$catDir") -PassThru -WindowStyle Hidden
+    $ok9112 = $false
+    foreach ($i in 1..20) { try { Invoke-RestMethod "http://127.0.0.1:9112/catalog-ok.json" -TimeoutSec 2 | Out-Null; $ok9112 = $true; break } catch { Start-Sleep -Milliseconds 500 } }
+    if (-not $ok9112) { Write-Host "server katalog uji :9112 tidak hidup — pemeriksaan katalog akan gagal" -ForegroundColor Yellow }
+} catch { Write-Host "python http.server gagal: $($_.Exception.Message)" -ForegroundColor Yellow }
+$env:GAMA_AGENT_CATALOG_URL = "http://127.0.0.1:9112/catalog-ok.json"
 
 # 2) Jalankan agent (WinExe tray; mutex single-instance; auto-start HKCU ditulis — runner sekali pakai).
 $proc = Start-Process -FilePath $Exe -PassThru -WindowStyle Hidden
@@ -123,9 +137,58 @@ try {
     } else {
         Fail "printer virtual tidak bisa dibuat — cetak fixtures tidak teruji"
     }
+
+    # 10) PR-12 — /health field aditif (deviceId GUID, osArch, katalog); versi dari assembly.
+    if (-not ($h.deviceId -match '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')) { Fail "/health deviceId bukan GUID: $($h.deviceId)" } else { Ok "/health deviceId GUID" }
+    if ($h.osArch -notin @("x64", "x86", "arm64")) { Fail "/health osArch aneh: $($h.osArch)" } else { Ok "/health osArch=$($h.osArch)" }
+    if ($h.catalogVersion -ne 0 -or $h.catalogSource -notin @("seed", "server")) { Fail "/health katalog awal bukan v0 benih/server: $($h.catalogSource)/$($h.catalogVersion)" } else { Ok "/health katalog v0 ($($h.catalogSource))" }
+    $h2 = Invoke-RestMethod "$base/health" -TimeoutSec 5
+    if ($h2.deviceId -ne $h.deviceId) { Fail "deviceId berubah antar panggilan" } else { Ok "deviceId stabil" }
+
+    # 11) PR-12 — katalog resep bertanda tangan: sah diterima, diubah/rusak/non-loopback ditolak.
+    $rc = Invoke-RestMethod "$base/recipes" -TimeoutSec 5
+    if ($rc.ok -ne $true -or -not (@($rc.recipes.model) -contains "TM-U220")) { Fail "/recipes tanpa TM-U220: $($rc | ConvertTo-Json -Compress)" } else { Ok "/recipes memuat TM-U220" }
+    $okc = Invoke-RestMethod "$base/catalog/refresh" -Method Post -ContentType "application/json" -Body '{"url":"http://127.0.0.1:9112/catalog-ok.json"}' -TimeoutSec 30
+    if ($okc.ok -ne $true -or $okc.source -ne "server" -or $okc.catalogVersion -ne 0) { Fail "refresh katalog sah gagal: $($okc | ConvertTo-Json -Compress)" } else { Ok "refresh katalog sah -> server v0" }
+    $rc = Invoke-RestMethod "$base/recipes" -TimeoutSec 5
+    if (-not (@($rc.recipes.model) -contains "TEST-PRINTER")) { Fail "/recipes tanpa TEST-PRINTER setelah refresh: $($rc | ConvertTo-Json -Compress)" } else { Ok "/recipes memuat TEST-PRINTER" }
+    if (@($rc.recipes.model) -contains "DISABLED-PRINTER") { Fail "/recipes menawarkan resep disabled" } else { Ok "/recipes menyembunyikan resep disabled" }
+    $badc = Invoke-RestMethod "$base/catalog/refresh" -Method Post -ContentType "application/json" -Body '{"url":"http://127.0.0.1:9112/catalog-bad.json"}' -TimeoutSec 30
+    if ($badc.ok -ne $false -or $badc.error -ne "SIGNATURE_INVALID") { Fail "katalog diubah tidak ditolak: $($badc | ConvertTo-Json -Compress)" } else { Ok "katalog diubah -> SIGNATURE_INVALID" }
+    $rc2 = Invoke-RestMethod "$base/recipes" -TimeoutSec 5
+    if ((@($rc2.recipes.model) -contains "EVIL-PRINTER") -or -not (@($rc2.recipes.model) -contains "TEST-PRINTER")) { Fail "/recipes berubah setelah katalog ditolak" } else { Ok "/recipes tetap setelah katalog ditolak" }
+    $brk = Invoke-RestMethod "$base/catalog/refresh" -Method Post -ContentType "application/json" -Body '{"url":"http://127.0.0.1:9112/catalog-broken.json"}' -TimeoutSec 30
+    if ($brk.ok -ne $false -or $brk.error -ne "CATALOG_ENVELOPE_INVALID") { Fail "amplop rusak tidak ditolak: $($brk | ConvertTo-Json -Compress)" } else { Ok "amplop rusak -> CATALOG_ENVELOPE_INVALID" }
+    $rej = Invoke-RestMethod "$base/catalog/refresh" -Method Post -ContentType "application/json" -Body '{"url":"https://evil.example/catalog.json"}' -TimeoutSec 30
+    if ($rej.ok -ne $false -or $rej.error -ne "CATALOG_URL_REJECTED") { Fail "override alamat non-loopback tidak ditolak: $($rej | ConvertTo-Json -Compress)" } else { Ok "override non-loopback -> CATALOG_URL_REJECTED" }
+    $h3 = Invoke-RestMethod "$base/health" -TimeoutSec 5
+    if ($h3.catalogSource -ne "server") { Fail "/health catalogSource != server setelah refresh ($($h3.catalogSource))" } else { Ok "/health catalogSource=server" }
+
+    # 12) PR-12 — /setup/printer: model tak dikenal & resep disabled → UNSUPPORTED_MODEL; paket tak ada →
+    #     3 percobaan → failed + error terstruktur (DOWNLOAD_FAILED / HASH_MISMATCH), bukan teks bebas.
+    foreach ($m in "NOPE", "DISABLED-PRINTER") {
+        $u = Invoke-RestMethod "$base/setup/printer" -Method Post -ContentType "application/json" -Body ('{"model":"' + $m + '"}') -TimeoutSec 10
+        if ($u.ok -ne $false -or $u.error -ne "UNSUPPORTED_MODEL") { Fail "setup $m tidak UNSUPPORTED_MODEL: $($u | ConvertTo-Json -Compress)" } else { Ok "setup $m -> UNSUPPORTED_MODEL" }
+    }
+    $st = Invoke-RestMethod "$base/setup/printer" -Method Post -ContentType "application/json" -Body '{"model":"TEST-PRINTER"}' -TimeoutSec 10
+    if ($st.ok -ne $true -or $st.state -ne "running") { Fail "setup TEST-PRINTER tidak running: $($st | ConvertTo-Json -Compress)" }
+    else {
+        $deadline2 = (Get-Date).AddSeconds(150); $final = $null
+        while ((Get-Date) -lt $deadline2) { Start-Sleep -Seconds 2; $final = Invoke-RestMethod "$base/setup/status" -TimeoutSec 5; if ($final.state -in @("failed", "done")) { break } }
+        if ($null -eq $final -or $final.state -ne "failed" -or $final.error -notin @("DOWNLOAD_FAILED", "HASH_MISMATCH")) { Fail "setup TEST-PRINTER: state=$($final.state) error=$($final.error) msg=$($final.message)" } else { Ok "setup TEST-PRINTER -> failed/$($final.error) (kode terstruktur)" }
+    }
+
+    # 13) PR-12/PR-14 — /print/test {printerRole} mencetak ke printer PERAN (bukan PDF).
+    if ($hasPdf) {
+        $tp = Invoke-RestMethod "$base/print/test" -Method Post -ContentType "application/json" -Body '{"printerRole":"CASHIER"}' -TimeoutSec 60
+        if ($tp.ok -ne $true -or $tp.printer -ne $vp) { Fail "/print/test peran gagal: $($tp | ConvertTo-Json -Compress)" } else { Ok "/print/test CASHIER -> $($tp.printer)" }
+        $tpb = Invoke-RestMethod "$base/print/test" -Method Post -ContentType "application/json" -Body '{"printerRole":"NOPE"}' -TimeoutSec 60
+        if ($tpb.ok -ne $false -or $tpb.error -ne "ROLE_UNMAPPED") { Fail "/print/test peran asing tidak ROLE_UNMAPPED: $($tpb | ConvertTo-Json -Compress)" } else { Ok "/print/test peran asing -> ROLE_UNMAPPED" }
+    }
 }
 finally {
     if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+    if ($catSrv -and -not $catSrv.HasExited) { Stop-Process -Id $catSrv.Id -Force }
     # Bersihkan auto-start yang ditulis agent di runner (kerapian; runner sekali pakai).
     try { Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "GamaPrintAgent" -ErrorAction SilentlyContinue } catch {}
 }

@@ -65,18 +65,30 @@ fetch('http://localhost:9111/health').then(r => r.json()).then(console.log)
 
 > Ingat: `localhost` relatif ke tempat **browser** berjalan → browser harus satu mesin dengan agent.
 
-## Endpoints (spike)
+## Endpoints (v1.1.0 — kontrak: `gamapos-go-2/docs/reference/print-agent-contract.md`)
 
-| Method  | Path           | Spike behavior |
-|---------|----------------|----------------|
-| GET     | `/health`      | `{ ok, agentVersion, schemaVersion, mode:"spike" }` |
-| GET     | `/printers`    | stub (`installed: []`) — enumerasi nyata butuh `System.Drawing` (lihat komentar di `Program.vb`) |
-| POST    | `/print`       | simpan body JSON ke `jobs/` (tidak mencetak) |
-| POST    | `/print/test`  | `{ ok, note }` |
-| OPTIONS | *              | CORS preflight |
+| Method  | Path                 | Balasan |
+|---------|----------------------|---------|
+| GET     | `/health`            | `{ ok, agentVersion, schemaVersion, mode, deviceId, osArch, catalogVersion, catalogSource }` — versi dibaca dari assembly (`<Version>` vbproj = satu sumber) |
+| GET     | `/printers`          | `{ ok, installed[], roles{CASHIER,DELIVERY,QRLABEL,REPORT}, default }` |
+| POST    | `/printers/config`   | simpan peta peran → `printers.json` |
+| POST    | `/print`             | amplop job v1 (BEKU) → cetak ke printer peran |
+| POST    | `/print/test`        | tanpa body: halaman uji ke PDF; body `{printerRole}`: halaman uji ke printer PERAN (`{ok, printer, role}`; `ROLE_UNMAPPED` bila belum dipetakan) |
+| GET     | `/recipes`           | model yang DIKENAL agent ini (dari katalog; resep `disabled` disembunyikan) — gerbang fakta tombol Pasang Otomatis (P-573) |
+| POST    | `/setup/printer`     | `{model}` → mulai pemasangan (async); `UNSUPPORTED_MODEL` bila tak ada di katalog |
+| GET     | `/setup/status`      | `{ ok, state, model, printer, role, message, error }` — `error` = kode terstruktur saat `failed` (`DOWNLOAD_FAILED`, `HASH_MISMATCH`, `UAC_TIMEOUT`, `INSTALL_FAILED`, `INSTALL_START_FAILED`, `EXTRACT_FAILED`, `PACKAGE_INVALID`, `UNSUPPORTED_KIND`, `SETUP_FAILED`) |
+| POST    | `/catalog/refresh`   | segarkan katalog resep sekarang; body opsional `{url}` HANYA loopback (smoke CI) → `{ok, catalogVersion, source, error?}` |
+| OPTIONS | *                    | CORS preflight |
 
-> Catatan: `/health` versi spike menghilangkan `uptimeSec` (ada di kontrak) dan menambah
-> `mode:"spike"` — divergensi sengaja, direkonsiliasi saat kontrak di-lock (M0).
+### Katalog resep (PR-12, K-5)
+
+Resep "Pasang Otomatis" = DATA dari server, bukan kode: `GET https://app.gamapos.id/print-agent/catalog.json`
+(amplop `{alg:"ed25519", keyId, payload(base64), signature}`), diverifikasi dengan kunci publik yang tertanam
+(`RecipeCatalog.vb`, sama dengan `pubkey.go` server) SEBELUM dipakai; versi tidak boleh mundur; salinan
+terakhir-berhasil di `%LOCALAPPDATA%\GamaPrintAgent\catalog\`; benih bawaan = TM-U220 (resep v1.0.2).
+Paket golden diverifikasi SHA-256 (cache maupun unduhan; 3 percobaan). Disegarkan 15 dtk setelah start lalu
+tiap 6 jam (bersama cek update). Override alamat: env `GAMA_AGENT_CATALOG_URL` — loopback saja.
+`fixtures/catalog/` = katalog uji versi 0 yang ditandatangani kunci pemilik (sah / diubah / rusak) untuk smoke CI.
 
 ## Targeting printer per-role (printers.json)
 

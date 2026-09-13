@@ -26,37 +26,22 @@ Imports System.Text.RegularExpressions
 Imports System.Threading
 Imports Newtonsoft.Json
 Imports Newtonsoft.Json.Linq
+Imports System.Security.Cryptography
 
 Module PrinterSetup
 
-    ' Resep per model. Tambah Xprinter / LX-310 di sini setelah golden config-nya terbukti.
-    Private Class Recipe
-        Public Model As String        ' kunci model (mis. "TM-U220") — dilaporkan di status
-        Public Url As String          ' paket preset di R2
-        Public FileName As String     ' nama file lokal (di folder cache)
-        Public PrinterName As String  ' nama printer Windows yang dibuat → untuk verifikasi + map peran
-        Public Role As String         ' peran printers.json (CASHIER / QRLABEL / DELIVERY / REPORT)
-        Public Kind As String         ' mekanisme: "apd" (APD Silent Installer .exe) | "seagull" (zip driver + DriverWizard)
-        Public DriverModel As String  ' hanya kind=seagull: string /model: untuk DriverWizard install
-    End Class
+    ' Resep TIDAK lagi tertanam di sini (PR-12, K-5): sumbernya RecipeCatalog (benih bawaan → salinan
+    ' terakhir-berhasil → katalog server bertanda tangan). Modul ini hanya mengenal `Kind` sebagai kode.
 
-    Private ReadOnly Recipes As New Dictionary(Of String, Recipe)(StringComparer.OrdinalIgnoreCase) From {
-        {"TM-U220", New Recipe With {
-            .Model = "TM-U220",
-            .Url = "https://installers.gamapos.id/golden/TM-U220-golden.exe",
-            .FileName = "TM-U220-golden.exe",
-            .PrinterName = "EPSON TM-U220 Receipt",
-            .Role = "CASHIER",
-            .Kind = "apd"}},
-        {"Xprinter-360B", New Recipe With {
-            .Model = "Xprinter-360B",
-            .Url = "https://installers.gamapos.id/golden/Xprinter-360B-golden.zip",
-            .FileName = "Xprinter-360B-golden.zip",
-            .PrinterName = "Xprinter XP-360B",
-            .Role = "QRLABEL",
-            .Kind = "seagull",
-            .DriverModel = "Xprinter XP-360B"}}
-    }
+    ' Galat pemasangan ber-KODE terstruktur (kontrak §C.2: web membaca `error`, bukan mem-parse teks).
+    Private Class SetupError
+        Inherits Exception
+        Public ReadOnly Code As String
+        Public Sub New(code As String, message As String)
+            MyBase.New(message)
+            Me.Code = code
+        End Sub
+    End Class
 
     ' Status pemasangan (async). Hanya SATU setup berjalan pada satu waktu (dijaga StatusLock).
     Private ReadOnly StatusLock As New Object()
@@ -65,6 +50,7 @@ Module PrinterSetup
     Private _printer As String = ""
     Private _role As String = ""
     Private _message As String = ""
+    Private _error As String = ""        ' kode galat terstruktur saat failed (PR-12), "" bila tidak ada
 
     ' Folder cache paket preset — di DataDir (%LOCALAPPDATA%) supaya bertahan lintas update Velopack.
     Private Function SetupDir() As String
@@ -88,8 +74,8 @@ Module PrinterSetup
         End Try
         If String.IsNullOrWhiteSpace(model) Then Return ErrJson("BAD_PAYLOAD", "model kosong.")
 
-        Dim rec As Recipe = Nothing
-        If Not Recipes.TryGetValue(model.Trim(), rec) Then
+        Dim rec As Recipe = RecipeCatalog.Find(model)
+        If rec Is Nothing Then
             Return ErrJson("UNSUPPORTED_MODEL", "Model tidak dikenal: " & model)
         End If
 
@@ -103,7 +89,9 @@ Module PrinterSetup
             _printer = rec.PrinterName
             _role = rec.Role
             _message = "Menyiapkan…"
+            _error = ""
         End SyncLock
+        Program.MarkActivity()
 
         Dim t As New Thread(Sub() RunSetupBackground(rec))
         t.IsBackground = True
@@ -121,8 +109,16 @@ Module PrinterSetup
                 {"model", _model},
                 {"printer", _printer},
                 {"role", _role},
-                {"message", _message}
+                {"message", _message},
+                {"error", If(_error = "", Nothing, CObj(_error))}
             })
+        End SyncLock
+    End Function
+
+    ' Sedang memasang? (dipakai penundaan penerapan update saat menganggur — Tray.OnApplyTick)
+    Public Function IsRunning() As Boolean
+        SyncLock StatusLock
+            Return _state = "running"
         End SyncLock
     End Function
 
@@ -139,10 +135,11 @@ Module PrinterSetup
         End SyncLock
     End Sub
 
-    Private Sub SetFailed(msg As String)
+    Private Sub SetFailed(code As String, msg As String)
         SyncLock StatusLock
             _state = "failed"
             _message = msg
+            _error = If(code, "")
         End SyncLock
     End Sub
 
@@ -154,60 +151,106 @@ Module PrinterSetup
             Dim pkg As String = EnsurePackage(rec)
 
             SetMessage("Memasang driver — klik 'Yes' saat izin admin (UAC) muncul…")
-            Dim err As String
             Select Case rec.Kind.ToLowerInvariant()
                 Case "apd"
-                    err = RunApdAndWait(pkg, rec.PrinterName)
+                    RunApdAndWait(pkg, rec.PrinterName)
                 Case "seagull"
-                    err = RunSeagullAndWait(pkg, rec.PrinterName, rec.DriverModel)
+                    RunSeagullAndWait(pkg, rec.PrinterName, rec.DriverModel)
                 Case Else
-                    err = "Jenis installer tak dikenal: " & rec.Kind
+                    Throw New SetupError("UNSUPPORTED_KIND", "Jenis installer tak dikenal: " & rec.Kind)
             End Select
-            If err <> "" Then
-                Console.WriteLine("   INSTALL: " & err)
-                SetFailed(err)
-                Return
-            End If
 
             ' Auto-map peran ke printers.json (merge — peran lain tak diubah).
             Printers.SetRole(rec.Role, rec.PrinterName)
             Console.WriteLine("   setup OK: " & rec.PrinterName & " → " & rec.Role)
             SetDone()
+        Catch se As SetupError
+            Console.WriteLine("   " & se.Code & ": " & se.Message)
+            SetFailed(se.Code, se.Message)
         Catch ex As Exception
             Console.WriteLine("   SETUP_FAILED: " & ex.Message)
-            SetFailed(ex.Message)
+            SetFailed("SETUP_FAILED", ex.Message)
         End Try
     End Sub
 
-    ' Unduh paket ke folder cache; skip bila sudah ada & berukuran wajar (>1 MB). Return path lokal.
+    ' Paket golden di cache HANYA dipercaya bila SHA-256-nya = katalog (PR-12; K-16 #2): cache tak
+    ' cocok → dihapus + diunduh ulang; unduhan diverifikasi lagi; 3 percobaan bertingkat →
+    ' DOWNLOAD_FAILED / HASH_MISMATCH (kode terstruktur → web menawarkan jalur manual).
     Private Function EnsurePackage(rec As Recipe) As String
         Dim dest As String = Path.Combine(SetupDir(), rec.FileName)
         Try
-            If File.Exists(dest) AndAlso New FileInfo(dest).Length > 1024L * 1024L Then
-                Console.WriteLine("   paket sudah di cache: " & dest)
-                Return dest
+            If File.Exists(dest) Then
+                If String.Equals(Sha256Hex(dest), rec.Sha256, StringComparison.OrdinalIgnoreCase) Then
+                    Console.WriteLine("   paket di cache cocok SHA-256: " & dest)
+                    Return dest
+                End If
+                Console.WriteLine("   paket di cache TIDAK cocok SHA-256 — dihapus: " & dest)
+                File.Delete(dest)
             End If
-        Catch
+        Catch ex As Exception
+            Console.WriteLine("   cache tak terbaca (" & ex.Message & ") — unduh ulang")
         End Try
 
-        Console.WriteLine("   mengunduh paket: " & rec.Url)
         ' Cloudflare butuh TLS 1.2+. net48 umumnya default OS, tapi pastikan.
         ServicePointManager.SecurityProtocol = ServicePointManager.SecurityProtocol Or SecurityProtocolType.Tls12
         Dim tmp As String = dest & ".tmp"
-        Try
-            Using wc As New WebClient()
-                wc.DownloadFile(rec.Url, tmp)
-            End Using
-        Catch ex As Exception
+        Dim lastErr As String = ""
+        Dim lastCode As String = "DOWNLOAD_FAILED"
+        For attempt As Integer = 1 To 3
+            SetMessage("Mengunduh paket driver (" & attempt & "/3)…")
+            Console.WriteLine("   mengunduh paket (" & attempt & "/3): " & rec.Url)
             Try
-                If File.Exists(tmp) Then File.Delete(tmp)
-            Catch
+                Using wc As New TimeoutWebClient(180000)
+                    wc.DownloadFile(rec.Url, tmp)
+                End Using
+                Dim got As String = Sha256Hex(tmp)
+                If Not String.Equals(got, rec.Sha256, StringComparison.OrdinalIgnoreCase) Then
+                    lastCode = "HASH_MISMATCH"
+                    lastErr = "SHA-256 paket tidak cocok dengan katalog (" & got.Substring(0, 12) & "… ≠ " & rec.Sha256.Substring(0, 12) & "…)."
+                    Console.WriteLine("   " & lastErr)
+                    Try
+                        File.Delete(tmp)
+                    Catch
+                    End Try
+                Else
+                    If File.Exists(dest) Then File.Delete(dest)
+                    File.Move(tmp, dest)
+                    Return dest
+                End If
+            Catch ex As Exception
+                lastCode = "DOWNLOAD_FAILED"
+                lastErr = "Gagal mengunduh paket: " & ex.Message
+                Console.WriteLine("   " & lastErr)
+                Try
+                    If File.Exists(tmp) Then File.Delete(tmp)
+                Catch
+                End Try
             End Try
-            Throw New Exception("Gagal mengunduh paket: " & ex.Message)
-        End Try
-        If File.Exists(dest) Then File.Delete(dest)
-        File.Move(tmp, dest)
-        Return dest
+            If attempt < 3 Then Thread.Sleep(2000 * attempt)
+        Next
+        Throw New SetupError(lastCode, lastErr & " Coba lagi nanti, atau pasang manual.")
+    End Function
+
+    ' WebClient dengan batas waktu (bawaan WebClient tanpa timeout → pemasangan bisa menggantung selamanya).
+    Private Class TimeoutWebClient
+        Inherits WebClient
+        Private ReadOnly _timeoutMs As Integer
+        Public Sub New(timeoutMs As Integer)
+            _timeoutMs = timeoutMs
+        End Sub
+        Protected Overrides Function GetWebRequest(address As Uri) As WebRequest
+            Dim r As WebRequest = MyBase.GetWebRequest(address)
+            If r IsNot Nothing Then r.Timeout = _timeoutMs
+            Return r
+        End Function
+    End Class
+
+    Private Function Sha256Hex(filePath As String) As String
+        Using sha As SHA256 = SHA256.Create()
+            Using fs As New FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read)
+                Return BitConverter.ToString(sha.ComputeHash(fs)).Replace("-", "").ToLowerInvariant()
+            End Using
+        End Using
     End Function
 
     ' Jalankan paket APD Silent lalu POLL sampai printer muncul (bukti sebenarnya).
@@ -215,9 +258,9 @@ Module PrinterSetup
     ' (broker), sehingga proses yang dikembalikan Process.Start langsung "exit" → WaitForExit
     ' tak berarti. UAC muncul selama poll → user klik Yes → driver terpasang → printer muncul.
     ' Return "" bila sukses, atau string alasan bila gagal.
-    Private Function RunApdAndWait(pkg As String, expectedPrinter As String) As String
+    Private Sub RunApdAndWait(pkg As String, expectedPrinter As String)
         ' Sudah terpasang? Lewati install (idempotent) — hindari UAC ulang; peran tetap di-map di pemanggil.
-        If IsPrinterInstalled(expectedPrinter) Then Return ""
+        If IsPrinterInstalled(expectedPrinter) Then Return
 
         Dim dir As String = Path.GetDirectoryName(pkg)
         Dim resultLog As String = Path.Combine(dir, "APD4SilentSetup.log")
@@ -236,7 +279,7 @@ Module PrinterSetup
         Try
             Process.Start(psi)
         Catch ex As Exception
-            Return "Gagal menjalankan paket installer: " & ex.Message
+            Throw New SetupError("INSTALL_START_FAILED", "Gagal menjalankan paket installer: " & ex.Message)
         End Try
 
         ' Poll: SUKSES saat printer muncul. Beri waktu user klik Yes di UAC + instalasi jalan.
@@ -247,25 +290,25 @@ Module PrinterSetup
             Thread.Sleep(stepMs)
             waited += stepMs
 
-            If IsPrinterInstalled(expectedPrinter) Then Return ""   ' SUKSES (ground truth)
+            If IsPrinterInstalled(expectedPrinter) Then Return   ' SUKSES (ground truth)
 
             ' Bila installer sudah menulis log dengan kode GAGAL terminal (bukan 0/-3), berhenti awal.
             Dim code As Integer
             If TryParseResultCode(resultLog, code) AndAlso code <> 0 AndAlso code <> -3 Then
-                Return "Instalasi gagal (Result Code " & code & ")."
+                Throw New SetupError("INSTALL_FAILED", "Instalasi gagal (Result Code " & code & ").")
             End If
         End While
 
-        Return "Instalasi tidak terdeteksi dalam 2,5 menit. Pastikan Anda klik 'Yes' saat jendela UAC (izin admin) muncul."
-    End Function
+        Throw New SetupError("UAC_TIMEOUT", "Instalasi tidak terdeteksi dalam 2,5 menit. Pastikan Anda klik 'Yes' saat jendela UAC (izin admin) muncul.")
+    End Sub
 
     ' Paket driver Seagull (zip) → extract → jalankan DriverWizard install (unattended) → POLL printer muncul.
     ' Golden config membawa DAFTAR stock (mis. 40×30) lewat Common\Defaults[SS]_*.sds yang sudah di-bake.
     ' Default stock TIDAK di-set di sini (batasan Seagull pada install baru) — QrLabel.vb yang memilih 40×30
     ' saat cetak. /autodetect = deteksi port USB printer yang tercolok (butuh printer fisik saat install).
-    Private Function RunSeagullAndWait(zipPath As String, expectedPrinter As String, driverModel As String) As String
+    Private Sub RunSeagullAndWait(zipPath As String, expectedPrinter As String, driverModel As String)
         ' Sudah terpasang? Lewati (idempotent) — peran tetap di-map di pemanggil.
-        If IsPrinterInstalled(expectedPrinter) Then Return ""
+        If IsPrinterInstalled(expectedPrinter) Then Return
 
         ' Extract paket ke folder di samping zip.
         Dim extractDir As String = Path.Combine(Path.GetDirectoryName(zipPath), "xprinter-driver")
@@ -276,11 +319,11 @@ Module PrinterSetup
         Try
             ZipFile.ExtractToDirectory(zipPath, extractDir)
         Catch ex As Exception
-            Return "Gagal mengekstrak paket driver: " & ex.Message
+            Throw New SetupError("EXTRACT_FAILED", "Gagal mengekstrak paket driver: " & ex.Message)
         End Try
 
         Dim dw As String = FindFileRecursive(extractDir, "DriverWizard.exe")
-        If String.IsNullOrEmpty(dw) Then Return "DriverWizard.exe tak ditemukan di paket driver."
+        If String.IsNullOrEmpty(dw) Then Throw New SetupError("PACKAGE_INVALID", "DriverWizard.exe tak ditemukan di paket driver.")
 
         Dim args As String = "install /name:""" & expectedPrinter & """ /model:""" & driverModel & """ /autodetect"
         Dim psi As New ProcessStartInfo() With {
@@ -293,7 +336,7 @@ Module PrinterSetup
         Try
             Process.Start(psi)
         Catch ex As Exception
-            Return "Gagal menjalankan DriverWizard: " & ex.Message
+            Throw New SetupError("INSTALL_START_FAILED", "Gagal menjalankan DriverWizard: " & ex.Message)
         End Try
 
         ' Poll: SUKSES saat printer muncul (bukti). Beri waktu UAC + instalasi.
@@ -303,11 +346,11 @@ Module PrinterSetup
         While waited < maxMs
             Thread.Sleep(stepMs)
             waited += stepMs
-            If IsPrinterInstalled(expectedPrinter) Then Return ""
+            If IsPrinterInstalled(expectedPrinter) Then Return
         End While
 
-        Return "Instalasi tidak terdeteksi dalam 2,5 menit. Pastikan printer tercolok (USB) & klik 'Yes' saat UAC."
-    End Function
+        Throw New SetupError("UAC_TIMEOUT", "Instalasi tidak terdeteksi dalam 2,5 menit. Pastikan printer tercolok (USB) & klik 'Yes' saat UAC.")
+    End Sub
 
     ' Cari file (nama persis) rekursif di dalam root. "" bila tak ada.
     Private Function FindFileRecursive(root As String, fileName As String) As String

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "version": 0,
+  "signedAt": "2026-09-13T11:00:00+07:00",
+  "recipes": [
+    {
+      "model": "TM-U220",
+      "kind": "apd",
+      "url": "https://installers.gamapos.id/golden/TM-U220-golden.exe",
+      "fileName": "TM-U220-golden.exe",
+      "sha256": "61871ea3565d5ba33fc3d2f7880a4bdc422a32e22ee527596fb5d1438c47b7f6",
+      "size": 15179776,
+      "printerName": "EPSON TM-U220 Receipt",
+      "role": "CASHIER",
+      "disabled": false
+    },
+    {
+      "model": "TEST-PRINTER",
+      "kind": "apd",
+      "url": "https://installers.gamapos.id/golden/does-not-exist-test.exe",
+      "fileName": "does-not-exist-test.exe",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "size": 1,
+      "printerName": "Test Printer (smoke)",
+      "role": "REPORT",
+      "disabled": false,
+      "note": "HANYA untuk smoke CI: katalog uji versi 0 (armada menyimpan versi >= 1 → tidak pernah menggantikan katalog nyata)"
+    },
+    {
+      "model": "DISABLED-PRINTER",
+      "kind": "seagull",
+      "url": "https://installers.gamapos.id/golden/does-not-exist-disabled.zip",
+      "fileName": "does-not-exist-disabled.zip",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "size": 1,
+      "printerName": "Disabled Printer (smoke)",
+      "role": "QRLABEL",
+      "driverModel": "X",
+      "disabled": true
+    }
+  ]
+}

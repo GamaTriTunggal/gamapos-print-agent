@@ -27,8 +27,72 @@ Imports Velopack
 Module Program
 
     Private Const Prefix As String = "http://localhost:9111/"
-    Private Const AgentVersion As String = "1.0.2"
+    ' Versi SATU sumber (aturan mutlak 5, PR-12): <Version> vbproj → AssemblyVersion → "Major.Minor.Build".
+    Private ReadOnly AgentVersion As String = AssemblyVersionString()
     Private Const SchemaVersion As Integer = 1
+
+    ' Waktu aktivitas terakhir (cetak / pemasangan) — penerapan update saat MENGANGGUR (K-16 #7).
+    Private _lastActivityUtc As DateTime = DateTime.UtcNow
+
+    Friend Sub MarkActivity()
+        _lastActivityUtc = DateTime.UtcNow
+    End Sub
+
+    Friend Function IdleFor(span As TimeSpan) As Boolean
+        Return DateTime.UtcNow - _lastActivityUtc >= span
+    End Function
+
+    Public Function AgentVersionString() As String
+        Return AgentVersion
+    End Function
+
+    Private Function AssemblyVersionString() As String
+        Try
+            Dim v As Version = Reflection.Assembly.GetExecutingAssembly().GetName().Version
+            Return v.Major & "." & v.Minor & "." & v.Build
+        Catch
+            Return "0.0.0"
+        End Try
+    End Function
+
+    ' Arsitektur OS dari variabel lingkungan Windows (ARM64 memakai emulasi x64 → Is64BitOperatingSystem
+    ' tidak cukup): PROCESSOR_ARCHITEW6432 (proses 32-bit di OS 64-bit) → PROCESSOR_ARCHITECTURE.
+    Private Function OsArch() As String
+        Dim a As String = Environment.GetEnvironmentVariable("PROCESSOR_ARCHITEW6432")
+        If String.IsNullOrEmpty(a) Then a = Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE")
+        Select Case If(a, "").ToUpperInvariant()
+            Case "AMD64" : Return "x64"
+            Case "ARM64" : Return "arm64"
+            Case "X86" : Return "x86"
+            Case Else : Return If(Environment.Is64BitOperatingSystem, "x64", "x86")
+        End Select
+    End Function
+
+    ' GUID perangkat (PR-12): dibuat sekali di %APPDATA%\GamaPrintAgent\device-id, bertahan lintas uninstall.
+    Private _deviceId As String = Nothing
+
+    Private Function DeviceId() As String
+        If _deviceId IsNot Nothing Then Return _deviceId
+        Dim p As String = AppPaths.DeviceIdPath()
+        Try
+            If File.Exists(p) Then
+                Dim g As Guid
+                If Guid.TryParse(File.ReadAllText(p).Trim(), g) Then
+                    _deviceId = g.ToString("D")
+                    Return _deviceId
+                End If
+            End If
+        Catch
+        End Try
+        Dim fresh As String = Guid.NewGuid().ToString("D")
+        Try
+            File.WriteAllText(p, fresh & Environment.NewLine, New UTF8Encoding(False))
+        Catch ex As Exception
+            Console.WriteLine("device-id tidak bisa disimpan: " & ex.Message)
+        End Try
+        _deviceId = fresh
+        Return _deviceId
+    End Function
 
     Private _listener As HttpListener = Nothing
     Private _instanceMutex As Mutex = Nothing
@@ -46,6 +110,7 @@ Module Program
 
         AppPaths.SetupLogging()   ' Console.WriteLine → file log (WinExe tak punya jendela console)
         AutoStart.Enable()        ' daftar auto-start (HKCU Run) — agent jalan otomatis tiap login user
+        RecipeCatalog.Load()      ' PR-12: benih → salinan terakhir-berhasil; server disegarkan oleh timer tray
         Application.EnableVisualStyles()
         Application.SetCompatibleTextRenderingDefault(False)
 
@@ -78,7 +143,8 @@ Module Program
         End Try
 
         Console.WriteLine("Gama Print Agent v" & AgentVersion & " listening on " & Prefix)
-        Console.WriteLine("Endpoints: GET /health | GET /printers | POST /print | POST /print/test | POST /printers/config | POST /setup/printer | GET /setup/status")
+        Console.WriteLine("Endpoints: GET /health | GET /printers | GET /recipes | POST /print | POST /print/test | POST /printers/config | POST /setup/printer | GET /setup/status | POST /catalog/refresh")
+        Console.WriteLine("Katalog resep: versi " & RecipeCatalog.Version() & " (" & RecipeCatalog.Source() & ") | deviceId " & DeviceId() & " | " & OsArch())
         Console.WriteLine(Printers.ConfigSummary())
         ' Bila proses sebelumnya mati saat cetak (default printer Windows belum dikembalikan), pulihkan.
         Printers.RestoreDefaultPrinterIfNeeded()
@@ -164,13 +230,27 @@ Module Program
         Select Case method & " " & path
 
             Case "GET /health"
-                WriteJson(ctx, 200, $"{{""ok"":true,""agentVersion"":""{AgentVersion}"",""schemaVersion"":{SchemaVersion},""mode"":""spike""}}")
+                ' Field lama tetap (ok, agentVersion, schemaVersion, mode); tambahan PR-12 aditif:
+                ' deviceId, osArch, catalogVersion, catalogSource.
+                WriteJson(ctx, 200, JsonConvert.SerializeObject(New Dictionary(Of String, Object) From {
+                    {"ok", True}, {"agentVersion", AgentVersion}, {"schemaVersion", SchemaVersion}, {"mode", "spike"},
+                    {"deviceId", DeviceId()}, {"osArch", OsArch()},
+                    {"catalogVersion", RecipeCatalog.Version()}, {"catalogSource", RecipeCatalog.Source()}}))
+
+            Case "GET /recipes"
+                ' PR-12 / P-573: model yang benar-benar dikenal agent ini (gerbang fakta tombol Pasang Otomatis).
+                WriteJson(ctx, 200, RecipeCatalog.RecipesJson())
+
+            Case "POST /catalog/refresh"
+                ' Segarkan katalog sekarang (tray juga melakukannya berkala). Body opsional {url} loopback (smoke).
+                WriteJson(ctx, 200, RecipeCatalog.RefreshJson(ReadBody(req)))
 
             Case "GET /printers"
                 ' Printer terpasang + peta role (printers.json) + default Windows.
                 WriteJson(ctx, 200, Printers.StatusJson())
 
             Case "POST /print"
+                MarkActivity()
                 Dim body As String
                 Try
                     body = ReadBody(req)
@@ -188,10 +268,39 @@ Module Program
                 WriteJson(ctx, 200, Dispatch(body))
 
             Case "POST /print/test"
-                Dim pdf As String = Nothing
-                Printers.Serialize(Sub() pdf = PrintTestPage())
-                Console.WriteLine("   printed -> " & pdf)
-                WriteJson(ctx, 200, $"{{""ok"":true,""printed"":{JsonString(pdf)}}}")
+                MarkActivity()
+                ' Tanpa body = perilaku lama (PDF, PrintToFile). Body {printerRole} (PR-12/PR-14): cetak halaman
+                ' uji ke printer PERAN lewat jalur cetak yang sama — bukti nyata "printer nota ini bekerja".
+                Dim role As String = Nothing
+                Dim tbody As String = ReadBody(req)
+                If Not String.IsNullOrWhiteSpace(tbody) Then
+                    Try
+                        role = JObject.Parse(tbody).Value(Of String)("printerRole")
+                    Catch
+                        WriteJson(ctx, 200, "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""Body harus { ""printerRole"": ""CASHIER"" } atau kosong.""}")
+                        Return
+                    End Try
+                End If
+                If String.IsNullOrWhiteSpace(role) Then
+                    Dim pdf As String = Nothing
+                    Printers.Serialize(Sub() pdf = PrintTestPage())
+                    Console.WriteLine("   printed -> " & pdf)
+                    WriteJson(ctx, 200, $"{{""ok"":true,""printed"":{JsonString(pdf)}}}")
+                Else
+                    Dim target As String = Printers.Resolve(role.Trim().ToUpperInvariant())
+                    If String.IsNullOrEmpty(target) Then
+                        WriteJson(ctx, 200, "{""ok"":false,""error"":""ROLE_UNMAPPED"",""message"":""Belum ada printer yang dipilih untuk peran " & role.Trim().ToUpperInvariant() & ".""}")
+                    Else
+                        Try
+                            Printers.Serialize(Sub() PrintTestPageTo(target))
+                            Console.WriteLine("   test page -> " & target & " (" & role & ")")
+                            WriteJson(ctx, 200, "{""ok"":true,""printer"":" & JsonString(target) & ",""role"":" & JsonString(role.Trim().ToUpperInvariant()) & "}")
+                        Catch ex As Exception
+                            Console.WriteLine("   PRINT_FAILED (test): " & ex.Message)
+                            WriteJson(ctx, 200, "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}")
+                        End Try
+                    End If
+                End If
 
             Case "POST /printers/config"
                 WriteJson(ctx, 200, Printers.SaveConfig(ReadBody(req)))

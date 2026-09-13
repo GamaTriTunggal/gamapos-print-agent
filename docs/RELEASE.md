@@ -6,14 +6,17 @@ Setiap butir wajib dicentang; hasilnya dicatat di `release-journal.md`.
 ## Sebelum `pack.ps1`
 
 - [ ] CI hijau di commit yang akan dirilis (`.github/workflows/ci.yml`).
-- [ ] `<Version>` di `SpikeTransport.vbproj` dinaikkan; `AgentVersion` di `Program.vb` SAMA
-      (sampai PR-12 menyatukannya).
+- [ ] `<Version>` di `SpikeTransport.vbproj` dinaikkan (SATU sumber sejak 1.1.0 — `/health` membacanya
+      dari assembly; smoke CI memeriksa keduanya sama).
 - [ ] Tidak ada jalur kode uninstall/downgrade driver (aturan mutlak 2): `grep -ri "uninstall\|printui\|Remove-Printer" src/` hanya mengenai komentar.
 - [ ] Perubahan endpoint dicatat di `gamapos-go-2/docs/reference/print-agent-contract.md` §C
       (delta berversi) + `P-xxx` register — commit repo Go menyebut commit repo ini.
 - [ ] Perubahan perilaku cetak armada (aturan mutlak 3) sudah DIKETOK pemilik dan disebut di
       catatan rilis; bila belum, cabut dari rilis.
-- [ ] Hash SHA-256 paket golden yang dirujuk resep/katalog dicatat di catatan rilis.
+- [ ] Hash SHA-256 paket golden yang dirujuk katalog dicatat di catatan rilis (sumber:
+      `gamapos-go-2/internal/features/printagentcatalog/catalog.json`).
+- [ ] Kunci publik katalog di `RecipeCatalog.vb` = `pubkey.go` server (kunci privat TIDAK pernah
+      ikut repo; `fixtures/catalog/*.json` = katalog uji versi 0 bertanda tangan — bukan rahasia).
 
 ## `pack.ps1` + unggah
 

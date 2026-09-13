@@ -38,6 +38,27 @@ Module AppPaths
         Return Path.Combine(DataDir(), "debug.flag")
     End Function
 
+    ' %APPDATA%\GamaPrintAgent\device-id (PR-12): di LUAR folder instalasi maupun data LOCALAPPDATA —
+    ' bertahan lintas uninstall; GUID dibuat sekali, dilaporkan /health (pemantau perangkat K-16.4).
+    Public Function DeviceIdPath() As String
+        Dim d As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GamaPrintAgent")
+        Try
+            Directory.CreateDirectory(d)
+        Catch
+        End Try
+        Return Path.Combine(d, "device-id")
+    End Function
+
+    ' Salinan terakhir-berhasil katalog resep (PR-12) — di data dir, bertahan lintas update Velopack.
+    Public Function CatalogDir() As String
+        Dim d As String = Path.Combine(DataDir(), "catalog")
+        Try
+            Directory.CreateDirectory(d)
+        Catch
+        End Try
+        Return d
+    End Function
+
     Public Function JobsDir() As String
         Dim d As String = Path.Combine(DataDir(), "jobs")
         Try
