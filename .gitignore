@@ -39,3 +39,7 @@ Thumbs.db
 ## Vendored assemblies (mis. Microsoft.VisualBasic.PowerPacks) — kecualikan dari *.dll global
 !lib/
 !lib/*.dll
+
+## Keluaran pack.ps1 (rilis dibangun di VM; artefak diunggah ke GitHub Release, bukan di-commit)
+publish/
+Releases/
