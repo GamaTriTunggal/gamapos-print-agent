@@ -17,8 +17,8 @@ PowerPacks) — "Opsi B". Tanpa dialog cetak browser.
 
 | Versi | Saluran | Keadaan |
 |---|---|---|
-| **1.0.2** (12 Jul 2026) | rilis penuh — `releases/latest` | yang dipakai armada PC toko hari ini |
-| **1.1.0** (13 Sep 2026) | **pre-release** (pilot) | agent pembaca katalog resep dari server; PC uji pemilik lulus; pilot Vin Jaya menyusul (papan printer PR-13) |
+| **1.1.0** (13 Sep 2026; promosi 15 Sep 2026 14:59 WIB) | rilis penuh — `releases/latest` | agent pembaca katalog resep dari server; PC uji pemilik lulus 13 Sep; armada (Vin Jaya + Vin Jaya 2) memperbarui diri lewat auto-update |
+| **1.0.2** (12 Jul 2026) | rilis penuh sebelumnya | tetap tersedia sebagai jalan mundur manual |
 
 Ceklis rilis: [`docs/RELEASE.md`](docs/RELEASE.md) · jurnal tiap rilis: [`docs/release-journal.md`](docs/release-journal.md).
 Satu rilis penuh = SELURUH armada dalam ≤ 6 jam (+ saat PC dimulai ulang) tanpa jalan pulang otomatis —
