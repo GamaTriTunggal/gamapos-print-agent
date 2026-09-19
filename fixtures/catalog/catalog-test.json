@@ -12,7 +12,10 @@
       "size": 15179776,
       "printerName": "EPSON TM-U220 Receipt",
       "role": "CASHIER",
-      "disabled": false
+      "disabled": false,
+      "usbIds": [
+        "USB\\VID_04B8&PID_0202"
+      ]
     },
     {
       "model": "TEST-PRINTER",
@@ -37,6 +40,34 @@
       "role": "QRLABEL",
       "driverModel": "X",
       "disabled": true
+    },
+    {
+      "model": "TEST-LABEL",
+      "kind": "seagull",
+      "url": "https://installers.gamapos.id/golden/does-not-exist-label.zip",
+      "fileName": "does-not-exist-label.zip",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "size": 1,
+      "printerName": "Test Label (smoke)",
+      "role": "QRLABEL",
+      "driverModel": "X",
+      "disabled": false,
+      "usbIds": [
+        "USB\\VID_FFFF&PID_0001"
+      ],
+      "note": "HANYA smoke CI (P-592): seagull menunggu printer tercolok SEBELUM unduh → waiting_printer/WAITING_CABLE (perangkat VID_FFFF tidak pernah ada di runner) → POST /setup/cancel → idle"
+    },
+    {
+      "model": "TEST-EXISTING",
+      "kind": "apd",
+      "url": "https://installers.gamapos.id/golden/does-not-exist-existing.exe",
+      "fileName": "does-not-exist-existing.exe",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "size": 1,
+      "printerName": "Gama Smoke Printer",
+      "role": "REPORT",
+      "disabled": false,
+      "note": "HANYA smoke CI (P-592): antrean 'Gama Smoke Printer' dibuat smoke.ps1 → pemasangan dilewati (idempoten) → auto-map dua tahap: REPORT kosong/sama → applied; REPORT menunjuk printer lain → conflict + previousPrinter, tidak ditimpa"
     }
   ]
 }

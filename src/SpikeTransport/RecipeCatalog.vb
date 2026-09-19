@@ -34,6 +34,9 @@ Public Class Recipe
     Public Property Role As String          ' CASHIER | QRLABEL | DELIVERY | REPORT
     Public Property DriverModel As String   ' seagull saja
     Public Property Disabled As Boolean
+    ' Residu PR-12 (P-592): hardware ID USB perangkat (mis. "USB\VID_04B8&PID_0202") untuk state
+    ' waiting_printer — opsional; kosong = kehadiran perangkat tidak diperiksa. Agent 1.1.0 mengabaikannya.
+    Public Property UsbIds As List(Of String)
 End Class
 
 Module RecipeCatalog
@@ -51,7 +54,8 @@ Module RecipeCatalog
         "{""schemaVersion"":1,""version"":0,""signedAt"":""2026-09-13T00:00:00+07:00"",""recipes"":[" &
         "{""model"":""TM-U220"",""kind"":""apd"",""url"":""https://installers.gamapos.id/golden/TM-U220-golden.exe""," &
         """fileName"":""TM-U220-golden.exe"",""sha256"":""61871ea3565d5ba33fc3d2f7880a4bdc422a32e22ee527596fb5d1438c47b7f6""," &
-        """size"":15179776,""printerName"":""EPSON TM-U220 Receipt"",""role"":""CASHIER"",""disabled"":false}]}"
+        """size"":15179776,""printerName"":""EPSON TM-U220 Receipt"",""role"":""CASHIER"",""disabled"":false," &
+        """usbIds"":[""USB\\VID_04B8&PID_0202""]}]}"
 
     Private ReadOnly StateLock As New Object()
     Private _recipes As New Dictionary(Of String, Recipe)(StringComparer.OrdinalIgnoreCase)
@@ -380,8 +384,15 @@ Module RecipeCatalog
                 Return "role tidak dikenal"
         End Select
         If r.Kind = "seagull" AndAlso String.IsNullOrWhiteSpace(r.DriverModel) Then Return "seagull butuh driverModel"
+        If r.UsbIds IsNot Nothing Then
+            For Each id As String In r.UsbIds
+                If id Is Nothing OrElse Not UsbId.IsMatch(id) Then Return "usbIds harus berbentuk USB\VID_xxxx&PID_xxxx"
+            Next
+        End If
         Return ""
     End Function
+
+    Private ReadOnly UsbId As New Regex("^USB\\VID_[0-9A-Fa-f]{4}&PID_[0-9A-Fa-f]{4}$", RegexOptions.Compiled)
 
     Private Function LastGoodPath() As String
         Return Path.Combine(AppPaths.CatalogDir(), "catalog.json")

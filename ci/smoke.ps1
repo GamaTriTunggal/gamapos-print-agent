@@ -2,8 +2,9 @@
 # Menjalankan exe hasil build sebagai proses latar, menunggu :9111, memeriksa bentuk balasan
 # endpoint, memutar semua fixtures ke POST /print dengan semua peran dipetakan ke printer virtual
 # berport berkas, menguji katalog resep bertanda tangan (PR-12: sah/diubah/rusak/non-loopback),
-# kode galat pemasangan terstruktur, dan /print/test per peran, lalu mematikan proses.
-# Exit 1 bila ada yang meleset.
+# kode galat pemasangan terstruktur, /print/test per peran, state waiting_printer + /setup/cancel,
+# auto-map dua tahap (conflict/applied), dan label QR tanpa peran QRLABEL (warning), lalu mematikan
+# proses. Exit 1 bila ada yang meleset.
 #
 # Pakai lokal (PowerShell, Windows): .\ci\smoke.ps1 -Exe .\src\SpikeTransport\bin\Release\net48\GamaPrintAgent.SpikeTransport.exe
 param(
@@ -184,6 +185,74 @@ try {
         if ($tp.ok -ne $true -or $tp.printer -ne $vp) { Fail "/print/test peran gagal: $($tp | ConvertTo-Json -Compress)" } else { Ok "/print/test CASHIER -> $($tp.printer)" }
         $tpb = Invoke-RestMethod "$base/print/test" -Method Post -ContentType "application/json" -Body '{"printerRole":"NOPE"}' -TimeoutSec 60
         if ($tpb.ok -ne $false -or $tpb.error -ne "ROLE_UNMAPPED") { Fail "/print/test peran asing tidak ROLE_UNMAPPED: $($tpb | ConvertTo-Json -Compress)" } else { Ok "/print/test peran asing -> ROLE_UNMAPPED" }
+    }
+
+    # 14) P-592 (residu PR-12) — state waiting_printer: resep seagull ber-usbIds perangkat yang tak pernah
+    #     ada di runner → agent menunggu printer tercolok SEBELUM unduh/UAC (waiting=WAITING_CABLE); setup
+    #     lain saat menunggu → BUSY; POST /setup/cancel → idle (tidak ada yang terpasang); cancel saat idle = no-op.
+    $wl = Invoke-RestMethod "$base/setup/printer" -Method Post -ContentType "application/json" -Body '{"model":"TEST-LABEL"}' -TimeoutSec 10
+    if ($wl.ok -ne $true) { Fail "setup TEST-LABEL tidak dimulai: $($wl | ConvertTo-Json -Compress)" }
+    else {
+        $deadline3 = (Get-Date).AddSeconds(30); $w = $null
+        while ((Get-Date) -lt $deadline3) { Start-Sleep -Seconds 1; $w = Invoke-RestMethod "$base/setup/status" -TimeoutSec 5; if ($w.state -ne "running") { break } }
+        if ($null -eq $w -or $w.state -ne "waiting_printer" -or $w.waiting -ne "WAITING_CABLE") { Fail "TEST-LABEL: state=$($w.state) waiting=$($w.waiting) error=$($w.error) msg=$($w.message)" } else { Ok "TEST-LABEL -> waiting_printer/WAITING_CABLE (sebelum unduh)" }
+        $busy = Invoke-RestMethod "$base/setup/printer" -Method Post -ContentType "application/json" -Body '{"model":"TEST-EXISTING"}' -TimeoutSec 10
+        if ($busy.ok -ne $false -or $busy.error -ne "BUSY") { Fail "setup saat menunggu tidak BUSY: $($busy | ConvertTo-Json -Compress)" } else { Ok "setup saat menunggu -> BUSY" }
+        $cx = Invoke-RestMethod "$base/setup/cancel" -Method Post -ContentType "application/json" -Body '{}' -TimeoutSec 15
+        if ($cx.ok -ne $true -or $cx.state -ne "idle" -or $cx.cancelled -ne $true) { Fail "/setup/cancel saat menunggu: $($cx | ConvertTo-Json -Compress)" } else { Ok "/setup/cancel saat menunggu -> idle" }
+        $w2 = Invoke-RestMethod "$base/setup/status" -TimeoutSec 5
+        if ($w2.state -ne "idle" -or $null -ne $w2.waiting) { Fail "status sesudah cancel: state=$($w2.state) waiting=$($w2.waiting)" } else { Ok "status sesudah cancel = idle" }
+    }
+    $cn = Invoke-RestMethod "$base/setup/cancel" -Method Post -ContentType "application/json" -Body '{}' -TimeoutSec 15
+    if ($cn.ok -ne $true -or $cn.cancelled -ne $false) { Fail "/setup/cancel saat idle: $($cn | ConvertTo-Json -Compress)" } else { Ok "/setup/cancel saat idle -> no-op" }
+
+    # 15) P-592 — auto-map DUA TAHAP dengan antrean yang SUDAH ada (TEST-EXISTING = 'Gama Smoke Printer';
+    #     pemasangan dilewati/idempoten, tanpa menunggu): REPORT menunjuk printer LAIN → done + mapping=conflict
+    #     + previousPrinter, peta TIDAK ditimpa; REPORT kosong → applied (ditulis); REPORT sama → applied.
+    if ($hasPdf) {
+        function Invoke-SetupExisting() {
+            $r = Invoke-RestMethod "$base/setup/printer" -Method Post -ContentType "application/json" -Body '{"model":"TEST-EXISTING"}' -TimeoutSec 10
+            if ($r.ok -ne $true) { return $r }
+            $dl = (Get-Date).AddSeconds(60); $f = $null
+            while ((Get-Date) -lt $dl) { Start-Sleep -Seconds 1; $f = Invoke-RestMethod "$base/setup/status" -TimeoutSec 5; if ($f.state -in @("done", "failed", "idle")) { break } }
+            return $f
+        }
+        $pdfName = "Microsoft Print to PDF"
+        $body = @{ CASHIER = $vp; DELIVERY = $vp; QRLABEL = $vp; REPORT = $pdfName } | ConvertTo-Json
+        Invoke-RestMethod "$base/printers/config" -Method Post -ContentType "application/json" -Body $body -TimeoutSec 10 | Out-Null
+        $c1 = Invoke-SetupExisting
+        if ($c1.state -ne "done" -or $c1.mapping -ne "conflict" -or $c1.previousPrinter -ne $pdfName -or $c1.printer -ne $vp) { Fail "TEST-EXISTING conflict: $($c1 | ConvertTo-Json -Compress)" } else { Ok "TEST-EXISTING (REPORT=$pdfName) -> done/conflict, previousPrinter dilaporkan" }
+        $pr1 = Invoke-RestMethod "$base/printers" -TimeoutSec 5
+        if ($pr1.roles.REPORT -ne $pdfName) { Fail "conflict menimpa peta: REPORT=$($pr1.roles.REPORT)" } else { Ok "conflict: peta REPORT tidak ditimpa" }
+        $body = @{ CASHIER = $vp; DELIVERY = $vp; QRLABEL = $vp } | ConvertTo-Json
+        Invoke-RestMethod "$base/printers/config" -Method Post -ContentType "application/json" -Body $body -TimeoutSec 10 | Out-Null
+        $c2 = Invoke-SetupExisting
+        $pr2 = Invoke-RestMethod "$base/printers" -TimeoutSec 5
+        if ($c2.state -ne "done" -or $c2.mapping -ne "applied" -or $pr2.roles.REPORT -ne $vp) { Fail "TEST-EXISTING applied (REPORT kosong): $($c2 | ConvertTo-Json -Compress) REPORT=$($pr2.roles.REPORT)" } else { Ok "TEST-EXISTING (REPORT kosong) -> applied, REPORT=$vp" }
+        $c3 = Invoke-SetupExisting
+        if ($c3.state -ne "done" -or $c3.mapping -ne "applied" -or $null -ne $c3.waiting -or $null -ne $c3.warning) { Fail "TEST-EXISTING applied (REPORT sama): $($c3 | ConvertTo-Json -Compress)" } else { Ok "TEST-EXISTING (REPORT sama) -> applied, tanpa menunggu" }
+    }
+
+    # 16) P-592 — label QR saat peran QRLABEL BELUM dipetakan: tetap dicetak ke printer default Windows
+    #     (perilaku 1.0.2; menolak = K-1c ditahan) + warning ROLE_UNMAPPED & nama printer yang dipakai.
+    #     Default Windows runner diarahkan ke printer virtual (tanpa dialog) selama langkah ini.
+    if ($hasPdf) {
+        $prevDefault = $null
+        try { $prevDefault = (Get-CimInstance Win32_Printer -Filter "Default=TRUE" | Select-Object -First 1).Name } catch {}
+        try {
+            (New-Object -ComObject WScript.Network).SetDefaultPrinter($vp)
+            $body = @{ CASHIER = $vp; DELIVERY = $vp; REPORT = $vp } | ConvertTo-Json
+            Invoke-RestMethod "$base/printers/config" -Method Post -ContentType "application/json" -Body $body -TimeoutSec 10 | Out-Null
+            $lbl = Get-Content (Join-Path $PSScriptRoot "..\fixtures\qr_item_label.sample.json") -Raw
+            $q = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body $lbl -TimeoutSec 90
+            if ($q.ok -ne $true -or $q.warning -ne "ROLE_UNMAPPED" -or $q.printer -ne $vp) { Fail "label tanpa QRLABEL: $($q | ConvertTo-Json -Compress)" } else { Ok "label tanpa QRLABEL -> ok + warning ROLE_UNMAPPED, printer=$vp" }
+            $body = @{ CASHIER = $vp; DELIVERY = $vp; QRLABEL = $vp; REPORT = $vp } | ConvertTo-Json
+            Invoke-RestMethod "$base/printers/config" -Method Post -ContentType "application/json" -Body $body -TimeoutSec 10 | Out-Null
+            $q2 = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body $lbl -TimeoutSec 90
+            if ($q2.ok -ne $true -or $null -ne $q2.warning -or $q2.printer -ne $vp) { Fail "label dengan QRLABEL: $($q2 | ConvertTo-Json -Compress)" } else { Ok "label dengan QRLABEL -> ok tanpa warning" }
+        } finally {
+            if ($prevDefault) { try { (New-Object -ComObject WScript.Network).SetDefaultPrinter($prevDefault) } catch {} }
+        }
     }
 }
 finally {

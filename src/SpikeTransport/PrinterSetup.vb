@@ -10,6 +10,14 @@
 ' (user klik "Yes" sekali). Karena UseShellExecute=True tak bisa redirect stdout, HASIL dibaca dari
 ' file log (APD4SilentSetup.log yang dibuat di folder paket), bukan dari output proses.
 '
+' Residu PR-12 (v1.2.0, P-592 register repo Go; K-16 #4): state `waiting_printer` — sesudah driver
+' terpasang (apd) atau SEBELUM installer dijalankan (seagull, DriverWizard /autodetect butuh printer
+' tercolok), agent menunggu perangkat USB ber-hardware-ID resep hadir (DeviceProbe/WMI) dan antrean
+' online; kode `waiting` = WAITING_CABLE | WAITING_ONLINE. Auto-map peran DUA TAHAP: peran kosong atau
+' sudah menunjuk printer yang sama → ditulis; menunjuk printer LAIN → tidak ditimpa, status `mapping`
+' = "conflict" + `previousPrinter` → web bertanya "ganti X ke Y?". POST /setup/cancel membatalkan
+' menunggu/pemasangan. Alur cetak (K-1c) tidak disentuh.
+'
 ' Tanpa deklarasi Namespace (RootNamespace GamaPrintAgent.SpikeTransport ditambahkan otomatis) —
 ' lihat catatan yang sama di Program.vb.
 
@@ -45,12 +53,20 @@ Module PrinterSetup
 
     ' Status pemasangan (async). Hanya SATU setup berjalan pada satu waktu (dijaga StatusLock).
     Private ReadOnly StatusLock As New Object()
-    Private _state As String = "idle"     ' idle | running | done | failed
+    Private _state As String = "idle"     ' idle | running | waiting_printer | done | failed
     Private _model As String = ""
     Private _printer As String = ""
     Private _role As String = ""
     Private _message As String = ""
     Private _error As String = ""        ' kode galat terstruktur saat failed (PR-12), "" bila tidak ada
+    Private _waiting As String = ""      ' WAITING_CABLE | WAITING_ONLINE saat waiting_printer (P-592)
+    Private _mapping As String = ""      ' applied | conflict — hasil auto-map peran (P-592)
+    Private _previousPrinter As String = ""   ' printer yang SUDAH dipetakan ke peran saat conflict
+    Private _warning As String = ""      ' PRINTER_NOT_DETECTED bila selesai tanpa printer terdeteksi
+    Private _cancel As Boolean = False   ' diminta POST /setup/cancel; dibaca loop menunggu/poll
+
+    Private Const DeviceWaitMs As Integer = 10 * 60 * 1000   ' batas menunggu printer tercolok
+    Private Const OnlineWaitMs As Integer = 2 * 60 * 1000    ' batas menunggu antrean online sesudah tercolok
 
     ' Folder cache paket preset — di DataDir (%LOCALAPPDATA%) supaya bertahan lintas update Velopack.
     Private Function SetupDir() As String
@@ -81,8 +97,8 @@ Module PrinterSetup
 
         ' Cek-dan-set atomik: tolak bila sudah ada setup berjalan.
         SyncLock StatusLock
-            If _state = "running" Then
-                Return "{""ok"":false,""error"":""BUSY"",""message"":""Sedang memasang. Tunggu selesai."",""state"":""running"",""model"":" & JStr(_model) & "}"
+            If _state = "running" OrElse _state = "waiting_printer" Then
+                Return "{""ok"":false,""error"":""BUSY"",""message"":""Sedang memasang. Tunggu selesai atau batalkan."",""state"":" & JStr(_state) & ",""model"":" & JStr(_model) & "}"
             End If
             _state = "running"
             _model = rec.Model
@@ -90,6 +106,11 @@ Module PrinterSetup
             _role = rec.Role
             _message = "Menyiapkan…"
             _error = ""
+            _waiting = ""
+            _mapping = ""
+            _previousPrinter = ""
+            _warning = ""
+            _cancel = False
         End SyncLock
         Program.MarkActivity()
 
@@ -110,17 +131,64 @@ Module PrinterSetup
                 {"printer", _printer},
                 {"role", _role},
                 {"message", _message},
-                {"error", If(_error = "", Nothing, CObj(_error))}
+                {"error", If(_error = "", Nothing, CObj(_error))},
+                {"waiting", If(_waiting = "", Nothing, CObj(_waiting))},
+                {"mapping", If(_mapping = "", Nothing, CObj(_mapping))},
+                {"previousPrinter", If(_previousPrinter = "", Nothing, CObj(_previousPrinter))},
+                {"warning", If(_warning = "", Nothing, CObj(_warning))}
             })
         End SyncLock
     End Function
 
-    ' Sedang memasang? (dipakai penundaan penerapan update saat menganggur — Tray.OnApplyTick)
+    ' Sedang memasang/menunggu? (dipakai penundaan penerapan update saat menganggur — Tray.OnApplyTick)
     Public Function IsRunning() As Boolean
         SyncLock StatusLock
-            Return _state = "running"
+            Return _state = "running" OrElse _state = "waiting_printer"
         End SyncLock
     End Function
+
+    ' POST /setup/cancel (P-592): hentikan menunggu printer / pemasangan yang sedang berjalan.
+    ' Menunggu ≤ 4 dtk sampai thread latar benar-benar berpindah state, lalu balas state akhirnya.
+    Public Function HandleCancel() As String
+        Dim active As Boolean
+        SyncLock StatusLock
+            active = (_state = "running" OrElse _state = "waiting_printer")
+            If active Then _cancel = True
+        End SyncLock
+        If active Then
+            For i As Integer = 1 To 20
+                Thread.Sleep(200)
+                SyncLock StatusLock
+                    If _state <> "running" AndAlso _state <> "waiting_printer" Then Exit For
+                End SyncLock
+            Next
+        End If
+        SyncLock StatusLock
+            Return "{""ok"":true,""state"":" & JStr(_state) & ",""cancelled"":" & If(active, "true", "false") & "}"
+        End SyncLock
+    End Function
+
+    Private Function Cancelled() As Boolean
+        SyncLock StatusLock
+            Return _cancel
+        End SyncLock
+    End Function
+
+    Private Sub SetWaiting(code As String, msg As String)
+        SyncLock StatusLock
+            _state = "waiting_printer"
+            _waiting = code
+            _message = msg
+        End SyncLock
+    End Sub
+
+    Private Sub SetRunning(msg As String)
+        SyncLock StatusLock
+            _state = "running"
+            _waiting = ""
+            _message = msg
+        End SyncLock
+    End Sub
 
     Private Sub SetMessage(msg As String)
         SyncLock StatusLock
@@ -128,50 +196,164 @@ Module PrinterSetup
         End SyncLock
     End Sub
 
-    Private Sub SetDone()
+    Private Sub SetDone(msg As String, Optional warning As String = "")
         SyncLock StatusLock
             _state = "done"
-            _message = "Selesai — printer siap dipakai."
+            _waiting = ""
+            _message = msg
+            _warning = If(warning, "")
+        End SyncLock
+    End Sub
+
+    Private Sub SetIdle(msg As String)
+        SyncLock StatusLock
+            _state = "idle"
+            _waiting = ""
+            _message = msg
         End SyncLock
     End Sub
 
     Private Sub SetFailed(code As String, msg As String)
         SyncLock StatusLock
             _state = "failed"
+            _waiting = ""
             _message = msg
             _error = If(code, "")
         End SyncLock
     End Sub
 
-    ' Proses pemasangan di background: unduh → jalankan → verifikasi → auto-map peran → set status.
+    ' Proses pemasangan di background (P-592):
+    '   apd     : (antrean belum ada → unduh → jalankan, UAC) → auto-map peran → bila baru dipasang dan resep
+    '             punya usbIds: waiting_printer sampai printer tercolok & online (≤10 mnt; lewat = done + warning).
+    '   seagull : (antrean belum ada → waiting_printer SAMPAI printer tercolok [DriverWizard /autodetect butuh
+    '             printer] → unduh → jalankan, UAC) → auto-map peran.
+    ' Antrean yang SUDAH ada (idempoten, toko lama) tidak pernah menunggu — perilaku 1.1.0.
     Private Sub RunSetupBackground(rec As Recipe)
         Try
             Console.WriteLine("Setup printer: " & rec.PrinterName & " (" & rec.Kind & ")")
-            SetMessage("Menyiapkan installer…")
-            Dim pkg As String = EnsurePackage(rec)
+            Dim queueExisted As Boolean = IsPrinterInstalled(rec.PrinterName)
+            Dim kind As String = rec.Kind.ToLowerInvariant()
+            If kind <> "apd" AndAlso kind <> "seagull" Then Throw New SetupError("UNSUPPORTED_KIND", "Jenis installer tak dikenal: " & rec.Kind)
 
-            SetMessage("Memasang driver — klik 'Yes' saat izin admin (UAC) muncul…")
-            Select Case rec.Kind.ToLowerInvariant()
-                Case "apd"
+            If Not queueExisted Then
+                If kind = "seagull" Then
+                    ' DriverWizard /autodetect hanya berhasil bila printer tercolok → tunggu DULU (sebelum unduh 57 MB & UAC).
+                    WaitForDevice(rec, "Colok kabel USB printer label ke komputer ini dan nyalakan printernya — pemasangan lanjut otomatis begitu printer terdeteksi.", True)
+                End If
+                SetRunning("Menyiapkan installer…")
+                Dim pkg As String = EnsurePackage(rec)
+                SetRunning("Memasang driver — klik 'Yes' saat izin admin (UAC) muncul…")
+                If kind = "apd" Then
                     RunApdAndWait(pkg, rec.PrinterName)
-                Case "seagull"
+                Else
                     RunSeagullAndWait(pkg, rec.PrinterName, rec.DriverModel)
-                Case Else
-                    Throw New SetupError("UNSUPPORTED_KIND", "Jenis installer tak dikenal: " & rec.Kind)
-            End Select
+                End If
+            End If
 
-            ' Auto-map peran ke printers.json (merge — peran lain tak diubah).
-            Printers.SetRole(rec.Role, rec.PrinterName)
-            Console.WriteLine("   setup OK: " & rec.PrinterName & " → " & rec.Role)
-            SetDone()
+            Dim mapping As String = ApplyRoleMapping(rec)
+            Console.WriteLine("   setup OK: " & rec.PrinterName & " → " & rec.Role & " (mapping " & mapping & ")")
+
+            Dim warning As String = ""
+            If kind = "apd" AndAlso Not queueExisted Then
+                ' Driver + antrean ada. Sebelum toko menekan "cetak percobaan": tunggu printer tercolok & online.
+                If Not WaitForDevice(rec, "Driver terpasang. Sekarang colok kabel USB printer ke komputer ini dan nyalakan printernya — kami menunggu…", False) Then
+                    warning = "PRINTER_NOT_DETECTED"
+                End If
+            End If
+
+            Dim msg As String
+            If mapping = "conflict" Then
+                msg = "Driver terpasang. Printer untuk peran ini di komputer ini masih '" & PreviousPrinter() & "' — pilih: ganti ke '" & rec.PrinterName & "' atau tetap."
+            ElseIf warning <> "" Then
+                msg = "Driver terpasang dan printer sudah dipilih. Printer belum terdeteksi di USB — colok dan nyalakan sebelum cetak percobaan."
+            Else
+                msg = "Selesai — printer siap dipakai."
+            End If
+            SetDone(msg, warning)
         Catch se As SetupError
             Console.WriteLine("   " & se.Code & ": " & se.Message)
-            SetFailed(se.Code, se.Message)
+            If se.Code = "CANCELLED_IDLE" Then
+                SetIdle("Dibatalkan.")
+            Else
+                SetFailed(se.Code, se.Message)
+            End If
         Catch ex As Exception
             Console.WriteLine("   SETUP_FAILED: " & ex.Message)
             SetFailed("SETUP_FAILED", ex.Message)
         End Try
     End Sub
+
+    Private Function PreviousPrinter() As String
+        SyncLock StatusLock
+            Return _previousPrinter
+        End SyncLock
+    End Function
+
+    ' Auto-map DUA TAHAP (P-592): peran kosong / sudah menunjuk printer yang sama → tulis (merge);
+    ' peran menunjuk printer LAIN → JANGAN timpa: laporkan conflict + previousPrinter, web yang bertanya.
+    Private Function ApplyRoleMapping(rec As Recipe) As String
+        Dim cur As String = Printers.Resolve(rec.Role)
+        If cur = "" OrElse String.Equals(cur, rec.PrinterName, StringComparison.OrdinalIgnoreCase) Then
+            Printers.SetRole(rec.Role, rec.PrinterName)
+            SyncLock StatusLock
+                _mapping = "applied"
+                _previousPrinter = ""
+            End SyncLock
+            Return "applied"
+        End If
+        SyncLock StatusLock
+            _mapping = "conflict"
+            _previousPrinter = cur
+        End SyncLock
+        Console.WriteLine("   peran " & rec.Role & " sudah menunjuk '" & cur & "' — tidak ditimpa (conflict)")
+        Return "conflict"
+    End Function
+
+    ' Tunggu perangkat USB resep hadir lalu antrean online (state waiting_printer). Return True bila
+    ' terdeteksi (atau tidak bisa diperiksa: tanpa usbIds / WMI gagal → dianggap hadir supaya tidak
+    ' mengunci). False = lewat batas waktu. `pre` = sebelum pemasangan: batal → CANCELLED_IDLE (tak ada
+    ' yang terpasang, kembali idle); lewat batas → PRINTER_NOT_DETECTED (failed).
+    Private Function WaitForDevice(rec As Recipe, cableMsg As String, pre As Boolean) As Boolean
+        Dim present As Boolean? = DeviceProbe.UsbDevicePresent(rec.UsbIds)
+        If Not present.HasValue Then Return True   ' tidak bisa diperiksa → lanjut
+        Dim waited As Integer = 0
+        Const stepMs As Integer = 2000
+        While Not present.Value
+            If waited = 0 Then
+                SetWaiting("WAITING_CABLE", cableMsg)
+                Console.WriteLine("   menunggu printer tercolok (" & String.Join(",", rec.UsbIds) & ")…")
+            End If
+            If Cancelled() Then
+                If pre Then Throw New SetupError("CANCELLED_IDLE", "Dibatalkan sebelum pemasangan.")
+                Return False
+            End If
+            If waited >= DeviceWaitMs Then
+                If pre Then Throw New SetupError("PRINTER_NOT_DETECTED", "Printer tidak terdeteksi di USB dalam 10 menit. Colok dan nyalakan printer, lalu klik Pasang otomatis lagi.")
+                Return False
+            End If
+            Thread.Sleep(stepMs)
+            waited += stepMs
+            Program.MarkActivity()
+            present = DeviceProbe.UsbDevicePresent(rec.UsbIds)
+            If Not present.HasValue Then Return True
+        End While
+        If pre Then Return True   ' sebelum pemasangan antrean belum ada — keadaan online diperiksa nanti
+
+        ' Perangkat hadir. Antrean online? (kertas/penutup/offline) — batas 2 menit, lalu lanjut apa adanya.
+        Dim onlineWaited As Integer = 0
+        While onlineWaited < OnlineWaitMs
+            Dim st As String = DeviceProbe.QueueState(rec.PrinterName)
+            If st = "online" OrElse st = "unknown" OrElse st = "missing" Then Exit While
+            If onlineWaited = 0 Then
+                SetWaiting("WAITING_ONLINE", "Printer terdeteksi tetapi belum siap: pasang kertas dan pita, tutup penutupnya, pastikan lampu tidak berkedip merah.")
+                Console.WriteLine("   antrean " & rec.PrinterName & " " & st & " — menunggu online…")
+            End If
+            If Cancelled() Then Exit While
+            Thread.Sleep(stepMs)
+            onlineWaited += stepMs
+        End While
+        Return True
+    End Function
 
     ' Paket golden di cache HANYA dipercaya bila SHA-256-nya = katalog (PR-12; K-16 #2): cache tak
     ' cocok → dihapus + diunduh ulang; unduhan diverifikasi lagi; 3 percobaan bertingkat →
@@ -226,6 +408,7 @@ Module PrinterSetup
                 Catch
                 End Try
             End Try
+            If Cancelled() Then Throw New SetupError("CANCELLED", "Pemasangan dibatalkan.")
             If attempt < 3 Then Thread.Sleep(2000 * attempt)
         Next
         Throw New SetupError(lastCode, lastErr & " Coba lagi nanti, atau pasang manual.")
@@ -291,6 +474,7 @@ Module PrinterSetup
             waited += stepMs
 
             If IsPrinterInstalled(expectedPrinter) Then Return   ' SUKSES (ground truth)
+            If Cancelled() Then Throw New SetupError("CANCELLED", "Pemasangan dibatalkan.")
 
             ' Bila installer sudah menulis log dengan kode GAGAL terminal (bukan 0/-3), berhenti awal.
             Dim code As Integer
@@ -347,6 +531,7 @@ Module PrinterSetup
             Thread.Sleep(stepMs)
             waited += stepMs
             If IsPrinterInstalled(expectedPrinter) Then Return
+            If Cancelled() Then Throw New SetupError("CANCELLED", "Pemasangan dibatalkan.")
         End While
 
         Throw New SetupError("UAC_TIMEOUT", "Instalasi tidak terdeteksi dalam 2,5 menit. Pastikan printer tercolok (USB) & klik 'Yes' saat UAC.")

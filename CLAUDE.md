@@ -30,7 +30,8 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
    ditulis: menolak job saat printer offline, menolak cetak bila peran tidak dipetakan (hari ini
    jatuh ke printer default Windows — perilaku terdokumentasi), pemilihan stock label
    (`SelectLabelStock`, commit 72fc131). Endpoint/field baru yang ADITIF bebas, dengan syarat
-   web tetap bekerja melawan agent v1.0.2.
+   web tetap bekerja melawan agent v1.0.2. Pemeriksaan WMI (`DeviceProbe.vb`, 1.2.0) HANYA untuk alur
+   Pasang Otomatis — jangan dipakai untuk menolak job cetak (itu K-1c).
 4. **Kompatibilitas mundur adalah kontrak**: field lama tidak berubah arti; `state` lama
    (`idle|running|done|failed`) tetap; endpoint baru yang tidak ada di agent lama = web jatuh
    ke jalur lama.

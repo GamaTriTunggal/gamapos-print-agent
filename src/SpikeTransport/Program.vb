@@ -143,7 +143,7 @@ Module Program
         End Try
 
         Console.WriteLine("Gama Print Agent v" & AgentVersion & " listening on " & Prefix)
-        Console.WriteLine("Endpoints: GET /health | GET /printers | GET /recipes | POST /print | POST /print/test | POST /printers/config | POST /setup/printer | GET /setup/status | POST /catalog/refresh")
+        Console.WriteLine("Endpoints: GET /health | GET /printers | GET /recipes | POST /print | POST /print/test | POST /printers/config | POST /setup/printer | GET /setup/status | POST /setup/cancel | POST /catalog/refresh")
         Console.WriteLine("Katalog resep: versi " & RecipeCatalog.Version() & " (" & RecipeCatalog.Source() & ") | deviceId " & DeviceId() & " | " & OsArch())
         Console.WriteLine(Printers.ConfigSummary())
         ' Bila proses sebelumnya mati saat cetak (default printer Windows belum dikembalikan), pulihkan.
@@ -311,8 +311,12 @@ Module Program
                 WriteJson(ctx, 200, PrinterSetup.HandleSetup(ReadBody(req)))
 
             Case "GET /setup/status"
-                ' Status pemasangan terkini (dipoll web sampai done/failed).
+                ' Status pemasangan terkini (dipoll web sampai done/failed; waiting_printer = menunggu printer, P-592).
                 WriteJson(ctx, 200, PrinterSetup.StatusJson())
+
+            Case "POST /setup/cancel"
+                ' P-592: batalkan menunggu printer / pemasangan yang sedang berjalan → {ok, state, cancelled}.
+                WriteJson(ctx, 200, PrinterSetup.HandleCancel())
 
             Case Else
                 WriteJson(ctx, 404, "{""ok"":false,""error"":""NOT_FOUND""}")
@@ -496,9 +500,10 @@ Module Program
                 End If
                 Try
                     Dim p As QrItemLabelPayload = job.payload.ToObject(Of QrItemLabelPayload)()
-                    Printers.Serialize(Sub() PrintQrItemLabel(p))   ' serialize cetak; targeting via PrinterSettings.PrinterName (QRLABEL)
-                    Console.WriteLine("   printed qr_item_label " & If(p.itemId, ""))
-                    Return "{""ok"":true,""jobType"":""qr_item_label"",""itemId"":" & JsonString(If(p.itemId, "")) & "}"
+                    Dim outcome As QrPrintOutcome = Nothing
+                    Printers.Serialize(Sub() outcome = PrintQrItemLabel(p))   ' serialize cetak; targeting via PrinterSettings.PrinterName (QRLABEL)
+                    Console.WriteLine("   printed qr_item_label " & If(p.itemId, "") & " -> " & outcome.Printer & If(outcome.FellBackToDefault, " (default Windows, QRLABEL belum dipetakan)", ""))
+                    Return QrResultJson("qr_item_label", "itemId", If(p.itemId, ""), outcome)
                 Catch ex As Exception
                     Console.WriteLine("   PRINT_FAILED: " & ex.Message)
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
@@ -510,9 +515,10 @@ Module Program
                 End If
                 Try
                     Dim p As QrInvoicePayload = job.payload.ToObject(Of QrInvoicePayload)()
-                    Printers.Serialize(Sub() PrintQrInvoice(p))
-                    Console.WriteLine("   printed qr_invoice " & If(p.invoiceNo, ""))
-                    Return "{""ok"":true,""jobType"":""qr_invoice"",""invoiceNo"":" & JsonString(If(p.invoiceNo, "")) & "}"
+                    Dim outcome As QrPrintOutcome = Nothing
+                    Printers.Serialize(Sub() outcome = PrintQrInvoice(p))
+                    Console.WriteLine("   printed qr_invoice " & If(p.invoiceNo, "") & " -> " & outcome.Printer & If(outcome.FellBackToDefault, " (default Windows, QRLABEL belum dipetakan)", ""))
+                    Return QrResultJson("qr_invoice", "invoiceNo", If(p.invoiceNo, ""), outcome)
                 Catch ex As Exception
                     Console.WriteLine("   PRINT_FAILED: " & ex.Message)
                     Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}"
@@ -522,6 +528,18 @@ Module Program
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":" & JsonString(job.jobType) & "}"
 
         End Select
+    End Function
+
+    ' Balasan cetak label QR (P-592): field lama tetap (ok, jobType, itemId/invoiceNo); aditif `printer`
+    ' (antrean yang dipakai) + `warning:"ROLE_UNMAPPED"` & `message` bila jatuh ke default Windows.
+    Private Function QrResultJson(jobType As String, idKey As String, idVal As String, outcome As QrPrintOutcome) As String
+        Dim o As New Dictionary(Of String, Object) From {
+            {"ok", True}, {"jobType", jobType}, {idKey, idVal}, {"printer", If(outcome Is Nothing, "", outcome.Printer)}}
+        If outcome IsNot Nothing AndAlso outcome.FellBackToDefault Then
+            o("warning") = "ROLE_UNMAPPED"
+            o("message") = "Printer label belum dipilih di komputer ini — label dicetak ke printer default Windows '" & outcome.Printer & "'. Pilih printer label di Pengaturan → Printer."
+        End If
+        Return JsonConvert.SerializeObject(o)
     End Function
 
     Private Const MaxBodyBytes As Long = 1024L * 1024L   ' 1 MB — cukup utk nota terbesar; cegah OOM/DoS

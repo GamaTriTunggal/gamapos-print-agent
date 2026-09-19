@@ -6,6 +6,9 @@
 ' qr_item_label: itemId + harga (Courier 17 bold) lalu QR(itemId), `copies` salinan.
 ' qr_invoice   : invoiceNo (Courier 8 bold) lalu QR(invoiceNo), 1 salinan.
 ' Run di thread STA (sama spt cetak PrintDocument lain). ZXing.Net 0.16.9 — API persis aplikasi lama.
+' P-592 (residu PR-12): peran QRLABEL BELUM dipetakan → tetap dicetak ke printer default Windows
+' (perilaku 1.0.2; menolak = K-1c, ditahan) TETAPI hasilnya membawa `warning: ROLE_UNMAPPED` + nama
+' printer yang dipakai, supaya web bisa memberi tahu toko alih-alih diam.
 
 Option Strict On
 Option Explicit On
@@ -13,6 +16,12 @@ Option Explicit On
 Imports System
 Imports System.Drawing
 Imports System.Drawing.Printing
+
+' Hasil cetak label: printer yang dipakai + apakah jatuh ke default Windows karena peran belum dipetakan.
+Public Class QrPrintOutcome
+    Public Property Printer As String = ""
+    Public Property FellBackToDefault As Boolean = False
+End Class
 
 Module QrLabel
 
@@ -27,28 +36,34 @@ Module QrLabel
         Return writer.Write(value)
     End Function
 
-    Public Sub PrintQrItemLabel(p As QrItemLabelPayload)
-        RunSta(Sub() RenderQrItem(p))
-    End Sub
+    Public Function PrintQrItemLabel(p As QrItemLabelPayload) As QrPrintOutcome
+        Dim outcome As QrPrintOutcome = Nothing
+        RunSta(Sub() outcome = RenderQrItem(p))
+        Return outcome
+    End Function
 
-    Private Sub RenderQrItem(p As QrItemLabelPayload)
+    Private Function RenderQrItem(p As QrItemLabelPayload) As QrPrintOutcome
         Dim itemId As String = If(p.itemId, "")
         Dim priceStr As String = Fmt(p.salesPrice)
         Dim copies As Integer = Math.Min(20, Math.Max(1, p.copies))   ' clamp [1..20]: cegah cetak massal + CShort overflow
-        PrintViaDoc(Sub(e As PrintPageEventArgs) DrawTwoLineQr(e, itemId, priceStr, itemId, 17), copies)
-    End Sub
+        Return PrintViaDoc(Sub(e As PrintPageEventArgs) DrawTwoLineQr(e, itemId, priceStr, itemId, 17), copies)
+    End Function
 
-    Public Sub PrintQrInvoice(p As QrInvoicePayload)
-        RunSta(Sub() RenderQrInvoice(p))
-    End Sub
+    Public Function PrintQrInvoice(p As QrInvoicePayload) As QrPrintOutcome
+        Dim outcome As QrPrintOutcome = Nothing
+        RunSta(Sub() outcome = RenderQrInvoice(p))
+        Return outcome
+    End Function
 
-    Private Sub RenderQrInvoice(p As QrInvoicePayload)
+    Private Function RenderQrInvoice(p As QrInvoicePayload) As QrPrintOutcome
         Dim inv As String = If(p.invoiceNo, "")
-        PrintViaDoc(Sub(e As PrintPageEventArgs) DrawOneLineQr(e, inv, inv, 8), 1)
-    End Sub
+        Return PrintViaDoc(Sub(e As PrintPageEventArgs) DrawOneLineQr(e, inv, inv, 8), 1)
+    End Function
 
-    ' Buat PrintDocument, target printer QRLABEL (atau default bila tak dipetakan), cetak `copies` salinan.
-    Private Sub PrintViaDoc(painter As Action(Of PrintPageEventArgs), copies As Integer)
+    ' Buat PrintDocument, target printer QRLABEL (atau default bila tak dipetakan — dilaporkan di
+    ' hasil, P-592), cetak `copies` salinan.
+    Private Function PrintViaDoc(painter As Action(Of PrintPageEventArgs), copies As Integer) As QrPrintOutcome
+        Dim outcome As New QrPrintOutcome()
         Using doc As New PrintDocument()
             Dim target As String = Printers.Resolve("QRLABEL")
             If target <> "" Then
@@ -56,7 +71,10 @@ Module QrLabel
                 If Not doc.PrinterSettings.IsValid Then
                     Throw New Exception("Printer QRLABEL '" & target & "' tidak ditemukan.")
                 End If
+            Else
+                outcome.FellBackToDefault = True
             End If
+            outcome.Printer = doc.PrinterSettings.PrinterName
             SelectLabelStock(doc)   ' pilih ukuran ~40×30 eksplisit (jangan bergantung default printer)
             doc.PrinterSettings.Copies = CShort(copies)
             Dim handler As PrintPageEventHandler =
@@ -71,7 +89,8 @@ Module QrLabel
                 RemoveHandler doc.PrintPage, handler
             End Try
         End Using
-    End Sub
+        Return outcome
+    End Function
 
     ' itemId + harga lalu QR (label barang).
     Private Sub DrawTwoLineQr(e As PrintPageEventArgs, lineA As String, lineB As String, qrValue As String, fontSize As Integer)

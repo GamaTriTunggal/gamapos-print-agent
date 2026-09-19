@@ -17,7 +17,8 @@ PowerPacks) — "Opsi B". Tanpa dialog cetak browser.
 
 | Versi | Saluran | Keadaan |
 |---|---|---|
-| **1.1.0** (13 Sep 2026; promosi 15 Sep 2026 14:59 WIB) | rilis penuh — `releases/latest` | agent pembaca katalog resep dari server; PC uji pemilik lulus 13 Sep; armada (Vin Jaya + Vin Jaya 2) memperbarui diri lewat auto-update |
+| **1.2.0** (kode 19 Sep 2026, BELUM dirilis) | — | residu PR-12: state `waiting_printer` (menunggu printer tercolok/online, WMI), auto-map peran dua tahap (`mapping: conflict` + `previousPrinter`, tidak menimpa), `POST /setup/cancel`, label QR tanpa peran QRLABEL → `warning: ROLE_UNMAPPED`; katalog `usbIds` |
+| **1.1.0** (13 Sep 2026; promosi 15 Sep 2026 14:59 WIB) | rilis penuh — `releases/latest` | agent pembaca katalog resep dari server; PC uji pemilik lulus 13 Sep; pilot selesai 18 Sep (kedua toko 1.1.0, nota normal) |
 | **1.0.2** (12 Jul 2026) | rilis penuh sebelumnya | tetap tersedia sebagai jalan mundur manual |
 
 Ceklis rilis: [`docs/RELEASE.md`](docs/RELEASE.md) · jurnal tiap rilis: [`docs/release-journal.md`](docs/release-journal.md).
@@ -40,6 +41,7 @@ src/SpikeTransport/      → seluruh kode agent (nama folder warisan spike Juni 
   Printers.vb            → peta peran → printer Windows (printers.json), ganti default sesaat utk PowerPacks
   PrinterSetup.vb        → Pasang Otomatis: unduh paket golden (SHA-256), jalankan installer (apd | seagull)
   RecipeCatalog.vb       → katalog resep: benih → disk → server, verifikasi Ed25519, anti-rollback
+  DeviceProbe.vb         → WMI: perangkat USB resep hadir? antrean online? (hanya alur Pasang Otomatis)
   Updater.vb, Tray.vb, AutoStart.vb, AppPaths.vb → auto-update Velopack, ikon tray, Run key HKCU, jalur data
 fixtures/                → 17 sample JSON per jobType (uji Lapis 1 + smoke CI); fixtures/catalog/ = katalog uji v0 bertanda tangan
 reference/               → PDF "kebenaran" hasil cetak app VB.NET lama (pembanding visual)
@@ -91,11 +93,12 @@ Body `/print` TIDAK disimpan kecuali debug di-opt-in (`GAMA_AGENT_DEBUG_JOBS=1` 
 | GET     | `/health`            | `{ ok, agentVersion, schemaVersion, mode, deviceId, osArch, catalogVersion, catalogSource }` — versi dibaca dari assembly (`<Version>` vbproj = satu sumber) |
 | GET     | `/printers`          | `{ ok, installed[], roles{CASHIER,DELIVERY,QRLABEL,REPORT}, default }` |
 | POST    | `/printers/config`   | simpan peta peran → `printers.json` |
-| POST    | `/print`             | amplop job v1 (BEKU) → cetak ke printer peran |
+| POST    | `/print`             | amplop job v1 (BEKU) → cetak ke printer peran. Label QR (`qr_item_label`/`qr_invoice`): balasan + `printer` yang dipakai; peran QRLABEL belum dipetakan → tetap dicetak ke default Windows + `warning:"ROLE_UNMAPPED"` & `message` (1.2.0) |
 | POST    | `/print/test`        | tanpa body: halaman uji ke PDF; body `{printerRole}`: halaman uji ke printer PERAN (`{ok, printer, role}`; `ROLE_UNMAPPED` bila belum dipetakan) |
 | GET     | `/recipes`           | model yang DIKENAL agent ini (dari katalog; resep `disabled` disembunyikan) — gerbang fakta tombol Pasang Otomatis (P-573) |
 | POST    | `/setup/printer`     | `{model}` → mulai pemasangan (async); `UNSUPPORTED_MODEL` bila tak ada di katalog |
-| GET     | `/setup/status`      | `{ ok, state, model, printer, role, message, error }` — `error` = kode terstruktur saat `failed` (`DOWNLOAD_FAILED`, `HASH_MISMATCH`, `UAC_TIMEOUT`, `INSTALL_FAILED`, `INSTALL_START_FAILED`, `EXTRACT_FAILED`, `PACKAGE_INVALID`, `UNSUPPORTED_KIND`, `SETUP_FAILED`) |
+| GET     | `/setup/status`      | `{ ok, state, model, printer, role, message, error, waiting, mapping, previousPrinter, warning }` — `state` = `idle`\|`running`\|`waiting_printer`\|`done`\|`failed`; `error` = kode terstruktur saat `failed` (`DOWNLOAD_FAILED`, `HASH_MISMATCH`, `UAC_TIMEOUT`, `INSTALL_FAILED`, `INSTALL_START_FAILED`, `EXTRACT_FAILED`, `PACKAGE_INVALID`, `UNSUPPORTED_KIND`, `SETUP_FAILED`, `PRINTER_NOT_DETECTED`, `CANCELLED`); `waiting` = `WAITING_CABLE`\|`WAITING_ONLINE` saat `waiting_printer`; `mapping` = `applied`\|`conflict` (+`previousPrinter`) saat `done`; `warning` = `PRINTER_NOT_DETECTED` bila selesai tanpa printer terdeteksi (1.2.0) |
+| POST    | `/setup/cancel`      | batalkan menunggu printer / pemasangan yang berjalan → `{ ok, state, cancelled }` (menunggu sebelum pemasangan → `idle`; saat pemasangan → `failed`/`CANCELLED`) (1.2.0) |
 | POST    | `/catalog/refresh`   | segarkan katalog resep sekarang; body opsional `{url}` HANYA loopback (smoke CI) → `{ok, catalogVersion, source, error?}` |
 | OPTIONS | *                    | CORS preflight (`Access-Control-Allow-Origin: *`) |
 
@@ -109,7 +112,10 @@ Resep "Pasang Otomatis" = DATA dari server, bukan kode: `GET https://app.gamapos
 (`RecipeCatalog.vb` — WAJIB sama dengan `pubkey.go` server; kunci privat hanya di laptop pemilik) SEBELUM dipakai; versi
 tidak boleh mundur; salinan terakhir-berhasil di `%LOCALAPPDATA%\GamaPrintAgent\catalog\`; benih bawaan = TM-U220
 (resep 1.0.2). Paket golden (R2 `installers.gamapos.id`) diverifikasi SHA-256 (cache maupun unduhan; 3 percobaan) —
-objek yang tidak cocok katalog TIDAK dijalankan (`HASH_MISMATCH`). Disegarkan 15 dtk setelah start lalu tiap 6 jam
+objek yang tidak cocok katalog TIDAK dijalankan (`HASH_MISMATCH`). Resep boleh membawa `usbIds` (hardware ID
+USB, mis. `USB\VID_04B8&PID_0202`) — dipakai 1.2.0 untuk menunggu printer tercolok (`waiting_printer`):
+`apd` menunggu SESUDAH driver terpasang (≤10 mnt, lewat = `done` + `warning`), `seagull` menunggu SEBELUM
+unduh/UAC (DriverWizard `/autodetect` butuh printer). Antrean yang sudah ada tidak pernah menunggu. Disegarkan 15 dtk setelah start lalu tiap 6 jam
 (bersama cek update). Override alamat: env `GAMA_AGENT_CATALOG_URL` — loopback saja. `fixtures/catalog/` = katalog uji
 versi 0 bertanda tangan kunci nyata (sah / diubah / rusak) untuk smoke CI — jangan naikkan versinya (armada menyimpan ≥ 1).
 
@@ -133,8 +139,9 @@ langsung menyasar printer peran.
 `.github/workflows/ci.yml` (windows-latest, tiap push/PR): grep larangan uninstall driver (aturan mutlak 2) → `dotnet build`
 Release → `ci/smoke.ps1`: jalankan exe sebagai proses latar, tunggu `:9111`, periksa bentuk `/health` (versi = `<Version>`),
 `/printers`, `/setup/status`, `/print/test`, katalog uji (sah/diubah/rusak), lalu putar 17 fixture ke `POST /print` dengan
-`printers.json` yang memetakan semua peran ke printer virtual "Generic / Text Only" berport berkas (tanpa dialog). **Merah =
-tidak boleh dirilis.**
+`printers.json` yang memetakan semua peran ke printer virtual "Generic / Text Only" berport berkas (tanpa dialog); 1.2.0
+menambah: `waiting_printer`/`WAITING_CABLE` + `/setup/cancel` (resep uji `TEST-LABEL`), auto-map dua tahap conflict/applied
+(`TEST-EXISTING` = antrean printer virtual), label QR tanpa QRLABEL → `warning`. **Merah = tidak boleh dirilis.**
 
 ## Rilis (hanya pemilik; VM Windows 64-bit)
 

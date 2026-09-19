@@ -8,7 +8,7 @@
     <AssemblyName>GamaPrintAgent.SpikeTransport</AssemblyName>
     <StartupObject>GamaPrintAgent.SpikeTransport.Program</StartupObject>
     <ApplicationIcon>..\..\gamapos.ico</ApplicationIcon>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <LangVersion>latest</LangVersion>
     <OptionStrict>On</OptionStrict>
     <OptionExplicit>On</OptionExplicit>
@@ -35,6 +35,8 @@
     <Reference Include="System.Windows.Forms" />
     <!-- ZipFile.ExtractToDirectory (paket golden Seagull = zip) — tak auto-direferensi di SDK-style net48. -->
     <Reference Include="System.IO.Compression.FileSystem" />
+    <!-- WMI (Win32_PnPEntity / Win32_Printer) untuk state waiting_printer Pasang Otomatis — DeviceProbe.vb (P-592). -->
+    <Reference Include="System.Management" />
     <!-- 2b: PowerPacks Printer (VB6 compat) untuk port printReceipt; DLL di-vendor di lib/. -->
     <Reference Include="Microsoft.VisualBasic.PowerPacks">
       <HintPath>..\..\lib\Microsoft.VisualBasic.PowerPacks.dll</HintPath>
