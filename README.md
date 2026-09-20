@@ -17,9 +17,9 @@ PowerPacks) — "Opsi B". Tanpa dialog cetak browser.
 
 | Versi | Saluran | Keadaan |
 |---|---|---|
-| **1.2.0** (kode 19 Sep 2026, BELUM dirilis) | — | residu PR-12: state `waiting_printer` (menunggu printer tercolok/online, WMI), auto-map peran dua tahap (`mapping: conflict` + `previousPrinter`, tidak menimpa), `POST /setup/cancel`, label QR tanpa peran QRLABEL → `warning: ROLE_UNMAPPED`; katalog `usbIds` |
-| **1.1.0** (13 Sep 2026; promosi 15 Sep 2026 14:59 WIB) | rilis penuh — `releases/latest` | agent pembaca katalog resep dari server; PC uji pemilik lulus 13 Sep; pilot selesai 18 Sep (kedua toko 1.1.0, nota normal) |
-| **1.0.2** (12 Jul 2026) | rilis penuh sebelumnya | tetap tersedia sebagai jalan mundur manual |
+| **1.2.0** (pre-release 20 Sep 2026; **rilis penuh 20 Sep 2026 16:14 WIB**) | rilis penuh — `releases/latest` | residu PR-12: state `waiting_printer` (menunggu printer tercolok/online, WMI), auto-map peran dua tahap (`mapping: conflict` + `previousPrinter`, tidak menimpa), `POST /setup/cancel`, label QR tanpa peran QRLABEL → `warning: ROLE_UNMAPPED`; katalog `usbIds` |
+| **1.1.0** (13 Sep 2026; promosi 15 Sep 2026 14:59 WIB) | rilis penuh sebelumnya | agent pembaca katalog resep dari server; PC uji pemilik lulus 13 Sep; pilot selesai 18 Sep (kedua toko 1.1.0, nota normal) |
+| **1.0.2** (12 Jul 2026) | rilis lama | tetap tersedia di GitHub Releases |
 
 Ceklis rilis: [`docs/RELEASE.md`](docs/RELEASE.md) · jurnal tiap rilis: [`docs/release-journal.md`](docs/release-journal.md).
 Satu rilis penuh = SELURUH armada dalam ≤ 6 jam (+ saat PC dimulai ulang) tanpa jalan pulang otomatis —
