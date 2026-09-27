@@ -11,6 +11,7 @@
     <Compile Include="../../src/SpikeTransport/SchemaGate.vb" Link="SchemaGate.vb" />
     <Compile Include="../../src/SpikeTransport/SaleV2Parser.vb" Link="SaleV2Parser.vb" />
     <Compile Include="../../src/SpikeTransport/ReceivableV2Parser.vb" Link="ReceivableV2Parser.vb" />
+    <Compile Include="../../src/SpikeTransport/ReceivableV2Rows.vb" Link="ReceivableV2Rows.vb" />
     <Compile Include="../../src/SpikeTransport/ReceiptNameLayout.vb" Link="ReceiptNameLayout.vb" />
     <Compile Include="../../src/SpikeTransport/SaleV2Format.vb" Link="SaleV2Format.vb" />
     <Compile Include="../../src/SpikeTransport/SaleV2Rows.vb" Link="SaleV2Rows.vb" />

@@ -72,6 +72,10 @@ Module Program
         Dim fifo As JObject = JObject.Parse(fifoSource)
         AcceptProof("selected dengan kredit", selected)
         AcceptProof("FIFO transfer", fifo)
+        CheckProofRows("selected kredit dan diskon", selected,
+            "BON 101=-100|BON 102=1100", "TOTAL BON=1000|DISKON (-)=100|-TOTAL BAYAR=900|UANG DITERIMA=1000|KEMBALIAN=100")
+        CheckProofRows("FIFO fee ditanggung toko", fifo,
+            "BON 101=400", "TOTAL BON=2000|BAYAR=400|-SISA BON=1600")
 
         Dim card As JObject = CType(selected.DeepClone(), JObject)
         card("jobType") = "receivable_selected_card"
@@ -86,6 +90,27 @@ Module Program
         cardAmounts("tenderSen") = "0"
         cardAmounts("changeSen") = "0"
         AcceptProof("selected EDC", card)
+        CheckProofRows("selected EDC", card,
+            "BON 101=-100|BON 102=1100", "TOTAL BON=1000|DISKON (-)=100|-TOTAL BAYAR=900|BIAYA EDC=20|-TOTAL DITAGIH=920")
+
+        Dim selectedWire As JObject = CType(selected.DeepClone(), JObject)
+        selectedWire("payload")("paymentMethod") = "WIRE"
+        Dim wireAmounts As JObject = CType(selectedWire("payload")("amounts"), JObject)
+        wireAmounts("roundingSen") = "25"
+        wireAmounts("transferFeeSen") = "25"
+        wireAmounts("stampFeeSen") = "50"
+        wireAmounts("netPaymentSen") = "800"
+        wireAmounts("cashSen") = "0"
+        wireAmounts("noncashSen") = "800"
+        wireAmounts("customerPaysSen") = "800"
+        wireAmounts("merchantReceivesSen") = "800"
+        wireAmounts("tenderSen") = "0"
+        wireAmounts("changeSen") = "0"
+        selectedWire("payload")("allocations")(1)("roundingSen") = "25"
+        selectedWire("payload")("allocations")(1)("transferFeeSen") = "25"
+        selectedWire("payload")("allocations")(1)("stampFeeSen") = "50"
+        CheckProofRows("selected transfer semua pengurang", selectedWire,
+            "BON 101=-100|BON 102=1100", "TOTAL BON=1000|DISKON (-)=100|PEMBULATAN (-)=25|BIAYA TF (-)=25|MATERAI (-)=50|-TOTAL BAYAR=800")
 
         Dim zero As JObject = CType(selected.DeepClone(), JObject)
         zero("payload")("paymentMethod") = "WIRE"
@@ -96,6 +121,8 @@ Module Program
             zeroAmounts(name) = "0"
         Next
         AcceptProof("selected nol", zero)
+        CheckProofRows("selected nol", zero,
+            "BON 101=-100|BON 102=1100", "TOTAL BON=1000|DISKON (-)=1000|-TOTAL BAYAR=0")
 
         Dim reprint As JObject = CType(selected.DeepClone(), JObject)
         CType(reprint("payload"), JObject)("reprint") = JObject.Parse("{""date"":""2026-09-28"",""time"":""08:00"",""processor"":{""userId"":""9"",""name"":""KASIR ULANG""}}")
@@ -109,6 +136,8 @@ Module Program
         expensive("payload")("amounts")("transferFeeSen") = "500"
         expensive("payload")("amounts")("merchantReceivesSen") = "-100"
         AcceptProof("FIFO fee lebih besar dari cicilan", expensive)
+        CheckProofRows("FIFO fee lebih besar dari cicilan", expensive,
+            "BON 101=400", "TOTAL BON=2000|BAYAR=400|-SISA BON=1600")
 
         Dim credit As JObject = CType(fifo.DeepClone(), JObject)
         Dim rows As JArray = CType(credit("payload")("allocations"), JArray)
@@ -135,6 +164,31 @@ Module Program
         Dim missingStore As JObject = CType(selected.DeepClone(), JObject)
         CType(missingStore("store"), JObject).Remove("name")
         RejectProof("header historis hilang", missingStore.ToString(Formatting.None))
+        If FormatReceivableSen(-100L) <> "-1" OrElse
+           FormatReceivableSen(252L) <> "2,52" OrElse
+           FormatReceivableSen(99999999999999L) <> "999.999.999.999,99" Then
+            Throw New InvalidOperationException("Format sen bertanda bukti piutang salah.")
+        End If
+        Try
+            FormatReceivableSen(Long.MinValue)
+            Throw New InvalidOperationException("Sen di luar kontrak diterima.")
+        Catch ex As ArgumentOutOfRangeException
+            ' Ditolak sebelum Math.Abs agar tidak overflow.
+        End Try
+    End Sub
+
+    Private Sub CheckProofRows(name As String, job As JObject, expectedAllocations As String,
+                               expectedAmounts As String)
+        Dim valid As JObject = ParseReceivableV2(job.ToString(Formatting.None))
+        Dim payload As JObject = CType(valid("payload"), JObject)
+        Dim actualAllocations As String = String.Join("|", BuildReceivableAllocationRows(payload).
+            Select(Function(row) row.Caption & "=" & row.Sen.ToString(CultureInfo.InvariantCulture)))
+        Dim actualAmounts As String = String.Join("|", BuildReceivableAmountRows(CStr(valid("jobType")),
+            CStr(payload("paymentMethod")), CType(payload("amounts"), JObject)).
+            Select(Function(row) If(row.SeparatorBefore, "-", "") & row.Caption & "=" & row.Sen.ToString(CultureInfo.InvariantCulture)))
+        If actualAllocations <> expectedAllocations OrElse actualAmounts <> expectedAmounts Then
+            Throw New InvalidOperationException(name & " baris salah: " & actualAllocations & " / " & actualAmounts)
+        End If
     End Sub
 
     Private Sub AcceptProof(name As String, job As JObject)
