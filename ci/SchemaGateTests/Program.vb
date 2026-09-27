@@ -8,7 +8,8 @@ Imports System.Linq
 
 Module Program
     Sub Main(args As String())
-        If args.Length <> 1 OrElse Not IO.Directory.Exists(args(0)) Then
+        If (args.Length <> 1 AndAlso args.Length <> 2) OrElse Not IO.Directory.Exists(args(0)) OrElse
+           (args.Length = 2 AndAlso Not IO.Directory.Exists(args(1))) Then
             Throw New ArgumentException("Diperlukan jalur direktori fixtures v1.")
         End If
         Dim cases As (Name As String, Body As String, Expected As String)() = {
@@ -58,11 +59,54 @@ Module Program
         End If
         CheckSaleV2(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
         CheckReceivableV2(IO.Path.Combine(args(0), "v2"))
+        If args.Length = 2 Then CheckGoReceivableV2(args(1))
         CheckNameLayout()
         CheckMoneyFormat()
         CheckItemLayout()
         CheckMetadataLayout()
         Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 17 rejected; receivable v2 parser accepted/rejected; amount rows/name/money/item/metadata layout passed.")
+    End Sub
+
+    Private Sub CheckGoReceivableV2(folder As String)
+        Dim scenarios As (FileName As String, JobType As String)() = {
+            ("selected_cash.json", "receivable_selected"),
+            ("selected_wire.json", "receivable_selected"),
+            ("selected_edc.json", "receivable_selected_card"),
+            ("selected_reprint.json", "receivable_selected"),
+            ("selected_zero.json", "receivable_selected"),
+            ("fifo_cash.json", "receivable_proof"),
+            ("fifo_wire_credit.json", "receivable_proof"),
+            ("fifo_edc.json", "receivable_proof"),
+            ("fifo_fee_exceeds_payment.json", "receivable_proof")}
+        If IO.Directory.GetFiles(folder, "*.json").Length <> scenarios.Length Then
+            Throw New InvalidOperationException("Jumlah fixture Go bukti piutang tidak lengkap.")
+        End If
+        Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        For Each scenario In scenarios
+            Dim root As JObject = ParseReceivableV2(IO.File.ReadAllText(IO.Path.Combine(folder, scenario.FileName)))
+            If CStr(root("jobType")) <> scenario.JobType OrElse
+               CStr(root("store")("name")) <> "SYNTHETIC STORE" OrElse
+               CStr(root("payload")("customer")("id")) <> "CS9001" Then
+                Throw New InvalidOperationException("Fixture Go bukti piutang tidak cocok: " & scenario.FileName)
+            End If
+            Dim plan As ReceivableV2PrintPlan = BuildReceivableV2Plan(root, 40.0F, 20.0F, characters, characters)
+            If plan.AllocationLines.Count = 0 OrElse plan.AmountLines.Count = 0 Then
+                Throw New InvalidOperationException("Layout fixture Go kosong: " & scenario.FileName)
+            End If
+            If scenario.FileName = "selected_reprint.json" AndAlso
+               (plan.ReprintName.Count = 0 OrElse plan.OriginalName.Count = 0) Then
+                Throw New InvalidOperationException("Atribusi cetak ulang fixture Go hilang.")
+            End If
+            If scenario.FileName = "selected_zero.json" AndAlso
+               CStr(root("payload")("amounts")("netPaymentSen")) <> "0" Then
+                Throw New InvalidOperationException("Selected nol fixture Go berubah.")
+            End If
+            If scenario.FileName = "fifo_fee_exceeds_payment.json" AndAlso
+               Not CStr(root("payload")("amounts")("merchantReceivesSen")).StartsWith("-", StringComparison.Ordinal) Then
+                Throw New InvalidOperationException("Merchant net negatif fixture Go hilang.")
+            End If
+        Next
+        Console.WriteLine("Go→agent receivable v2: 9 committed synthetic jobs parsed and preflighted.")
     End Sub
 
     Private Sub CheckReceivableV2(folder As String)
