@@ -12,5 +12,6 @@
     <Compile Include="../../src/SpikeTransport/SaleV2Parser.vb" Link="SaleV2Parser.vb" />
     <Compile Include="../../src/SpikeTransport/ReceiptNameLayout.vb" Link="ReceiptNameLayout.vb" />
     <Compile Include="../../src/SpikeTransport/SaleV2Format.vb" Link="SaleV2Format.vb" />
+    <Compile Include="../../src/SpikeTransport/SaleV2Rows.vb" Link="SaleV2Rows.vb" />
   </ItemGroup>
 </Project>

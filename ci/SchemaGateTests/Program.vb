@@ -39,7 +39,7 @@ Module Program
         CheckSaleV2(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
         CheckNameLayout()
         CheckMoneyFormat()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 8 accepted + 11 rejected; name/money layout passed.")
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 11 rejected; amount rows/name/money layout passed.")
     End Sub
 
     Private Sub CheckSaleV2(path As String)
@@ -47,6 +47,19 @@ Module Program
         ParseSaleV2(source)
         Dim baseline As JObject = JObject.Parse(source)
         Accept("cash", baseline)
+        CheckAmountRows("cash rounding", baseline,
+            "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|UANG DITERIMA=2000000|KEMBALIAN=50000")
+
+        Dim discounted As JObject = CType(baseline.DeepClone(), JObject)
+        Dim discountedAmounts As JObject = CType(discounted("payload")("amounts"), JObject)
+        discountedAmounts("discountSen") = "10000"
+        For Each name As String In {"netSen", "principalAppliedSen", "cashSen", "customerPaysSen", "merchantReceivesSen"}
+            discountedAmounts(name) = "1940000"
+        Next
+        discountedAmounts("changeSen") = "60000"
+        Accept("cash discount plus rounding", discounted)
+        CheckAmountRows("cash discount plus rounding", discounted,
+            "TOTAL BELANJA=1975200|DISKON (-)=10000|PEMBULATAN (-)=25200|-TOTAL NOTA=1940000|UANG DITERIMA=2000000|KEMBALIAN=60000")
 
         Dim edc As JObject = CType(baseline.DeepClone(), JObject)
         Dim payload As JObject = CType(edc("payload"), JObject)
@@ -62,6 +75,8 @@ Module Program
         amounts("tenderSen") = "0"
         amounts("changeSen") = "0"
         Accept("edc fees", edc)
+        CheckAmountRows("edc fees", edc,
+            "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|BIAYA EDC=500|-TOTAL DIBAYAR=1950500")
 
         Dim split As JObject = CType(edc.DeepClone(), JObject)
         payload = CType(split("payload"), JObject)
@@ -73,6 +88,8 @@ Module Program
         amounts("tenderSen") = "1050000"
         amounts("changeSen") = "50000"
         Accept("split edc", split)
+        CheckAmountRows("split edc", split,
+            "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|BIAYA EDC=500|-TOTAL DIBAYAR=1950500|TUNAI=1000000|EDC=950000")
 
         Dim splitWire As JObject = CType(split.DeepClone(), JObject)
         payload = CType(splitWire("payload"), JObject)
@@ -83,6 +100,8 @@ Module Program
         amounts("customerPaysSen") = "1950000"
         amounts("merchantReceivesSen") = "1950000"
         Accept("split wire", splitWire)
+        CheckAmountRows("split wire", splitWire,
+            "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|TUNAI=1000000|TRANSFER=950000")
 
         Dim credit As JObject = CType(baseline.DeepClone(), JObject)
         payload = CType(credit("payload"), JObject)
@@ -98,6 +117,8 @@ Module Program
         amounts("tenderSen") = "0"
         amounts("changeSen") = "0"
         Accept("DP0", credit)
+        CheckAmountRows("DP0", credit,
+            "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|BAYAR=0|SISA UTANG=1950000")
 
         Dim deposit As JObject = CType(credit.DeepClone(), JObject)
         payload = CType(deposit("payload"), JObject)
@@ -110,6 +131,8 @@ Module Program
         amounts("merchantReceivesSen") = "600000"
         amounts("tenderSen") = "600000"
         Accept("DP positif", deposit)
+        CheckAmountRows("DP positif", deposit,
+            "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|BAYAR=600000|SISA UTANG=1350000")
 
         Dim reprint As JObject = CType(baseline.DeepClone(), JObject)
         CType(reprint("payload"), JObject)("reprint") = JObject.Parse("{""date"":""2026-09-28"",""time"":""08:00"",""processor"":{""userId"":""3"",""name"":""Kasir Ulang""}}")
@@ -144,6 +167,15 @@ Module Program
         Reject("duplikat jumlah", source.Replace("""roundingSen"":""25200""", """roundingSen"":""25200"",""roundingSen"":""0"""))
         Reject("baris pecahan palsu", fraction.ToString(Formatting.None).Replace("""totalSen"":""0""", """totalSen"":""2"""))
         Reject("kasbon diskon manual", credit.ToString(Formatting.None).Replace("""discountSen"":""0""", """discountSen"":""1"""))
+    End Sub
+
+    Private Sub CheckAmountRows(name As String, job As JObject, expected As String)
+        Dim payload As JObject = CType(job("payload"), JObject)
+        Dim rows = BuildSaleAmountRows(CStr(job("jobType")), CStr(payload("paymentMethod")),
+                                       CStr(payload("noncashMethod")), CType(payload("amounts"), JObject))
+        Dim actual As String = String.Join("|", rows.Select(Function(row) If(row.SeparatorBefore, "-", "") &
+            row.Caption & "=" & row.Sen.ToString(CultureInfo.InvariantCulture)))
+        If actual <> expected Then Throw New InvalidOperationException(name & ": baris jumlah berbeda: " & actual)
     End Sub
 
     Private Sub Accept(name As String, job As JObject)

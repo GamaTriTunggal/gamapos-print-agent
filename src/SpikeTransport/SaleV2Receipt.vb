@@ -40,8 +40,11 @@ Module SaleV2Receipt
                            CStr(payload("time")), reprintDate, reprintTime)
         printer.Print(Line2())
         PrintSaleItems(printer, CType(payload("items"), JArray))
-        PrintSaleAmounts(printer, CStr(root("jobType")), CStr(payload("paymentMethod")),
-                         CStr(payload("noncashMethod")), amounts)
+        For Each row As SaleAmountRow In BuildSaleAmountRows(CStr(root("jobType")),
+                  CStr(payload("paymentMethod")), CStr(payload("noncashMethod")), amounts)
+            If row.SeparatorBefore Then printer.Print(Line1())
+            AmountLine(printer, row.Caption, row.Sen)
+        Next
         Dim originalName As String = CStr(payload("originalProcessor")("name"))
         Dim reprintName As String = If(reprint Is Nothing, Nothing, CStr(reprint("processor")("name")))
         PrintSaleFooter(printer, originalName, reprintName)
@@ -87,39 +90,11 @@ Module SaleV2Receipt
         Next
     End Sub
 
-    Private Sub PrintSaleAmounts(printer As Printer, jobType As String, method As String,
-                                 noncashMethod As String, amounts As JObject)
-        AmountLine(printer, "TOTAL BELANJA", Sen(amounts, "grossSen"))
-        If Sen(amounts, "discountSen") > 0 Then AmountLine(printer, "DISKON (-)", Sen(amounts, "discountSen"))
-        If Sen(amounts, "roundingSen") > 0 Then AmountLine(printer, "PEMBULATAN (-)", Sen(amounts, "roundingSen"))
-        printer.Print(Line1())
-        AmountLine(printer, "TOTAL NOTA", Sen(amounts, "netSen"))
-        If Sen(amounts, "customerFeeSen") > 0 Then
-            AmountLine(printer, "BIAYA EDC", Sen(amounts, "customerFeeSen"))
-            printer.Print(Line1())
-            AmountLine(printer, "TOTAL DIBAYAR", Sen(amounts, "customerPaysSen"))
-        End If
-        If jobType = "kasbon_receipt" Then
-            AmountLine(printer, "BAYAR", Sen(amounts, "principalAppliedSen"))
-            AmountLine(printer, "SISA UTANG", Sen(amounts, "remainingSen"))
-        ElseIf method = "SPLIT" Then
-            AmountLine(printer, "TUNAI", Sen(amounts, "cashSen"))
-            AmountLine(printer, If(noncashMethod = "EDC", "EDC", "TRANSFER"), Sen(amounts, "noncashSen"))
-        ElseIf method = "CASH" AndAlso Sen(amounts, "changeSen") > 0 Then
-            AmountLine(printer, "UANG DITERIMA", Sen(amounts, "tenderSen"))
-            AmountLine(printer, "KEMBALIAN", Sen(amounts, "changeSen"))
-        End If
-    End Sub
-
     Private Sub AmountLine(printer As Printer, caption As String, amountSen As Long)
         Dim value As String = FormatSaleSen(amountSen)
         If caption.Length + value.Length + 1 > TotCol Then Throw New ArgumentException("Baris jumlah melampaui kolom nota.")
         printer.Print(T(1), caption, T(TotCol - value.Length + 1), value)
     End Sub
-
-    Private Function Sen(amounts As JObject, field As String) As Long
-        Return Long.Parse(CStr(amounts(field)), CultureInfo.InvariantCulture)
-    End Function
 
     Private Sub PrintSaleFooter(printer As Printer, originalName As String, reprintName As String)
         printer.Print(T(1), Line1())
