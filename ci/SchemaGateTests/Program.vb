@@ -39,7 +39,8 @@ Module Program
         CheckSaleV2(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
         CheckNameLayout()
         CheckMoneyFormat()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 11 rejected; amount rows/name/money layout passed.")
+        CheckItemLayout()
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 11 rejected; amount rows/name/money/item layout passed.")
     End Sub
 
     Private Sub CheckSaleV2(path As String)
@@ -239,6 +240,55 @@ Module Program
             If FormatSaleQuantity(scenario.Value) <> scenario.Expected Then
                 Throw New InvalidOperationException("Format kuantitas " & scenario.Value & " tidak cocok.")
             End If
+        Next
+    End Sub
+
+    Private Sub CheckItemLayout()
+        Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        Dim ordinary = BuildSaleItemLines(100L, " SAK" & vbTab, "Semen  Putih" & vbCrLf & "Kualitas Tinggi",
+                                          1975200L, 1975200L, 40.0F, 40, characters)
+        If ordinary(0) <> "1 SAK Semen Putih Kualitas Tinggi" OrElse
+           ordinary(ordinary.Count - 1).Length <> 40 Then
+            Throw New InvalidOperationException("Item biasa tidak dinormalisasi/diratakan.")
+        End If
+        Dim wrapped = BuildSaleItemLines(100L, "SAK", "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                                         1000L, 1000L, 12.0F, 12, characters)
+        Dim restored As String = ""
+        For Each line As String In wrapped.Take(wrapped.Count - 1)
+            If line.Length > 12 OrElse Not line.StartsWith("1 SAK ", StringComparison.Ordinal) AndAlso
+               Not line.StartsWith("      ", StringComparison.Ordinal) Then
+                Throw New InvalidOperationException("Item panjang melewati area/indentasi.")
+            End If
+            restored &= line.Substring(6)
+        Next
+        If restored <> "ABCDEFGHIJKLMNOPQRSTUVWXYZ" Then Throw New InvalidOperationException("Nama item terpotong saat bungkus.")
+
+        Dim graphemes As Func(Of String, Single) = Function(value As String) CSng(StringInfo.ParseCombiningCharacters(value).Length)
+        Dim unicodeName As String = String.Concat(Enumerable.Repeat("😊", 20))
+        Dim unicodeLines = BuildSaleItemLines(100L, "", unicodeName, 1000L, 1000L, 10.0F, 10, graphemes)
+        Dim unicodeRestored As String = ""
+        For Each line As String In unicodeLines.Take(unicodeLines.Count - 1)
+            If graphemes(line) > 10.0F Then Throw New InvalidOperationException("Item Unicode melewati area.")
+            unicodeRestored &= line.Substring(2)
+        Next
+        If unicodeRestored <> unicodeName Then Throw New InvalidOperationException("Grapheme item terpotong.")
+        Dim highAmount = BuildSaleItemLines(100L, "SAK", "A", 99999999999999L, 99999999999999L,
+                                            40.0F, 40, characters)
+        If highAmount.Count <> 3 OrElse highAmount(1).Length > 40 OrElse highAmount(2).Length > 40 Then
+            Throw New InvalidOperationException("Harga dan total besar tidak dipisah aman.")
+        End If
+        For Each action As Action In {
+            Sub() BuildSaleItemLines(100L, "UNIT PANJANG", "Barang", 1000L, 1000L, 4.0F, 4, characters),
+            Sub() BuildSaleItemLines(100L, "", vbTab & vbCrLf, 1000L, 1000L, 40.0F, 40, characters),
+            Sub() BuildSaleItemLines(100L, "", "Barang", 1000L, 1000L, Single.NaN, 40, characters),
+            Sub() BuildSaleItemLines(100L, "", "Barang", 1000L, 1000L, 40.0F, 40, Nothing)}
+            Dim rejected As Boolean = False
+            Try
+                action()
+            Catch ex As ArgumentException
+                rejected = True
+            End Try
+            If Not rejected Then Throw New InvalidOperationException("Item yang tidak muat/metrik rusak diterima.")
         Next
     End Sub
 End Module

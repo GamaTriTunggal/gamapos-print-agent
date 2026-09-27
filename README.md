@@ -33,11 +33,13 @@ schema 1. Parser murni tiga nota penjualan schema 2 sudah ada dan diuji,
 serta draf formatter terpisah sudah dapat dibangun, tetapi **belum dipanggil
 dispatcher** dan belum ada bukti cetak Windows/printer atau izin rilis.
 Formatter memakai sen `Decimal`, baris pembulatan tersendiri, dan mengukur
-lebar nama kasir dengan `Printer.TextWidth` saat nanti dicetak. Uji murni
+lebar nama kasir serta item dengan `Printer.TextWidth` saat nanti dicetak.
+Item dan footer dipreflight sebelum header dicetak; ini belum membuktikan
+lebar sebenarnya atau keberhasilan driver. Uji murni
 lintas platform:
 `dotnet run --project ci/SchemaGateTests/SchemaGateTests.vbproj -c Release -- fixtures`
 (11 kasus gerbang, 17 fixture v1, varian/mutasi nota v2, baris jumlah untuk
-tunai/diskon/pembulatan/EDC/campuran/DP, planner nama dan format uang).
+tunai/diskon/pembulatan/EDC/campuran/DP, planner nama/item dan format uang).
 Build Linux lulus;
 smoke Windows dan printer fisik masih gerbang terpisah.
 
@@ -54,7 +56,7 @@ smoke Windows dan printer fisik masih gerbang terpisah.
 src/SpikeTransport/      → seluruh kode agent (nama folder warisan spike Juni 2026; proyek SpikeTransport.vbproj)
   Program.vb             → HttpListener :9111 + router endpoint
   SchemaGate.vb, SaleV2Parser.vb → pagar schema v1 + parser nota v2 belum aktif
-  SaleV2Receipt.vb, SaleV2Rows.vb, SaleV2Format.vb, ReceiptNameLayout.vb → draf layout v2 belum aktif
+  SaleV2Receipt.vb, SaleV2Rows.vb, SaleV2Format.vb, ReceiptNameLayout.vb, SaleV2ItemLayout.vb → draf layout v2 belum aktif
   Printing.vb, *Receipt.vb, DeliveryOrder.vb, QrLabel.vb, AmountListSlip.vb → 14 jobType (layout nota)
   Printers.vb            → peta peran → printer Windows (printers.json), ganti default sesaat utk PowerPacks
   PrinterSetup.vb        → Pasang Otomatis: unduh paket golden (SHA-256), jalankan installer (apd | seagull)
