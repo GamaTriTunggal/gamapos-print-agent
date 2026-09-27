@@ -69,7 +69,7 @@ Module SaleV2Parser
         Dim lineTotal As Decimal = 0D
         For Each token As JToken In items
             Dim item As JObject = Exact(token, "item", "name,quantity100,unit,priceSen,totalSen")
-            Text(item, "name", True)
+            PrintedName(item, "name")
             Text(item, "unit", False)
             Dim quantity As Long = PositiveString(item, "quantity100", MaxQuantity)
             Dim price As Long = Cent(item, "priceSen")
@@ -156,6 +156,18 @@ Module SaleV2Parser
         Return value
     End Function
 
+    ' P-606: nama yang lenyap saat normalisasi tidak boleh dicetak kosong.
+    Private Function PrintedName(obj As JObject, name As String) As String
+        Dim value As String = Text(obj, name, True)
+        For Each ch As Char In value
+            If Not Char.IsWhiteSpace(ch) AndAlso Not Char.IsControl(ch) AndAlso
+               Char.GetUnicodeCategory(ch) <> UnicodeCategory.Format Then
+                Return value
+            End If
+        Next
+        Throw New ArgumentException(name & " harus punya karakter terlihat.")
+    End Function
+
     Private Function PositiveString(obj As JObject, name As String, upper As Long) As Long
         Dim value As Long = CanonicalNumber(Text(obj, name, True), name)
         If value <= 0 OrElse value > upper Then Throw New ArgumentException(name & " melewati batas.")
@@ -184,6 +196,6 @@ Module SaleV2Parser
     Private Sub Processor(token As JToken, path As String)
         Dim actor As JObject = Exact(token, path, "userId,name")
         Text(actor, "userId", True)
-        Text(actor, "name", True)
+        PrintedName(actor, "name")
     End Sub
 End Module

@@ -42,6 +42,9 @@ lintas platform:
 tunai/diskon/pembulatan/EDC/campuran/DP, planner nama/item dan format uang).
 Build Linux lulus;
 smoke Windows dan printer fisik masih gerbang terpisah.
+P-606: parser v2 juga menolak nama barang/kasir/pencetak ulang yang hanya
+berisi spasi, kontrol, atau karakter format; nota tanpa identitas terlihat
+tidak boleh lolos validasi meski string JSON-nya tidak kosong.
 
 ## Dua fungsi agent — jangan dicampur
 

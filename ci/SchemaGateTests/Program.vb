@@ -40,7 +40,7 @@ Module Program
         CheckNameLayout()
         CheckMoneyFormat()
         CheckItemLayout()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 11 rejected; amount rows/name/money/item layout passed.")
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 15 rejected; amount rows/name/money/item layout passed.")
     End Sub
 
     Private Sub CheckSaleV2(path As String)
@@ -168,6 +168,18 @@ Module Program
         Reject("duplikat jumlah", source.Replace("""roundingSen"":""25200""", """roundingSen"":""25200"",""roundingSen"":""0"""))
         Reject("baris pecahan palsu", fraction.ToString(Formatting.None).Replace("""totalSen"":""0""", """totalSen"":""2"""))
         Reject("kasbon diskon manual", credit.ToString(Formatting.None).Replace("""discountSen"":""0""", """discountSen"":""1"""))
+        Dim invisibleActor As JObject = CType(baseline.DeepClone(), JObject)
+        invisibleActor("payload")("originalProcessor")("name") = " " & vbTab & vbCrLf
+        Reject("nama kasir tanpa karakter terlihat", invisibleActor.ToString(Formatting.None))
+        Dim invisibleItem As JObject = CType(baseline.DeepClone(), JObject)
+        invisibleItem("payload")("items")(0)("name") = vbTab & vbCrLf
+        Reject("nama barang tanpa karakter terlihat", invisibleItem.ToString(Formatting.None))
+        Dim invisibleReprint As JObject = CType(reprint.DeepClone(), JObject)
+        invisibleReprint("payload")("reprint")("processor")("name") = " " & vbTab
+        Reject("nama pencetak ulang tanpa karakter terlihat", invisibleReprint.ToString(Formatting.None))
+        Dim formatOnly As JObject = CType(baseline.DeepClone(), JObject)
+        formatOnly("payload")("originalProcessor")("name") = ChrW(&H200D)
+        Reject("nama kasir karakter format saja", formatOnly.ToString(Formatting.None))
     End Sub
 
     Private Sub CheckAmountRows(name As String, job As JObject, expected As String)
