@@ -6,6 +6,18 @@ Option Explicit On
 Imports Newtonsoft.Json.Linq
 
 Module SchemaGate
+    ' Pemilih keluarga v2 murni; jangan jatuhkan jenis baru ke formatter v1.
+    Friend Function SelectV2Family(jobType As String) As String
+        Select Case jobType
+            Case "cashier_receipt", "kasbon_receipt", "split_receipt"
+                Return "SALE"
+            Case "receivable_selected", "receivable_selected_card", "receivable_proof"
+                Return "RECEIVABLE"
+            Case Else
+                Return "UNSUPPORTED_JOBTYPE"
+        End Select
+    End Function
+
     ' Rute murni: agent yang kelak mengiklankan schema 2 tetap menerima v1.
     ' Pada build kini supportedVersion=1, sehingga v2 tetap ditolak.
     Friend Function RoutePrintSchema(body As String, supportedVersion As Integer) As String

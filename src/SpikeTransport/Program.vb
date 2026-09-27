@@ -330,7 +330,7 @@ Module Program
         ' payload v2 bernama cashier_receipt jatuh ke formatter v1 (yang akan
         ' membaca field berbeda dan dapat mencetak total nol/salah).
         Dim schemaResult As String = RoutePrintSchema(body, SchemaVersion)
-        If schemaResult = "V2" Then Return DispatchSaleV2(body)
+        If schemaResult = "V2" Then Return DispatchV2(body)
         If schemaResult <> "V1" Then
             If schemaResult = "BAD_PAYLOAD" Then
                 Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""JSON nota tidak sah.""}"
@@ -541,6 +541,27 @@ Module Program
         End Select
     End Function
 
+    ' Semua keluarga v2 tetap tidak terjangkau saat /health schema 1.
+    Private Function DispatchV2(body As String) As String
+        Dim root As JObject
+        Try
+            root = JObject.Parse(body, New JsonLoadSettings With {
+                .DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error})
+        Catch
+            Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""JSON v2 tidak sah.""}"
+        End Try
+        Dim kind As JToken = root("jobType")
+        Dim family As String = SelectV2Family(If(kind IsNot Nothing AndAlso kind.Type = JTokenType.String, CStr(kind), ""))
+        Select Case family
+            Case "SALE"
+                Return DispatchSaleV2(body)
+            Case "RECEIVABLE"
+                Return DispatchReceivableV2(body)
+            Case Else
+                Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":""Jenis nota v2 belum didukung.""}"
+        End Select
+    End Function
+
     ' Rute ini tetap tidak terjangkau saat /health mengiklankan schema 1.
     ' Parser v2 memeriksa seluruh uang/aktor sebelum printer dipilih; v1
     ' tetap masuk formatter lama tanpa perubahan data atau bentuk respons.
@@ -560,6 +581,24 @@ Module Program
             ' Jangan mengembalikan metadata nota ke log/respons galat.
             Console.WriteLine("   PRINT_FAILED v2: " & ex.GetType().Name)
             Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":""Cetak nota v2 gagal.""}"
+        End Try
+    End Function
+
+    Private Function DispatchReceivableV2(body As String) As String
+        Dim root As JObject
+        Try
+            root = ParseReceivableV2(body)
+        Catch
+            Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""Bukti piutang v2 tidak sah.""}"
+        End Try
+        Try
+            Dim kind As String = CStr(root("jobType"))
+            Dim transactionID As String = CStr(root("payload")("transactionId"))
+            WithRolePrinter(CStr(root("printerRole")), Sub() PrintReceivableV2Receipt(root))
+            Return "{""ok"":true,""jobType"":" & JsonString(kind) & ",""transactionId"":" & JsonString(transactionID) & "}"
+        Catch ex As Exception
+            Console.WriteLine("   PRINT_FAILED v2: " & ex.GetType().Name)
+            Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":""Cetak bukti piutang v2 gagal.""}"
         End Try
     End Function
 

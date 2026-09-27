@@ -1,4 +1,4 @@
-' Formatter kandidat bukti piutang schema 2. Belum terhubung ke dispatcher;
+' Formatter kandidat bukti piutang schema 2 pada rute dormant;
 ' /health tetap schema 1 sampai Windows/printer fisik dan gerbang lain lulus.
 Option Strict On
 Option Explicit On
@@ -12,6 +12,10 @@ Imports Newtonsoft.Json.Linq
 Module ReceivableV2Receipt
     Friend Sub PrintReceivableV2Receipt(body As String)
         Dim root As JObject = ParseReceivableV2(body)
+        PrintReceivableV2Receipt(root)
+    End Sub
+
+    Friend Sub PrintReceivableV2Receipt(root As JObject)
         RunSta(Sub() RenderReceivableV2(root))
     End Sub
 

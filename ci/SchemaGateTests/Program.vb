@@ -46,6 +46,18 @@ Module Program
                 Throw New InvalidOperationException(scenario.Name & ": " & actual & " != " & scenario.Expected)
             End If
         Next
+        For Each scenario In {
+            (Name:="cashier_receipt", Family:="SALE"), (Name:="kasbon_receipt", Family:="SALE"),
+            (Name:="split_receipt", Family:="SALE"),
+            (Name:="receivable_selected", Family:="RECEIVABLE"),
+            (Name:="receivable_selected_card", Family:="RECEIVABLE"),
+            (Name:="receivable_proof", Family:="RECEIVABLE"),
+            (Name:="return_note", Family:="UNSUPPORTED_JOBTYPE"),
+            (Name:="Cashier_Receipt", Family:="UNSUPPORTED_JOBTYPE")}
+            If SelectV2Family(scenario.Name) <> scenario.Family Then
+                Throw New InvalidOperationException("Keluarga job v2 salah: " & scenario.Name)
+            End If
+        Next
         Dim fixtures As String() = IO.Directory.GetFiles(args(0), "*.sample.json")
         If fixtures.Length < 17 Then Throw New InvalidOperationException("Fixture v1 kurang dari 17.")
         For Each fixture As String In fixtures
@@ -112,6 +124,10 @@ Module Program
     Private Sub CheckReceivableV2(folder As String)
         Dim selectedSource As String = IO.File.ReadAllText(IO.Path.Combine(folder, "receivable_selected.sample.json"))
         Dim fifoSource As String = IO.File.ReadAllText(IO.Path.Combine(folder, "receivable_proof.sample.json"))
+        If RoutePrintSchema(selectedSource, 1) <> "UNSUPPORTED_SCHEMA" OrElse
+           RoutePrintSchema(selectedSource, 2) <> "V2" Then
+            Throw New InvalidOperationException("Bukti piutang v2 melewati gerbang schema1.")
+        End If
         Dim selected As JObject = JObject.Parse(selectedSource)
         Dim fifo As JObject = JObject.Parse(fifoSource)
         AcceptProof("selected dengan kredit", selected)
