@@ -40,7 +40,8 @@ Module Program
         CheckNameLayout()
         CheckMoneyFormat()
         CheckItemLayout()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 17 rejected; amount rows/name/money/item layout passed.")
+        CheckMetadataLayout()
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 17 rejected; amount rows/name/money/item/metadata layout passed.")
     End Sub
 
     Private Sub CheckSaleV2(path As String)
@@ -307,6 +308,60 @@ Module Program
                 rejected = True
             End Try
             If Not rejected Then Throw New InvalidOperationException("Item yang tidak muat/metrik rusak diterima.")
+        Next
+    End Sub
+
+    Private Sub CheckMetadataLayout()
+        Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        Dim exact = LayoutCenteredSaleText("ABCDEFGHIJKLMNOPQRST", "NO NAME", 20.0F, characters)
+        If exact.Count <> 1 OrElse exact(0).Text <> "ABCDEFGHIJKLMNOPQRST" OrElse exact(0).X <> 0.0F Then
+            Throw New InvalidOperationException("Nama toko tepat 20 kolom berubah/menambah NO NAME.")
+        End If
+        Dim wrapped = LayoutCenteredSaleText("ABCDEFGHIJKLMNOPQRSTU", "NO NAME", 20.0F, characters)
+        If wrapped.Count <> 2 OrElse String.Concat(wrapped.Select(Function(line) line.Text)) <> "ABCDEFGHIJKLMNOPQRSTU" OrElse
+           wrapped.Any(Function(line) line.X < 0.0F OrElse line.X + characters(line.Text) > 20.0F) Then
+            Throw New InvalidOperationException("Nama toko panjang terpotong/melewati area.")
+        End If
+        Dim fullAddress = LayoutCenteredSaleText(New String("A"c, 40), "", 40.0F, characters)
+        If fullAddress.Count <> 1 OrElse fullAddress(0).Text.Length <> 40 Then
+            Throw New InvalidOperationException("Alamat tepat 40 kolom menambah baris palsu.")
+        End If
+        Dim customer = LayoutSaleCustomer("ALAMAT   : ", "  Jalan" & vbTab & "Panjang Sekali  ", 20.0F, characters)
+        If customer.Count < 2 OrElse customer(0) <> "ALAMAT   : Jalan" OrElse
+           customer.Any(Function(line) line.Length > 20) Then
+            Throw New InvalidOperationException("Alamat pelanggan tidak dibungkus aman.")
+        End If
+        Dim graphemes As Func(Of String, Single) = Function(value As String) CSng(StringInfo.ParseCombiningCharacters(value).Length)
+        Dim unicodeName As String = String.Concat(Enumerable.Repeat("😊", 12))
+        Dim unicodeLines = LayoutCenteredSaleText(unicodeName, "", 5.0F, graphemes)
+        If String.Concat(unicodeLines.Select(Function(line) line.Text)) <> unicodeName OrElse
+           unicodeLines.Any(Function(line) line.X < 0.0F OrElse line.X + graphemes(line.Text) > 5.0F) Then
+            Throw New InvalidOperationException("Header Unicode dipotong di tengah grapheme.")
+        End If
+        Dim receipt As String = LayoutSaleReceiptLine("26092701", "2026-09-27", "14:30:00", False, 40.0F, characters)
+        Dim reprint As String = LayoutSaleReceiptLine("", "2026-09-28", "08:00:00", True, 40.0F, characters)
+        If receipt.Length <> 40 OrElse Not receipt.StartsWith("NO:26092701", StringComparison.Ordinal) OrElse
+           Not receipt.EndsWith("14:30:00", StringComparison.Ordinal) OrElse
+           Not reprint.StartsWith("CETAK ULANG:", StringComparison.Ordinal) OrElse reprint.Length <> 40 Then
+            Throw New InvalidOperationException("Nomor/tanggal/jam nota tidak sesuai kolom.")
+        End If
+        Dim amount As String = LayoutSaleAmountLine("TOTAL BELANJA", 99999999999999L, 40, 40.0F, characters)
+        If amount.Length <> 40 OrElse Not amount.EndsWith("999.999.999.999,99", StringComparison.Ordinal) Then
+            Throw New InvalidOperationException("Jumlah besar tidak rata kanan.")
+        End If
+        For Each action As Action In {
+            Sub() LayoutSaleReceiptLine("1234567890123456", "2026-09-27", "14:30:00", False, 40.0F, characters),
+            Sub() LayoutSaleReceiptLine("1", "2026-09-27" & vbCrLf, "14:30:00", False, 40.0F, characters),
+            Sub() LayoutSaleAmountLine("TOTAL BELANJA", 99999999999999L, 30, 30.0F, characters),
+            Sub() LayoutSaleCustomer("ALAMAT   : ", "A", 3.0F, characters),
+            Sub() LayoutCenteredSaleText("A", "", Single.NaN, characters)}
+            Dim rejected As Boolean = False
+            Try
+                action()
+            Catch ex As ArgumentException
+                rejected = True
+            End Try
+            If Not rejected Then Throw New InvalidOperationException("Preflight metadata membiarkan masukan tak muat.")
         Next
     End Sub
 End Module

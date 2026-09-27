@@ -35,10 +35,33 @@ Module SaleV2Receipt
         End If
 
         Dim printer As New Printer()
-        ' Validasi semua item dengan font/area cetak nyata sebelum mencetak header.
+        ' Semua teks dinamis harus direncanakan sebelum Printer.Print pertama.
+        printer.Font = New Font(FontCourier, 18, FontStyle.Regular)
+        Dim nameWidth As Single = Math.Min(CSng(printer.ScaleWidth), CSng(printer.TextWidth(StrDup(StoreNameCol, " "))))
+        Dim measureName As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
+        Dim storeNameLines As List(Of PositionedNameLine) =
+            LayoutCenteredSaleText(store.name, "NO NAME", nameWidth, measureName)
         printer.Font = New Font(FontCourier, 9, FontStyle.Bold)
         Dim printable As Single = Math.Min(CSng(printer.ScaleWidth), CSng(printer.TextWidth(StrDup(TotCol, " "))))
         Dim measure As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
+        Dim storeDetails As New List(Of PositionedNameLine)()
+        If NormalizeProcessorName(store.address) <> "" Then
+            storeDetails.AddRange(LayoutCenteredSaleText(store.address, "", printable, measure))
+        End If
+        If NormalizeProcessorName(store.contact) <> "" Then
+            storeDetails.AddRange(LayoutCenteredSaleText(store.contact, "", printable, measure))
+        End If
+        Dim customerLines As New List(Of String)()
+        customerLines.AddRange(LayoutSaleCustomer(CapCustName, customer.name, printable, measure))
+        customerLines.AddRange(LayoutSaleCustomer(CapCustAddr, customer.address, printable, measure))
+        customerLines.AddRange(LayoutSaleCustomer(CapCustCont, customer.contact, printable, measure))
+        customerLines.AddRange(LayoutSaleCustomer(CapCustPoNo, customer.poNo, printable, measure))
+        Dim receiptLine As String = LayoutSaleReceiptLine(CStr(payload("receiptNo")), CStr(payload("date")),
+                                                           CStr(payload("time")), False, printable, measure)
+        Dim reprintLine As String = Nothing
+        If reprint IsNot Nothing Then
+            reprintLine = LayoutSaleReceiptLine("", reprintDate, reprintTime, True, printable, measure)
+        End If
         Dim itemLayouts As New List(Of List(Of String))()
         For Each token As JToken In CType(payload("items"), JArray)
             Dim item As JObject = CType(token, JObject)
@@ -54,19 +77,41 @@ Module SaleV2Receipt
         Dim originalLines As List(Of PositionedNameLine) = LayoutOriginalName(originalName, footCenter, printable, measure)
         Dim reprintLines As New List(Of PositionedNameLine)()
         If reprintName IsNot Nothing Then reprintLines = LayoutReprintName(reprintName, printable, measure)
-        PrintStoreHeader(printer, store)
-        PrintCustomerBlock(printer, customer)
-        PrintReceiptNoLine(printer, CStr(payload("receiptNo")), CStr(payload("date")),
-                           CStr(payload("time")), reprintDate, reprintTime)
+        Dim amountRows As List(Of SaleAmountRow) = BuildSaleAmountRows(CStr(root("jobType")),
+                  CStr(payload("paymentMethod")), CStr(payload("noncashMethod")), amounts)
+        Dim amountLines As New List(Of String)()
+        For Each row As SaleAmountRow In amountRows
+            amountLines.Add(LayoutSaleAmountLine(row.Caption, row.Sen, TotCol, printable, measure))
+        Next
+
+        printer.Font = New Font(FontCourier, 18, FontStyle.Regular)
+        printer.CurrentX = 0
+        printer.CurrentY = 0
+        PrintPositioned(printer, storeNameLines)
+        printer.Font = New Font(FontCourier, 9, FontStyle.Bold)
+        PrintPositioned(printer, storeDetails)
+        printer.Print()
+        For Each line As String In customerLines
+            printer.Print(line)
+        Next
+        If customerLines.Count > 0 Then printer.Print()
+        printer.Print(receiptLine)
+        If reprintLine IsNot Nothing Then printer.Print(reprintLine)
         printer.Print(Line2())
         PrintSaleItems(printer, itemLayouts)
-        For Each row As SaleAmountRow In BuildSaleAmountRows(CStr(root("jobType")),
-                  CStr(payload("paymentMethod")), CStr(payload("noncashMethod")), amounts)
-            If row.SeparatorBefore Then printer.Print(Line1())
-            AmountLine(printer, row.Caption, row.Sen)
+        For index As Integer = 0 To amountRows.Count - 1
+            If amountRows(index).SeparatorBefore Then printer.Print(Line1())
+            printer.Print(amountLines(index))
         Next
         PrintSaleFooter(printer, originalLines, reprintLines)
         printer.EndDoc()
+    End Sub
+
+    Private Sub PrintPositioned(printer As Printer, lines As List(Of PositionedNameLine))
+        For Each line As PositionedNameLine In lines
+            printer.CurrentX = line.X
+            printer.Print(line.Text)
+        Next
     End Sub
 
     Private Sub PrintSaleItems(printer As Printer, layouts As List(Of List(Of String)))
@@ -76,12 +121,6 @@ Module SaleV2Receipt
             Next
             printer.Print(If(index = layouts.Count - 1, Line2(), Line1()))
         Next
-    End Sub
-
-    Private Sub AmountLine(printer As Printer, caption As String, amountSen As Long)
-        Dim value As String = FormatSaleSen(amountSen)
-        If caption.Length + value.Length + 1 > TotCol Then Throw New ArgumentException("Baris jumlah melampaui kolom nota.")
-        printer.Print(T(1), caption, T(TotCol - value.Length + 1), value)
     End Sub
 
     Private Sub PrintSaleFooter(printer As Printer, originalLines As List(Of PositionedNameLine),
