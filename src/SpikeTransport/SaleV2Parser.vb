@@ -19,6 +19,9 @@ Module SaleV2Parser
     Private Const MaxQuantity As Long = 999999999999L
     Private ReadOnly Canonical As New Regex("\A(0|[1-9][0-9]{0,13})\z", RegexOptions.CultureInvariant)
     Private ReadOnly EventIdPattern As New Regex("\A[0-9a-f]{32}\z", RegexOptions.CultureInvariant)
+    Private ReadOnly CorrectionDatePattern As New Regex("\A[0-9]{4}-[0-9]{2}-[0-9]{2}\z", RegexOptions.CultureInvariant)
+    Private ReadOnly CorrectionTimePattern As New Regex("\A[0-9]{2}:[0-9]{2}:[0-9]{2}\z", RegexOptions.CultureInvariant)
+    Private ReadOnly CorrectionCustomerPattern As New Regex("\A[A-Z0-9]{1,6}\z", RegexOptions.CultureInvariant)
 
     Friend Function ParseSaleV2(body As String) As JObject
         If body Is Nothing OrElse Encoding.UTF8.GetByteCount(body) > 1048576 Then
@@ -60,10 +63,11 @@ Module SaleV2Parser
         Next
         Processor(payload("originalProcessor"), "originalProcessor")
         If payload.Property("reprint") IsNot Nothing Then
-            Dim reprint As JObject = Exact(payload("reprint"), "reprint", "date,time,processor")
+            Dim reprint As JObject = Exact(payload("reprint"), "reprint", "date,time,processor,corrections")
             Text(reprint, "date", True)
             Text(reprint, "time", True)
             Processor(reprint("processor"), "reprint.processor")
+            Corrections(reprint("corrections"))
         End If
 
         Dim items As JArray = TryCast(payload("items"), JArray)
@@ -136,6 +140,57 @@ Module SaleV2Parser
         End If
         Return root
     End Function
+
+    Private Sub Corrections(token As JToken)
+        Dim entries As JArray = TryCast(token, JArray)
+        If entries Is Nothing OrElse entries.Count > 2 Then Throw New ArgumentException("Daftar koreksi salinan tidak sah.")
+        Dim seenCustomer As Boolean = False
+        Dim seenPayment As Boolean = False
+        For Each entry As JToken In entries
+            Dim raw As JObject = TryCast(entry, JObject)
+            If raw Is Nothing Then Throw New ArgumentException("Koreksi salinan harus objek.")
+            Dim kind As String = Text(raw, "kind", True)
+            Dim correction As JObject
+            Select Case kind
+                Case "customer"
+                    If seenCustomer OrElse seenPayment Then Throw New ArgumentException("Urutan koreksi pelanggan salah.")
+                    seenCustomer = True
+                    correction = Exact(entry, "correction.customer", "kind,eventId,date,time,actorName,customerId,customerName")
+                    Dim customerId As String = Text(correction, "customerId", True)
+                    If Not CorrectionCustomerPattern.IsMatch(customerId) OrElse customerId = "CS0001" Then
+                        Throw New ArgumentException("Kode pelanggan koreksi tidak sah.")
+                    End If
+                    Dim customerName As String = Text(correction, "customerName", False)
+                    If StringInfo.ParseCombiningCharacters(customerName).Length > 255 Then
+                        Throw New ArgumentException("Nama pelanggan koreksi terlalu panjang.")
+                    End If
+                    If customerName <> "" Then PrintedName(correction, "customerName")
+                Case "payment"
+                    If seenPayment Then Throw New ArgumentException("Koreksi pembayaran duplikat.")
+                    seenPayment = True
+                    correction = Exact(entry, "correction.payment", "kind,eventId,date,time,actorName,paymentMethod,convertedToCredit")
+                    Dim method As String = Text(correction, "paymentMethod", True)
+                    If method <> "CASH" AndAlso method <> "WIRE" AndAlso method <> "EDC" Then
+                        Throw New ArgumentException("Metode koreksi pembayaran tidak sah.")
+                    End If
+                    If correction("convertedToCredit").Type <> JTokenType.Boolean Then
+                        Throw New ArgumentException("Status konversi harus boolean.")
+                    End If
+                Case Else
+                    Throw New ArgumentException("Jenis koreksi salinan tidak dikenal.")
+            End Select
+            If Not EventIdPattern.IsMatch(Text(correction, "eventId", True)) Then
+                Throw New ArgumentException("ID kejadian koreksi tidak sah.")
+            End If
+            If Not CorrectionDatePattern.IsMatch(Text(correction, "date", True)) OrElse
+               Not CorrectionTimePattern.IsMatch(Text(correction, "time", True)) Then
+                Throw New ArgumentException("Waktu koreksi tidak sah.")
+            End If
+            If StringInfo.ParseCombiningCharacters(PrintedName(correction, "actorName")).Length > 255 Then
+                Throw New ArgumentException("Nama aktor koreksi terlalu panjang.")
+            End If
+        Next
+    End Sub
 
     Private Function Exact(token As JToken, path As String, fields As String, Optional extra As String = Nothing) As JObject
         Dim result As JObject = TryCast(token, JObject)

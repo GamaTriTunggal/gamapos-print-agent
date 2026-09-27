@@ -82,6 +82,7 @@ Module SaleV2Receipt
         For Each row As SaleAmountRow In amountRows
             amountLines.Add(LayoutSaleAmountLine(row.Caption, row.Sen, TotCol, printable, measure))
         Next
+        Dim correctionLines As List(Of String) = LayoutSaleCorrections(reprint, printable, measure)
 
         printer.Font = New Font(FontCourier, 18, FontStyle.Regular)
         printer.CurrentX = 0
@@ -102,6 +103,12 @@ Module SaleV2Receipt
             If amountRows(index).SeparatorBefore Then printer.Print(Line1())
             printer.Print(amountLines(index))
         Next
+        If correctionLines.Count > 0 Then
+            printer.Print(Line1())
+            For Each line As String In correctionLines
+                printer.Print(line)
+            Next
+        End If
         PrintSaleFooter(printer, originalLines, reprintLines)
         printer.EndDoc()
     End Sub

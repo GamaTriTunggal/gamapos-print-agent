@@ -6,6 +6,7 @@ Option Explicit On
 Imports System
 Imports System.Collections.Generic
 Imports System.Globalization
+Imports Newtonsoft.Json.Linq
 
 Module SaleV2MetadataLayout
     Friend Function LayoutCenteredSaleText(raw As String, fallback As String, printableWidth As Single,
@@ -56,6 +57,39 @@ Module SaleV2MetadataLayout
         Dim line As String = caption & StrDup(columns - caption.Length - amount.Length, " ") & amount
         If Not Fits(line, printableWidth, measure) Then Throw New ArgumentException("Baris jumlah melampaui area cetak.")
         Return line
+    End Function
+
+    Friend Function LayoutSaleCorrections(reprint As JObject, printableWidth As Single,
+                                          measure As Func(Of String, Single)) As List(Of String)
+        Dim result As New List(Of String)()
+        If reprint Is Nothing Then Return result
+        Dim entries As JArray = CType(reprint("corrections"), JArray)
+        If entries.Count = 0 Then Return result
+        result.AddRange(LayoutSaleCustomer("", "ANGKA DI ATAS = NOTA ASAL", printableWidth, measure))
+        result.AddRange(LayoutSaleCustomer("", "KOREKSI SETELAH NOTA DIBUAT:", printableWidth, measure))
+        For Each token As JToken In entries
+            Dim entry As JObject = CType(token, JObject)
+            Dim kind As String = CStr(entry("kind"))
+            If kind = "customer" Then
+                Dim customerName As String = NormalizeProcessorName(CStr(entry("customerName")))
+                Dim customerId As String = CStr(entry("customerId"))
+                Dim description As String = If(customerName = "", customerId, customerName & " (" & customerId & ")")
+                result.AddRange(LayoutSaleCustomer("PELANGGAN : ", description, printableWidth, measure))
+            Else
+                Dim method As String = CStr(entry("paymentMethod"))
+                Dim methodName As String = If(method = "CASH", "TUNAI", If(method = "WIRE", "TRANSFER", "EDC"))
+                If CBool(entry("convertedToCredit")) Then
+                    result.AddRange(LayoutSaleCustomer("", "DIUBAH MENJADI KASBON", printableWidth, measure))
+                    result.AddRange(LayoutSaleCustomer("METODE DP : ", methodName, printableWidth, measure))
+                Else
+                    result.AddRange(LayoutSaleCustomer("METODE    : ", methodName, printableWidth, measure))
+                End If
+                result.AddRange(LayoutSaleCustomer("", "SALDO SEKARANG: LIHAT RIWAYAT", printableWidth, measure))
+            End If
+            result.AddRange(LayoutSaleCustomer("WAKTU     : ", CStr(entry("date")) & " " & CStr(entry("time")), printableWidth, measure))
+            result.AddRange(LayoutSaleCustomer("OLEH      : ", CStr(entry("actorName")), printableWidth, measure))
+        Next
+        Return result
     End Function
 
     Private Function WrapSaleText(value As String, firstPrefix As String, nextPrefix As String,

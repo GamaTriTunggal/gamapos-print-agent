@@ -8,8 +8,9 @@ Imports System.Linq
 
 Module Program
     Sub Main(args As String())
-        If (args.Length <> 1 AndAlso args.Length <> 2) OrElse Not IO.Directory.Exists(args(0)) OrElse
-           (args.Length = 2 AndAlso Not IO.Directory.Exists(args(1))) Then
+        If args.Length < 1 OrElse args.Length > 3 OrElse Not IO.Directory.Exists(args(0)) OrElse
+           (args.Length >= 2 AndAlso Not IO.Directory.Exists(args(1))) OrElse
+           (args.Length = 3 AndAlso Not IO.Directory.Exists(args(2))) Then
             Throw New ArgumentException("Diperlukan jalur direktori fixtures v1.")
         End If
         Dim cases As (Name As String, Body As String, Expected As String)() = {
@@ -72,11 +73,39 @@ Module Program
         CheckSaleV2(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
         CheckReceivableV2(IO.Path.Combine(args(0), "v2"))
         If args.Length = 2 Then CheckGoReceivableV2(args(1))
+        If args.Length = 3 Then
+            CheckGoReceivableV2(args(1))
+            CheckGoSaleV2(args(2))
+        End If
         CheckNameLayout()
         CheckMoneyFormat()
         CheckItemLayout()
         CheckMetadataLayout()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 17 rejected; receivable v2 parser accepted/rejected; amount rows/name/money/item/metadata layout passed.")
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale/receivable v2 parser accepted/rejected; amount rows/name/money/item/metadata/correction layout passed.")
+    End Sub
+
+    Private Sub CheckGoSaleV2(folder As String)
+        Dim files As String() = IO.Directory.GetFiles(folder, "*.json")
+        If files.Length <> 1 OrElse IO.Path.GetFileName(files(0)) <> "sale_corrected_reprint.json" Then
+            Throw New InvalidOperationException("Korpus Go salinan nota R1 tidak lengkap.")
+        End If
+        Dim root As JObject = ParseSaleV2(IO.File.ReadAllText(files(0)))
+        Dim payload As JObject = CType(root("payload"), JObject)
+        Dim reprint As JObject = CType(payload("reprint"), JObject)
+        Dim corrections As JArray = CType(reprint("corrections"), JArray)
+        Dim lines As List(Of String) = LayoutSaleCorrections(reprint, 40.0F,
+            Function(value As String) CSng(value.Length))
+        If CStr(root("jobType")) <> "cashier_receipt" OrElse
+           CStr(payload("amounts")("netSen")) <> "1950000" OrElse
+           corrections.Count <> 2 OrElse CStr(corrections(0)("customerId")) <> "CS9002" OrElse
+           CStr(corrections(1)("paymentMethod")) <> "WIRE" OrElse
+           Not CBool(corrections(1)("convertedToCredit")) OrElse
+           Not lines.Any(Function(line) line.Contains("NOTA ASAL")) OrElse
+           Not lines.Any(Function(line) line.Contains("KASBON")) OrElse
+           lines.Any(Function(line) line.Length > 40) Then
+            Throw New InvalidOperationException("Job Go salinan nota gagal diparse atau dicatat lengkap.")
+        End If
+        Console.WriteLine("Go→agent sale v2: corrected reprint parsed and preflighted.")
     End Sub
 
     Private Sub CheckGoReceivableV2(folder As String)
@@ -426,13 +455,60 @@ Module Program
             "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|BAYAR=600000|SISA UTANG=1350000")
 
         Dim reprint As JObject = CType(baseline.DeepClone(), JObject)
-        CType(reprint("payload"), JObject)("reprint") = JObject.Parse("{""date"":""2026-09-28"",""time"":""08:00"",""processor"":{""userId"":""3"",""name"":""Kasir Ulang""}}")
+        CType(reprint("payload"), JObject)("reprint") = JObject.Parse("{""date"":""2026-09-28"",""time"":""08:00"",""processor"":{""userId"":""3"",""name"":""Kasir Ulang""},""corrections"":[]}")
         Accept("reprint", reprint)
         Dim checkedReprint As JObject = ParseSaleV2(reprint.ToString(Formatting.None))
         If CStr(checkedReprint("payload")("originalProcessor")("name")) <> "Siti" OrElse
            CStr(checkedReprint("payload")("reprint")("processor")("name")) <> "Kasir Ulang" Then
             Throw New InvalidOperationException("Pemroses asli berubah saat cetak ulang.")
         End If
+        If LayoutSaleCorrections(CType(checkedReprint("payload")("reprint"), JObject), 40.0F,
+            Function(value As String) CSng(value.Length)).Count <> 0 Then
+            Throw New InvalidOperationException("Salinan tanpa koreksi diberi catatan palsu.")
+        End If
+
+        Dim corrected As JObject = CType(reprint.DeepClone(), JObject)
+        corrected("payload")("reprint")("corrections") = JArray.Parse("[{""kind"":""customer"",""eventId"":""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"",""date"":""2026-09-28"",""time"":""09:00:00"",""actorName"":""ADMIN SATU"",""customerId"":""CS9002"",""customerName"":""PELANGGAN BARU SANGAT PANJANG UNTUK DIBUNGKUS""},{""kind"":""payment"",""eventId"":""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"",""date"":""2026-09-28"",""time"":""10:00:00"",""actorName"":""ADMIN DUA"",""paymentMethod"":""WIRE"",""convertedToCredit"":true}]")
+        Accept("salinan dengan dua koreksi", corrected)
+        Dim correctedLines As List(Of String) = LayoutSaleCorrections(CType(corrected("payload")("reprint"), JObject),
+            40.0F, Function(value As String) CSng(value.Length))
+        If correctedLines.Count < 8 OrElse
+           Not correctedLines.Any(Function(line) line.Contains("NOTA ASAL")) OrElse
+           Not correctedLines.Any(Function(line) line.Contains("CS9002")) OrElse
+           Not correctedLines.Any(Function(line) line.Contains("KASBON")) OrElse
+           Not correctedLines.Any(Function(line) line.Contains("TRANSFER")) OrElse
+           Not correctedLines.Any(Function(line) line.Contains("LIHAT RIWAYAT")) OrElse
+           correctedLines.Any(Function(line) line.Length > 40) Then
+            Throw New InvalidOperationException("Catatan koreksi hilang atau melewati area cetak.")
+        End If
+        Try
+            LayoutSaleCorrections(CType(corrected("payload")("reprint"), JObject), 8.0F,
+                Function(value As String) CSng(value.Length))
+            Throw New InvalidOperationException("Catatan koreksi lolos pada area cetak sempit.")
+        Catch ex As ArgumentException
+            ' Preflight menolak sebelum Printer.Print pertama.
+        End Try
+        Dim badOrder As JObject = CType(corrected.DeepClone(), JObject)
+        Dim swapped As JArray = CType(badOrder("payload")("reprint")("corrections"), JArray)
+        Dim first As JToken = swapped(0).DeepClone()
+        swapped(0) = swapped(1).DeepClone()
+        swapped(1) = first
+        Reject("urutan koreksi terbalik", badOrder.ToString(Formatting.None))
+        Dim missingCorrections As JObject = CType(reprint.DeepClone(), JObject)
+        CType(missingCorrections("payload")("reprint"), JObject).Remove("corrections")
+        Reject("salinan tanpa daftar koreksi", missingCorrections.ToString(Formatting.None))
+        Dim invisibleCorrection As JObject = CType(corrected.DeepClone(), JObject)
+        invisibleCorrection("payload")("reprint")("corrections")(0)("actorName") = vbTab & vbCrLf
+        Reject("aktor koreksi tidak terlihat", invisibleCorrection.ToString(Formatting.None))
+        Dim oversizedCorrection As JObject = CType(corrected.DeepClone(), JObject)
+        oversizedCorrection("payload")("reprint")("corrections")(0)("actorName") = New String("A"c, 256)
+        Reject("aktor koreksi terlalu panjang", oversizedCorrection.ToString(Formatting.None))
+        Dim wrongDate As JObject = CType(corrected.DeepClone(), JObject)
+        wrongDate("payload")("reprint")("corrections")(0)("date") = "2026/09/28"
+        Reject("tanggal koreksi tidak sah", wrongDate.ToString(Formatting.None))
+        Dim sentinelCustomer As JObject = CType(corrected.DeepClone(), JObject)
+        sentinelCustomer("payload")("reprint")("corrections")(0)("customerId") = "CS0001"
+        Reject("pelanggan sentinel sebagai koreksi", sentinelCustomer.ToString(Formatting.None))
 
         Dim fraction As JObject = CType(baseline.DeepClone(), JObject)
         payload = CType(fraction("payload"), JObject)
