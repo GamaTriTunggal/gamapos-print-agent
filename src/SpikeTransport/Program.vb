@@ -230,12 +230,16 @@ Module Program
         Select Case method & " " & path
 
             Case "GET /health"
-                ' Field lama tetap (ok, agentVersion, schemaVersion, mode); tambahan PR-12 aditif:
-                ' deviceId, osArch, catalogVersion, catalogSource.
-                WriteJson(ctx, 200, JsonConvert.SerializeObject(New Dictionary(Of String, Object) From {
+                ' Field lama tetap. Parser/formatter dormant tidak boleh teriklankan
+                ' sebagai kemampuan cetak v2 sebelum uji Windows/printer dan rilis.
+                Dim health As New Dictionary(Of String, Object) From {
                     {"ok", True}, {"agentVersion", AgentVersion}, {"schemaVersion", SchemaVersion}, {"mode", "spike"},
                     {"deviceId", DeviceId()}, {"osArch", OsArch()},
-                    {"catalogVersion", RecipeCatalog.Version()}, {"catalogSource", RecipeCatalog.Source()}}))
+                    {"catalogVersion", RecipeCatalog.Version()}, {"catalogSource", RecipeCatalog.Source()}}
+                For Each capability As KeyValuePair(Of String, Object) In HealthPrintCapabilities()
+                    health.Add(capability.Key, capability.Value)
+                Next
+                WriteJson(ctx, 200, JsonConvert.SerializeObject(health))
 
             Case "GET /recipes"
                 ' PR-12 / P-573: model yang benar-benar dikenal agent ini (gerbang fakta tombol Pasang Otomatis).

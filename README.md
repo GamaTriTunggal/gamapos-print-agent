@@ -29,7 +29,9 @@ Pengaman lokal D-024 DR-08/P-604 (belum dirilis): `POST /print` memeriksa
 `schemaVersion` sebelum memilih formatter. Schema 2/future ditolak sebagai
 `UNSUPPORTED_SCHEMA`; JSON duplikat/rusak ditolak sebagai `BAD_PAYLOAD`,
 termasuk bila `jobType` sama dengan nota v1. `/health` tetap mengumumkan
-schema 1. Parser murni tiga nota penjualan schema 2 sudah ada dan diuji,
+`schemaVersion: 1`, `supportedPrintSchemas: [1]`, dan
+`supportedPrintJobTypesV2: []`; tidak ada job v2 yang boleh dikirim.
+Parser murni tiga nota penjualan schema 2 sudah ada dan diuji,
 serta draf formatter terpisah sudah terhubung ke cabang dispatcher v2,
 tetapi cabang itu **tidak terjangkau** selama konstanta kemampuan `/health`
 masih schema 1; belum ada bukti cetak Windows/printer atau izin rilis.
@@ -122,7 +124,7 @@ Body `/print` TIDAK disimpan kecuali debug di-opt-in (`GAMA_AGENT_DEBUG_JOBS=1` 
 
 | Method  | Path                 | Balasan |
 |---------|----------------------|---------|
-| GET     | `/health`            | `{ ok, agentVersion, schemaVersion, mode, deviceId, osArch, catalogVersion, catalogSource }` — versi dibaca dari assembly (`<Version>` vbproj = satu sumber) |
+| GET     | `/health`            | `{ ok, agentVersion, schemaVersion, mode, deviceId, osArch, catalogVersion, catalogSource, supportedPrintSchemas, supportedPrintJobTypesV2 }` — field cetak aditif build lokal masih `[1]`/`[]`; versi dibaca dari assembly (`<Version>` vbproj = satu sumber) |
 | GET     | `/printers`          | `{ ok, installed[], roles{CASHIER,DELIVERY,QRLABEL,REPORT}, default }` |
 | POST    | `/printers/config`   | simpan peta peran → `printers.json` |
 | POST    | `/print`             | amplop job v1 (BEKU) → cetak ke printer peran. Label QR (`qr_item_label`/`qr_invoice`): balasan + `printer` yang dipakai; peran QRLABEL belum dipetakan → tetap dicetak ke default Windows + `warning:"ROLE_UNMAPPED"` & `message` (1.2.0) |

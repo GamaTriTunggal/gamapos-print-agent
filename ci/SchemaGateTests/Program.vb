@@ -48,6 +48,12 @@ Module Program
                 Throw New InvalidOperationException(scenario.Name & ": " & actual & " != " & scenario.Expected)
             End If
         Next
+        Dim capabilities As JObject = JObject.FromObject(HealthPrintCapabilities())
+        If Not JToken.DeepEquals(capabilities("supportedPrintSchemas"), New JArray(1)) OrElse
+           Not JToken.DeepEquals(capabilities("supportedPrintJobTypesV2"), New JArray()) OrElse
+           RoutePrintSchema("{""schemaVersion"":2,""jobType"":""return_note""}", 1) <> "UNSUPPORTED_SCHEMA" Then
+            Throw New InvalidOperationException("Health mengiklankan job v2 sebelum gerbang cetak dibuka.")
+        End If
         For Each scenario In {
             (Name:="cashier_receipt", Family:="SALE"), (Name:="kasbon_receipt", Family:="SALE"),
             (Name:="split_receipt", Family:="SALE"),
