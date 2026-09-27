@@ -3,6 +3,8 @@ Option Explicit On
 
 Imports Newtonsoft.Json
 Imports Newtonsoft.Json.Linq
+Imports System.Globalization
+Imports System.Linq
 
 Module Program
     Sub Main(args As String())
@@ -35,7 +37,9 @@ Module Program
             If actual <> "OK" Then Throw New InvalidOperationException(fixture & ": " & actual)
         Next
         CheckSaleV2(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 8 accepted + 11 rejected passed.")
+        CheckNameLayout()
+        CheckMoneyFormat()
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 8 accepted + 11 rejected; name/money layout passed.")
     End Sub
 
     Private Sub CheckSaleV2(path As String)
@@ -157,5 +161,52 @@ Module Program
             Return
         End Try
         Throw New InvalidOperationException(name & " diterima padahal tidak sah.")
+    End Sub
+
+    Private Sub CheckNameLayout()
+        Dim measure As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        If NormalizeProcessorName("  Siti" & vbTab & vbCrLf & "  Kasir  ") <> "Siti Kasir" Then
+            Throw New InvalidOperationException("Spasi/control nama tidak dinormalisasi.")
+        End If
+        Dim centered = LayoutOriginalName("Siti", 30.0F, 40.0F, measure)
+        If centered.Count <> 1 OrElse centered(0).X <> 28.0F Then Throw New InvalidOperationException("Nama pendek tidak berpusat pada HORMAT KAMI.")
+        Dim right = LayoutOriginalName("ABCDEFGHIJKLMNOPQRSTUVWXY", 30.0F, 40.0F, measure)
+        If right.Count <> 1 OrElse right(0).X <> 15.0F Then Throw New InvalidOperationException("Nama menengah tidak rata kanan.")
+        Dim outside = LayoutOriginalName("Siti", 45.0F, 40.0F, measure)
+        If outside.Count <> 1 OrElse outside(0).X <> 36.0F Then Throw New InvalidOperationException("Jangkar di luar area tidak fallback kanan.")
+        Dim wrapped = LayoutOriginalName("SATU DUA TIGA EMPAT LIMA ENAM TUJUH DELAPAN SEMBILAN SEPULUH", 30.0F, 40.0F, measure)
+        If wrapped.Count < 2 Then Throw New InvalidOperationException("Nama panjang tidak dibungkus.")
+        For Each line In wrapped
+            If line.X < 0.0F OrElse line.X + measure(line.Text) > 40.0F Then Throw New InvalidOperationException("Nama melewati area cetak.")
+        Next
+        Dim unicodeName As String = String.Concat(Enumerable.Repeat("😊", 30))
+        Dim textElements As Func(Of String, Single) = Function(value As String) CSng(StringInfo.ParseCombiningCharacters(value).Length)
+        Dim unicodeLines = LayoutOriginalName(unicodeName, 7.0F, 10.0F, textElements)
+        If unicodeLines.Count <> 3 OrElse String.Concat(unicodeLines.Select(Function(line) line.Text)) <> unicodeName Then
+            Throw New InvalidOperationException("Nama Unicode dipotong di tengah karakter.")
+        End If
+        Dim reprint = LayoutReprintName("Kasir Ulang Dengan Nama Yang Sangat Panjang", 20.0F, measure)
+        If reprint.Count < 2 OrElse Not reprint(0).Text.StartsWith("Dicetak", StringComparison.Ordinal) Then
+            Throw New InvalidOperationException("Penanda cetak ulang tidak dibungkus.")
+        End If
+        For Each line In reprint
+            If line.X < 0.0F OrElse line.X + measure(line.Text) > 20.0F Then Throw New InvalidOperationException("Nama pencetak ulang melewati area.")
+        Next
+    End Sub
+
+    Private Sub CheckMoneyFormat()
+        For Each scenario In New (Value As Long, Expected As String)() {
+            (0L, "0"), (1L, "0,01"), (25200L, "252"), (1975200L, "19.752"),
+            (99999999999999L, "999.999.999.999,99")}
+            If FormatSaleSen(scenario.Value) <> scenario.Expected Then
+                Throw New InvalidOperationException("Format uang " & scenario.Value & " tidak cocok.")
+            End If
+        Next
+        For Each scenario In New (Value As Long, Expected As String)() {
+            (50L, "0,5"), (100L, "1"), (125L, "1,25")}
+            If FormatSaleQuantity(scenario.Value) <> scenario.Expected Then
+                Throw New InvalidOperationException("Format kuantitas " & scenario.Value & " tidak cocok.")
+            End If
+        Next
     End Sub
 End Module
