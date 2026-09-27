@@ -38,7 +38,9 @@ Module SaleV2Parser
         End If
         Text(root, "jobId", True)
         If Text(root, "printerRole", True) <> "CASHIER" Then Throw New ArgumentException("Peran printer bukan CASHIER.")
-        IntegerToken(root("copies"), Integer.MaxValue)
+        If IntegerToken(root("copies"), Integer.MaxValue) <> 1 Then
+            Throw New ArgumentException("copies harus 1; cetak salinan lewat job cetak ulang.")
+        End If
 
         Dim store As JObject = Exact(root("store"), "store", "name,address,contact")
         For Each field As String In {"name", "address", "contact"}

@@ -45,6 +45,9 @@ smoke Windows dan printer fisik masih gerbang terpisah.
 P-606: parser v2 juga menolak nama barang/kasir/pencetak ulang yang hanya
 berisi spasi, kontrol, atau karakter format; nota tanpa identitas terlihat
 tidak boleh lolos validasi meski string JSON-nya tidak kosong.
+DR-08: `copies` nota penjualan v2 sementara hanya `1`; salinan tambahan
+memerlukan job cetak ulang teratribusi yang terpisah. Parser menolak `2`
+baik pada nota asli maupun cetak ulang; formatter v1 tetap tidak berubah.
 
 ## Dua fungsi agent — jangan dicampur
 

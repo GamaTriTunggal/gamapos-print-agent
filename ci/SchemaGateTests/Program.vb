@@ -40,7 +40,7 @@ Module Program
         CheckNameLayout()
         CheckMoneyFormat()
         CheckItemLayout()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 15 rejected; amount rows/name/money/item layout passed.")
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 17 rejected; amount rows/name/money/item layout passed.")
     End Sub
 
     Private Sub CheckSaleV2(path As String)
@@ -180,6 +180,12 @@ Module Program
         Dim formatOnly As JObject = CType(baseline.DeepClone(), JObject)
         formatOnly("payload")("originalProcessor")("name") = ChrW(&H200D)
         Reject("nama kasir karakter format saja", formatOnly.ToString(Formatting.None))
+        Dim duplicateOriginal As JObject = CType(baseline.DeepClone(), JObject)
+        duplicateOriginal("copies") = 2
+        Reject("dua salinan nota asli", duplicateOriginal.ToString(Formatting.None))
+        Dim duplicateReprint As JObject = CType(reprint.DeepClone(), JObject)
+        duplicateReprint("copies") = 2
+        Reject("dua salinan cetak ulang", duplicateReprint.ToString(Formatting.None))
     End Sub
 
     Private Sub CheckAmountRows(name As String, job As JObject, expected As String)
