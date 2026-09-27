@@ -76,6 +76,7 @@ Module Program
             "BON 101=-100|BON 102=1100", "TOTAL BON=1000|DISKON (-)=100|-TOTAL BAYAR=900|UANG DITERIMA=1000|KEMBALIAN=100")
         CheckProofRows("FIFO fee ditanggung toko", fifo,
             "BON 101=400", "TOTAL BON=2000|BAYAR=400|-SISA BON=1600")
+        CheckReceivableLayout(selected, fifo)
 
         Dim card As JObject = CType(selected.DeepClone(), JObject)
         card("jobType") = "receivable_selected_card"
@@ -189,6 +190,70 @@ Module Program
         If actualAllocations <> expectedAllocations OrElse actualAmounts <> expectedAmounts Then
             Throw New InvalidOperationException(name & " baris salah: " & actualAllocations & " / " & actualAmounts)
         End If
+    End Sub
+
+    Private Sub CheckReceivableLayout(selected As JObject, fifo As JObject)
+        Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        Dim original As ReceivableV2PrintPlan = BuildReceivableV2Plan(
+            ParseReceivableV2(selected.ToString(Formatting.None)), 40.0F, 20.0F, characters, characters)
+        If original.StoreName.Count <> 1 OrElse original.StoreDetails.Count <> 2 OrElse
+           original.Title.Count <> 1 OrElse original.Metadata.Count < 6 OrElse
+           Not original.Metadata.Any(Function(line) line.Contains("PELUNASAN BON")) OrElse
+           Not original.Metadata.Any(Function(line) line.Contains("IN/260927/000001")) OrElse
+           Not original.Metadata.Any(Function(line) line.Contains("PELANGGAN")) OrElse
+           original.AllocationLines.Count <> 2 OrElse
+           Not original.AllocationLines(0).EndsWith("-1", StringComparison.Ordinal) OrElse
+           original.OriginalName.Count <> 1 OrElse original.OriginalName(0).Text <> "KASIR ASLI" OrElse
+           original.ReprintName.Count <> 0 Then
+            Throw New InvalidOperationException("Preflight bukti selected kehilangan identitas atau kredit bon.")
+        End If
+        Dim installment As ReceivableV2PrintPlan = BuildReceivableV2Plan(
+            ParseReceivableV2(fifo.ToString(Formatting.None)), 40.0F, 20.0F, characters, characters)
+        If installment.AllocationLines.Count <> 1 OrElse
+           Not installment.Metadata.Any(Function(line) line.Contains("CICILAN BON")) OrElse
+           Not installment.AmountLines.Any(Function(line) line.Contains("SISA BON")) OrElse
+           installment.AmountLines.Any(Function(line) line.Contains("BIAYA TF")) Then
+            Throw New InvalidOperationException("Biaya transfer merchant FIFO bocor sebagai tagihan pelanggan.")
+        End If
+        Dim reprint As JObject = CType(selected.DeepClone(), JObject)
+        CType(reprint("payload"), JObject)("reprint") = JObject.Parse("{""date"":""2026-09-28"",""time"":""08:00"",""processor"":{""userId"":""9"",""name"":""KASIR ULANG""}}")
+        Dim again As ReceivableV2PrintPlan = BuildReceivableV2Plan(
+            ParseReceivableV2(reprint.ToString(Formatting.None)), 40.0F, 20.0F, characters, characters)
+        If again.OriginalName(0).Text <> "KASIR ASLI" OrElse again.ReprintName.Count = 0 OrElse
+           Not again.ReprintName.Any(Function(line) line.Text.Contains("KASIR ULANG")) OrElse
+           Not again.Metadata.Any(Function(line) line.Contains("CETAK ULANG")) Then
+            Throw New InvalidOperationException("Cetak ulang menimpa pemroses asal.")
+        End If
+        Dim longNames As JObject = CType(reprint.DeepClone(), JObject)
+        longNames("payload")("originalProcessor")("name") = New String("X"c, 60)
+        longNames("payload")("reprint")("processor")("name") = New String("Y"c, 60)
+        Dim wrappedNames As ReceivableV2PrintPlan = BuildReceivableV2Plan(
+            ParseReceivableV2(longNames.ToString(Formatting.None)), 40.0F, 20.0F, characters, characters)
+        If wrappedNames.OriginalName.Count < 2 OrElse wrappedNames.ReprintName.Count < 2 OrElse
+           wrappedNames.OriginalName.Any(Function(line) line.X < 0.0F OrElse line.X + line.Text.Length > 40.0F) OrElse
+           wrappedNames.ReprintName.Any(Function(line) line.X < 0.0F OrElse line.X + line.Text.Length > 40.0F) Then
+            Throw New InvalidOperationException("Nama kasir panjang melewati area cetak.")
+        End If
+        Dim longCustomer As JObject = CType(selected.DeepClone(), JObject)
+        longCustomer("payload")("customer")("name") = "PELANGGAN TOKO BANGUNAN DENGAN NAMA SANGAT PANJANG DAN BERULANG"
+        Dim wrapped As ReceivableV2PrintPlan = BuildReceivableV2Plan(
+            ParseReceivableV2(longCustomer.ToString(Formatting.None)), 40.0F, 20.0F, characters, characters)
+        If wrapped.Metadata.Count <= original.Metadata.Count Then
+            Throw New InvalidOperationException("Nama pelanggan panjang tidak dibungkus.")
+        End If
+        Try
+            BuildReceivableV2Plan(ParseReceivableV2(selected.ToString(Formatting.None)),
+                                  25.0F, 20.0F, characters, characters)
+            Throw New InvalidOperationException("Area cetak sempit diterima sebelum printer.")
+        Catch ex As ArgumentException
+            ' Preflight menolak sebelum ada Printer.Print.
+        End Try
+        Try
+            LayoutReceivableAmountLine("BON 101", -100L, 40.0F, Function(value As String) Single.NaN)
+            Throw New InvalidOperationException("Metrik printer tidak sah diterima.")
+        Catch ex As ArgumentException
+            ' Lebar NaN bukan izin cetak.
+        End Try
     End Sub
 
     Private Sub AcceptProof(name As String, job As JObject)
