@@ -50,8 +50,9 @@ memerlukan job cetak ulang teratribusi yang terpisah. Parser menolak `2`
 baik pada nota asli maupun cetak ulang; formatter v1 tetap tidak berubah.
 Draf renderer v2 kini merencanakan header toko, blok pelanggan, nomor/tanggal
 nota, dan baris jumlah sebelum cetakan pertama. Layout v2 khusus menghindari
-baris "NO NAME" tambahan pada panjang header tepat kelipatan lebar; helper
-v1 tidak diubah. Tes murni bukan bukti font/driver/printer fisik Windows.
+baris kosong tambahan pada panjang header tepat kelipatan lebar dan tulisan
+"NO NAME" pada alamat/kontak kosong; helper v1 tidak diubah. Tes murni
+bukan bukti font/driver/printer fisik Windows.
 
 ## Dua fungsi agent — jangan dicampur
 

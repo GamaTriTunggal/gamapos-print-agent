@@ -315,7 +315,7 @@ Module Program
         Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
         Dim exact = LayoutCenteredSaleText("ABCDEFGHIJKLMNOPQRST", "NO NAME", 20.0F, characters)
         If exact.Count <> 1 OrElse exact(0).Text <> "ABCDEFGHIJKLMNOPQRST" OrElse exact(0).X <> 0.0F Then
-            Throw New InvalidOperationException("Nama toko tepat 20 kolom berubah/menambah NO NAME.")
+            Throw New InvalidOperationException("Nama toko tepat 20 kolom berubah/menambah baris kosong.")
         End If
         Dim wrapped = LayoutCenteredSaleText("ABCDEFGHIJKLMNOPQRSTU", "NO NAME", 20.0F, characters)
         If wrapped.Count <> 2 OrElse String.Concat(wrapped.Select(Function(line) line.Text)) <> "ABCDEFGHIJKLMNOPQRSTU" OrElse
@@ -324,7 +324,10 @@ Module Program
         End If
         Dim fullAddress = LayoutCenteredSaleText(New String("A"c, 40), "", 40.0F, characters)
         If fullAddress.Count <> 1 OrElse fullAddress(0).Text.Length <> 40 Then
-            Throw New InvalidOperationException("Alamat tepat 40 kolom menambah baris palsu.")
+            Throw New InvalidOperationException("Alamat tepat 40 kolom menambah baris kosong.")
+        End If
+        If LayoutCenteredSaleText("", "", 40.0F, characters).Count <> 0 Then
+            Throw New InvalidOperationException("Alamat kosong menambah NO NAME.")
         End If
         Dim customer = LayoutSaleCustomer("ALAMAT   : ", "  Jalan" & vbTab & "Panjang Sekali  ", 20.0F, characters)
         If customer.Count < 2 OrElse customer(0) <> "ALAMAT   : Jalan" OrElse

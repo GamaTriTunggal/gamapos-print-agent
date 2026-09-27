@@ -45,12 +45,8 @@ Module SaleV2Receipt
         Dim printable As Single = Math.Min(CSng(printer.ScaleWidth), CSng(printer.TextWidth(StrDup(TotCol, " "))))
         Dim measure As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
         Dim storeDetails As New List(Of PositionedNameLine)()
-        If NormalizeProcessorName(store.address) <> "" Then
-            storeDetails.AddRange(LayoutCenteredSaleText(store.address, "", printable, measure))
-        End If
-        If NormalizeProcessorName(store.contact) <> "" Then
-            storeDetails.AddRange(LayoutCenteredSaleText(store.contact, "", printable, measure))
-        End If
+        storeDetails.AddRange(LayoutCenteredSaleText(store.address, "", printable, measure))
+        storeDetails.AddRange(LayoutCenteredSaleText(store.contact, "", printable, measure))
         Dim customerLines As New List(Of String)()
         customerLines.AddRange(LayoutSaleCustomer(CapCustName, customer.name, printable, measure))
         customerLines.AddRange(LayoutSaleCustomer(CapCustAddr, customer.address, printable, measure))

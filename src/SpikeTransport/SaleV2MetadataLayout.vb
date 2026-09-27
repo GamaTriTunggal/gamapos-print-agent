@@ -13,6 +13,7 @@ Module SaleV2MetadataLayout
         Dim value As String = NormalizeProcessorName(raw)
         If value = "" Then value = fallback
         Dim result As New List(Of PositionedNameLine)()
+        If value = "" Then Return result
         For Each line As String In WrapSaleText(value, "", "", printableWidth, measure)
             result.Add(New PositionedNameLine(line, (printableWidth - CheckedWidth(line, measure)) / 2.0F))
         Next
