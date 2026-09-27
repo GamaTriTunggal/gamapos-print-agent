@@ -57,11 +57,101 @@ Module Program
             Throw New InvalidOperationException("Fixture nota v2 tidak dipilih sesuai kemampuan agent.")
         End If
         CheckSaleV2(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
+        CheckReceivableV2(IO.Path.Combine(args(0), "v2"))
         CheckNameLayout()
         CheckMoneyFormat()
         CheckItemLayout()
         CheckMetadataLayout()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 17 rejected; amount rows/name/money/item/metadata layout passed.")
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 17 rejected; receivable v2 parser accepted/rejected; amount rows/name/money/item/metadata layout passed.")
+    End Sub
+
+    Private Sub CheckReceivableV2(folder As String)
+        Dim selectedSource As String = IO.File.ReadAllText(IO.Path.Combine(folder, "receivable_selected.sample.json"))
+        Dim fifoSource As String = IO.File.ReadAllText(IO.Path.Combine(folder, "receivable_proof.sample.json"))
+        Dim selected As JObject = JObject.Parse(selectedSource)
+        Dim fifo As JObject = JObject.Parse(fifoSource)
+        AcceptProof("selected dengan kredit", selected)
+        AcceptProof("FIFO transfer", fifo)
+
+        Dim card As JObject = CType(selected.DeepClone(), JObject)
+        card("jobType") = "receivable_selected_card"
+        card("payload")("paymentMethod") = "EDC"
+        Dim cardAmounts As JObject = CType(card("payload")("amounts"), JObject)
+        cardAmounts("cashSen") = "0"
+        cardAmounts("noncashSen") = "900"
+        cardAmounts("customerFeeSen") = "20"
+        cardAmounts("merchantFeeSen") = "5"
+        cardAmounts("customerPaysSen") = "920"
+        cardAmounts("merchantReceivesSen") = "915"
+        cardAmounts("tenderSen") = "0"
+        cardAmounts("changeSen") = "0"
+        AcceptProof("selected EDC", card)
+
+        Dim zero As JObject = CType(selected.DeepClone(), JObject)
+        zero("payload")("paymentMethod") = "WIRE"
+        zero("payload")("allocations")(1)("discountSen") = "1000"
+        Dim zeroAmounts As JObject = CType(zero("payload")("amounts"), JObject)
+        zeroAmounts("discountSen") = "1000"
+        For Each name As String In {"netPaymentSen", "cashSen", "customerPaysSen", "merchantReceivesSen", "tenderSen", "changeSen"}
+            zeroAmounts(name) = "0"
+        Next
+        AcceptProof("selected nol", zero)
+
+        Dim reprint As JObject = CType(selected.DeepClone(), JObject)
+        CType(reprint("payload"), JObject)("reprint") = JObject.Parse("{""date"":""2026-09-28"",""time"":""08:00"",""processor"":{""userId"":""9"",""name"":""KASIR ULANG""}}")
+        AcceptProof("cetak ulang", reprint)
+        If CStr(reprint("payload")("originalProcessor")("name")) <> "KASIR ASLI" OrElse
+           CStr(reprint("payload")("reprint")("processor")("name")) <> "KASIR ULANG" Then
+            Throw New InvalidOperationException("Pemroses bukti asli tertimpa.")
+        End If
+
+        Dim expensive As JObject = CType(fifo.DeepClone(), JObject)
+        expensive("payload")("amounts")("transferFeeSen") = "500"
+        expensive("payload")("amounts")("merchantReceivesSen") = "-100"
+        AcceptProof("FIFO fee lebih besar dari cicilan", expensive)
+
+        Dim credit As JObject = CType(fifo.DeepClone(), JObject)
+        Dim rows As JArray = CType(credit("payload")("allocations"), JArray)
+        rows(0)("receiptNo") = "102"
+        rows(0)("principalAppliedSen") = "500"
+        rows(0)("afterSen") = "500"
+        rows.Insert(0, JObject.Parse("{""receiptNo"":""101"",""beforeSen"":""-100"",""principalAppliedSen"":""-100"",""afterSen"":""0"",""discountSen"":""0"",""roundingSen"":""0"",""transferFeeSen"":""0"",""stampFeeSen"":""0""}"))
+        AcceptProof("FIFO bon kredit", credit)
+
+        RejectProof("schema v1", selectedSource.Replace("""schemaVersion"": 2", """schemaVersion"": 1"))
+        RejectProof("schema duplikat", selectedSource.Replace("""schemaVersion"": 2", """schemaVersion"": 2,""schemaVersion"":1"))
+        RejectProof("dua salinan", selectedSource.Replace("""copies"": 1", """copies"": 2"))
+        RejectProof("saldo bon tidak konservatif", selectedSource.Replace("""principalAppliedSen"":""1100""", """principalAppliedSen"":""1099"""))
+        RejectProof("kas tak cocok", selectedSource.Replace("""netPaymentSen"":""900""", """netPaymentSen"":""901"""))
+        RejectProof("bon duplikat", selectedSource.Replace("""receiptNo"":""102""", """receiptNo"":""101"""))
+        RejectProof("angka negatif nol", selectedSource.Replace("""beforeSen"":""-100""", """beforeSen"":""-0"""))
+        RejectProof("field asing", selectedSource.Replace("""copies"": 1", """copies"": 1,""secret"":1"))
+        RejectProof("EDC di job salah", selectedSource.Replace("""paymentMethod"": ""CASH""", """paymentMethod"": ""EDC"""))
+        RejectProof("fee FIFO pada bon", fifoSource.Replace("""transferFeeSen"":""0""", """transferFeeSen"":""20"""))
+        RejectProof("penerimaan FIFO salah", fifoSource.Replace("""merchantReceivesSen"":""380""", """merchantReceivesSen"":""400"""))
+        Dim invisible As JObject = CType(selected.DeepClone(), JObject)
+        invisible("payload")("originalProcessor")("name") = " " & vbTab
+        RejectProof("pemroses tidak terlihat", invisible.ToString(Formatting.None))
+        Dim missingStore As JObject = CType(selected.DeepClone(), JObject)
+        CType(missingStore("store"), JObject).Remove("name")
+        RejectProof("header historis hilang", missingStore.ToString(Formatting.None))
+    End Sub
+
+    Private Sub AcceptProof(name As String, job As JObject)
+        Try
+            ParseReceivableV2(job.ToString(Formatting.None))
+        Catch ex As Exception
+            Throw New InvalidOperationException(name & " ditolak: " & ex.Message, ex)
+        End Try
+    End Sub
+
+    Private Sub RejectProof(name As String, body As String)
+        Try
+            ParseReceivableV2(body)
+        Catch
+            Return
+        End Try
+        Throw New InvalidOperationException(name & " diterima padahal tidak sah.")
     End Sub
 
     Private Sub CheckSaleV2(path As String)

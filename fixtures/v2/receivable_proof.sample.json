@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "jobId": "synthetic-fifo-proof",
+  "jobType": "receivable_proof",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {"name": "TOKO UJI", "address": "Jalan Uji", "contact": "0812"},
+  "payload": {
+    "eventId": "abcdef0123456789abcdef0123456789",
+    "transactionId": "IN/260927/000002",
+    "date": "2026-09-27",
+    "time": "12:40:00",
+    "customer": {"id": "CS001", "name": "PELANGGAN", "address": "Alamat", "contact": "0811"},
+    "allocations": [
+      {"receiptNo":"101","beforeSen":"1000","principalAppliedSen":"400","afterSen":"600","discountSen":"0","roundingSen":"0","transferFeeSen":"0","stampFeeSen":"0"}
+    ],
+    "amounts": {"totalBeforeSen":"2000","discountSen":"0","roundingSen":"0","transferFeeSen":"20","stampFeeSen":"0","netPaymentSen":"400","remainingSen":"1600","cashSen":"0","noncashSen":"400","customerFeeSen":"0","merchantFeeSen":"0","customerPaysSen":"400","merchantReceivesSen":"380","tenderSen":"0","changeSen":"0"},
+    "paymentMethod": "WIRE",
+    "originalProcessor": {"userId":"8","name":"KASIR ASLI"}
+  }
+}
