@@ -29,9 +29,11 @@ Pengaman lokal D-024 DR-08/P-604 (belum dirilis): `POST /print` memeriksa
 `schemaVersion` sebelum memilih formatter. Schema 2/future ditolak sebagai
 `UNSUPPORTED_SCHEMA`; JSON duplikat/rusak ditolak sebagai `BAD_PAYLOAD`,
 termasuk bila `jobType` sama dengan nota v1. `/health` tetap mengumumkan
-schema 1; belum ada parser/formatter v2 atau izin rilis. Uji murni lintas
-platform: `dotnet run --project ci/SchemaGateTests/SchemaGateTests.vbproj
--c Release -- fixtures` (11 kasus + 17 fixture v1). Build Linux lulus;
+schema 1. Parser murni tiga nota penjualan schema 2 sudah ada dan diuji,
+tetapi **belum dipanggil dispatcher**, belum ada formatter v2 atau izin
+rilis. Uji murni lintas platform:
+`dotnet run --project ci/SchemaGateTests/SchemaGateTests.vbproj -c Release -- fixtures`
+(11 kasus gerbang, 17 fixture v1, varian/mutasi nota v2). Build Linux lulus;
 smoke Windows dan printer fisik masih gerbang terpisah.
 
 ## Dua fungsi agent — jangan dicampur
@@ -46,6 +48,7 @@ smoke Windows dan printer fisik masih gerbang terpisah.
 ```
 src/SpikeTransport/      → seluruh kode agent (nama folder warisan spike Juni 2026; proyek SpikeTransport.vbproj)
   Program.vb             → HttpListener :9111 + router endpoint
+  SchemaGate.vb, SaleV2Parser.vb → pagar schema v1 + parser nota v2 belum aktif
   Printing.vb, *Receipt.vb, DeliveryOrder.vb, QrLabel.vb, AmountListSlip.vb → 14 jobType (layout nota)
   Printers.vb            → peta peran → printer Windows (printers.json), ganti default sesaat utk PowerPacks
   PrinterSetup.vb        → Pasang Otomatis: unduh paket golden (SHA-256), jalankan installer (apd | seagull)

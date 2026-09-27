@@ -1,0 +1,16 @@
+{
+  "schemaVersion":2,"jobId":"0123456789abcdef0123456789abcdef","jobType":"cashier_receipt",
+  "printerRole":"CASHIER","copies":1,
+  "store":{"name":"TOKO","address":"JL. SATU","contact":"0812"},
+  "payload":{
+    "eventId":"0123456789abcdef0123456789abcdef","transactionId":"IN/260927/000001","receiptNo":"26092701",
+    "date":"2026-09-27","time":"14:30",
+    "customer":{"name":"BUDI","address":"JL. DUA","contact":"0813","poNo":""},
+    "items":[{"name":"Semen","quantity100":"100","unit":"sak","priceSen":"1975200","totalSen":"1975200"}],
+    "amounts":{"grossSen":"1975200","discountSen":"0","roundingSen":"25200","netSen":"1950000",
+      "principalAppliedSen":"1950000","remainingSen":"0","cashSen":"1950000","noncashSen":"0",
+      "customerFeeSen":"0","merchantFeeSen":"0","customerPaysSen":"1950000",
+      "merchantReceivesSen":"1950000","tenderSen":"2000000","changeSen":"50000"},
+    "paymentMethod":"CASH","noncashMethod":"","originalProcessor":{"userId":"2","name":"Siti"}
+  }
+}

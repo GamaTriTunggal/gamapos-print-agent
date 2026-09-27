@@ -10,3 +10,8 @@ Invoke-RestMethod -Uri http://localhost:9111/print -Method Post -ContentType app
 ```
 
 Konvensi nama: `<jobType>.sample.json` (mis. `cashier_receipt.sample.json`, `return_note.sample.json`, ...).
+
+`v2/sale_cash.sample.json` adalah contoh **kontrak nota v2 yang belum aktif**
+untuk tes parser murni, bukan job yang boleh dikirim ke agent rilis. Seluruh
+fixture di akar folder tetap v1; smoke Windows saat ini mengharapkan 17 job
+v1 dan menolak schema 2. Jangan memasukkan fixture v2 ke putaran cetak v1.

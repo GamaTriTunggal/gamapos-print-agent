@@ -9,5 +9,6 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <Compile Include="../../src/SpikeTransport/SchemaGate.vb" Link="SchemaGate.vb" />
+    <Compile Include="../../src/SpikeTransport/SaleV2Parser.vb" Link="SaleV2Parser.vb" />
   </ItemGroup>
 </Project>
