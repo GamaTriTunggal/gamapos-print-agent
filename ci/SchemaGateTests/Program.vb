@@ -30,18 +30,38 @@ Module Program
                 Throw New InvalidOperationException(scenario.Name & ": " & actual & " != " & scenario.Expected)
             End If
         Next
+        Dim routes As (Name As String, Body As String, Supported As Integer, Expected As String)() = {
+            ("v1 active", "{""schemaVersion"":1,""jobType"":""cashier_receipt""}", 1, "V1"),
+            ("v2 gated", "{""schemaVersion"":2,""jobType"":""cashier_receipt""}", 1, "UNSUPPORTED_SCHEMA"),
+            ("v1 retained", "{""schemaVersion"":1,""jobType"":""cashier_receipt""}", 2, "V1"),
+            ("v2 future", "{""schemaVersion"":2,""jobType"":""cashier_receipt""}", 2, "V2"),
+            ("future unsupported", "{""schemaVersion"":3,""jobType"":""cashier_receipt""}", 2, "UNSUPPORTED_SCHEMA"),
+            ("duplicate blocked", "{""schemaVersion"":2,""schemaVersion"":1}", 2, "BAD_PAYLOAD"),
+            ("malformed blocked", "{""schemaVersion"":2", 2, "BAD_PAYLOAD")
+        }
+        For Each scenario In routes
+            Dim actual As String = RoutePrintSchema(scenario.Body, scenario.Supported)
+            If actual <> scenario.Expected Then
+                Throw New InvalidOperationException(scenario.Name & ": " & actual & " != " & scenario.Expected)
+            End If
+        Next
         Dim fixtures As String() = IO.Directory.GetFiles(args(0), "*.sample.json")
         If fixtures.Length < 17 Then Throw New InvalidOperationException("Fixture v1 kurang dari 17.")
         For Each fixture As String In fixtures
             Dim actual As String = CheckPrintSchema(IO.File.ReadAllText(fixture), 1)
             If actual <> "OK" Then Throw New InvalidOperationException(fixture & ": " & actual)
         Next
+        Dim saleFixture As String = IO.File.ReadAllText(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
+        If RoutePrintSchema(saleFixture, 1) <> "UNSUPPORTED_SCHEMA" OrElse
+           RoutePrintSchema(saleFixture, 2) <> "V2" Then
+            Throw New InvalidOperationException("Fixture nota v2 tidak dipilih sesuai kemampuan agent.")
+        End If
         CheckSaleV2(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
         CheckNameLayout()
         CheckMoneyFormat()
         CheckItemLayout()
         CheckMetadataLayout()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 17 rejected; amount rows/name/money/item/metadata layout passed.")
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale v2 parser: 9 accepted + 17 rejected; amount rows/name/money/item/metadata layout passed.")
     End Sub
 
     Private Sub CheckSaleV2(path As String)

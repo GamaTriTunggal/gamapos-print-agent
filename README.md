@@ -30,15 +30,16 @@ Pengaman lokal D-024 DR-08/P-604 (belum dirilis): `POST /print` memeriksa
 `UNSUPPORTED_SCHEMA`; JSON duplikat/rusak ditolak sebagai `BAD_PAYLOAD`,
 termasuk bila `jobType` sama dengan nota v1. `/health` tetap mengumumkan
 schema 1. Parser murni tiga nota penjualan schema 2 sudah ada dan diuji,
-serta draf formatter terpisah sudah dapat dibangun, tetapi **belum dipanggil
-dispatcher** dan belum ada bukti cetak Windows/printer atau izin rilis.
+serta draf formatter terpisah sudah terhubung ke cabang dispatcher v2,
+tetapi cabang itu **tidak terjangkau** selama konstanta kemampuan `/health`
+masih schema 1; belum ada bukti cetak Windows/printer atau izin rilis.
 Formatter memakai sen `Decimal`, baris pembulatan tersendiri, dan mengukur
 lebar nama kasir serta item dengan `Printer.TextWidth` saat nanti dicetak.
 Item dan footer dipreflight sebelum header dicetak; ini belum membuktikan
 lebar sebenarnya atau keberhasilan driver. Uji murni
 lintas platform:
 `dotnet run --project ci/SchemaGateTests/SchemaGateTests.vbproj -c Release -- fixtures`
-(11 kasus gerbang, 17 fixture v1, varian/mutasi nota v2, baris jumlah untuk
+(11 kasus gerbang, 7 rute kemampuan, 17 fixture v1, varian/mutasi nota v2, baris jumlah untuk
 tunai/diskon/pembulatan/EDC/campuran/DP, planner nama/item dan format uang).
 Build Linux lulus;
 smoke Windows dan printer fisik masih gerbang terpisah.

@@ -329,8 +329,9 @@ Module Program
         ' Schema 2 harus memilih parser/formatter tersendiri. Jangan biarkan
         ' payload v2 bernama cashier_receipt jatuh ke formatter v1 (yang akan
         ' membaca field berbeda dan dapat mencetak total nol/salah).
-        Dim schemaResult As String = CheckPrintSchema(body, SchemaVersion)
-        If schemaResult <> "OK" Then
+        Dim schemaResult As String = RoutePrintSchema(body, SchemaVersion)
+        If schemaResult = "V2" Then Return DispatchSaleV2(body)
+        If schemaResult <> "V1" Then
             If schemaResult = "BAD_PAYLOAD" Then
                 Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""JSON nota tidak sah.""}"
             End If
@@ -538,6 +539,28 @@ Module Program
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":" & JsonString(job.jobType) & "}"
 
         End Select
+    End Function
+
+    ' Rute ini tetap tidak terjangkau saat /health mengiklankan schema 1.
+    ' Parser v2 memeriksa seluruh uang/aktor sebelum printer dipilih; v1
+    ' tetap masuk formatter lama tanpa perubahan data atau bentuk respons.
+    Private Function DispatchSaleV2(body As String) As String
+        Dim root As JObject
+        Try
+            root = ParseSaleV2(body)
+        Catch ex As Exception
+            Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""Nota v2 tidak sah.""}"
+        End Try
+        Try
+            Dim kind As String = CStr(root("jobType"))
+            Dim receiptNo As String = CStr(root("payload")("receiptNo"))
+            WithRolePrinter(CStr(root("printerRole")), Sub() PrintSaleV2Receipt(root))
+            Return "{""ok"":true,""jobType"":" & JsonString(kind) & ",""rcptNo"":" & JsonString(receiptNo) & "}"
+        Catch ex As Exception
+            ' Jangan mengembalikan metadata nota ke log/respons galat.
+            Console.WriteLine("   PRINT_FAILED v2: " & ex.GetType().Name)
+            Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":""Cetak nota v2 gagal.""}"
+        End Try
     End Function
 
     ' Balasan cetak label QR (P-592): field lama tetap (ok, jobType, itemId/invoiceNo); aditif `printer`

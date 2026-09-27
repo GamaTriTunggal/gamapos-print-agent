@@ -1,5 +1,5 @@
-' Formatter awal tiga nota penjualan schema 2. Belum terhubung ke Dispatch;
-' tidak boleh diumumkan di /health sebelum smoke Windows dan printer fisik.
+' Formatter awal tiga nota penjualan schema 2. Rute Dispatch masih tertutup
+' oleh schema 1; jangan umumkan v2 di /health sebelum smoke Windows/printer.
 Option Strict On
 Option Explicit On
 
@@ -12,7 +12,10 @@ Imports Newtonsoft.Json.Linq
 
 Module SaleV2Receipt
     Friend Sub PrintSaleV2Receipt(body As String)
-        Dim root As JObject = ParseSaleV2(body)
+        PrintSaleV2Receipt(ParseSaleV2(body))
+    End Sub
+
+    Friend Sub PrintSaleV2Receipt(root As JObject)
         RunSta(Sub() RenderSaleV2(root))
     End Sub
 

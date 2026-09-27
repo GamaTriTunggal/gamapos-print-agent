@@ -1,6 +1,7 @@
 ' Parser nota penjualan schema 2 yang terpisah dari model/formatter v1.
-' Belum dipasang ke Dispatch atau /health; pemakaian menunggu formatter dan
-' uji Windows/printer. Semua jumlah dibaca sebagai string-sen, bukan Double.
+' Dispatch baru dapat menjangkaunya sesudah gerbang schema dinaikkan; /health
+' masih schema 1 sambil menunggu uji Windows/printer fisik. Semua jumlah
+' dibaca sebagai string-sen, bukan Double.
 Option Strict On
 Option Explicit On
 
