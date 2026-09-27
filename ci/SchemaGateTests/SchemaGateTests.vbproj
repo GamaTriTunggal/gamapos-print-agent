@@ -12,6 +12,7 @@
     <Compile Include="../../src/SpikeTransport/SaleV2Parser.vb" Link="SaleV2Parser.vb" />
     <Compile Include="../../src/SpikeTransport/ReceivableV2Parser.vb" Link="ReceivableV2Parser.vb" />
     <Compile Include="../../src/SpikeTransport/ReturnV2Parser.vb" Link="ReturnV2Parser.vb" />
+    <Compile Include="../../src/SpikeTransport/ReturnV2CoreLayout.vb" Link="ReturnV2CoreLayout.vb" />
     <Compile Include="../../src/SpikeTransport/ReceivableV2Rows.vb" Link="ReceivableV2Rows.vb" />
     <Compile Include="../../src/SpikeTransport/ReceivableV2Layout.vb" Link="ReceivableV2Layout.vb" />
     <Compile Include="../../src/SpikeTransport/ReceiptNameLayout.vb" Link="ReceiptNameLayout.vb" />

@@ -82,7 +82,7 @@ Module Program
         CheckMoneyFormat()
         CheckItemLayout()
         CheckMetadataLayout()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale/receivable/return v2 parser accepted/rejected; amount rows/name/money/item/metadata/correction layout passed.")
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale/receivable/return v2 parser accepted/rejected; return core and amount/name/money/item/metadata/correction layout passed.")
     End Sub
 
     Private Sub CheckReturnV2(path As String)
@@ -98,9 +98,37 @@ Module Program
            CStr(payload("items")(0)("totalSen")) <> "152" Then
             Throw New InvalidOperationException("Jumlah retur pecahan salah.")
         End If
+        Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        Dim plan As ReturnV2CorePlan = BuildReturnV2CorePlan(original, 40.0F, characters)
+        If plan.Title <> "NOTA KEMBALI BARANG" OrElse plan.CustomerLines.Count <> 3 OrElse
+           plan.ReceiptLine.IndexOf("26090001", StringComparison.Ordinal) < 0 OrElse
+           plan.ReprintLine IsNot Nothing OrElse plan.ItemLines.Count <> 2 OrElse
+           plan.ItemLines(0)(0) <> "1,5 BARANG A" OrElse
+           Not plan.ItemLines(0).Last().EndsWith("1,52", StringComparison.Ordinal) OrElse
+           Not plan.TotalLine.EndsWith("2,52", StringComparison.Ordinal) Then
+            Throw New InvalidOperationException("Layout inti retur asli tidak cocok.")
+        End If
         Dim reprint As JObject = CType(original.DeepClone(), JObject)
         reprint("payload")("reprint") = JObject.Parse("{""date"":""2026-09-29"",""time"":""09:30:00"",""processor"":{""userId"":""43"",""name"":""KASIR ULANG""}}")
         ParseReturnV2(reprint.ToString(Formatting.None))
+        Dim reprintPlan As ReturnV2CorePlan = BuildReturnV2CorePlan(reprint, 40.0F, characters)
+        If reprintPlan.ReprintLine Is Nothing OrElse
+           Not reprintPlan.ReprintLine.StartsWith("CETAK ULANG:", StringComparison.Ordinal) OrElse
+           reprintPlan.TotalLine <> plan.TotalLine Then
+            Throw New InvalidOperationException("Layout salinan retur mengubah nilai asal.")
+        End If
+        For Each action As Action In {
+            Sub() BuildReturnV2CorePlan(original, 39.0F, characters),
+            Sub() BuildReturnV2CorePlan(original, Single.NaN, characters),
+            Sub() BuildReturnV2CorePlan(original, 40.0F, Nothing)}
+            Dim rejected As Boolean = False
+            Try
+                action()
+            Catch ex As ArgumentException
+                rejected = True
+            End Try
+            If Not rejected Then Throw New InvalidOperationException("Layout retur menerima area/metrik cacat.")
+        Next
         Dim mutations As (Name As String, Edit As Action(Of JObject))() = {
             ("dua salinan", Sub(j) j("copies") = 2),
             ("schema lama", Sub(j) j("schemaVersion") = 1),
