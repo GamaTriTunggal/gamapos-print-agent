@@ -72,6 +72,7 @@ Module Program
         End If
         CheckSaleV2(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
         CheckReceivableV2(IO.Path.Combine(args(0), "v2"))
+        CheckReturnV2(IO.Path.Combine(args(0), "v2", "return_note.sample.json"))
         If args.Length = 2 Then CheckGoReceivableV2(args(1))
         If args.Length = 3 Then
             CheckGoReceivableV2(args(1))
@@ -81,7 +82,59 @@ Module Program
         CheckMoneyFormat()
         CheckItemLayout()
         CheckMetadataLayout()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale/receivable v2 parser accepted/rejected; amount rows/name/money/item/metadata/correction layout passed.")
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale/receivable/return v2 parser accepted/rejected; amount rows/name/money/item/metadata/correction layout passed.")
+    End Sub
+
+    Private Sub CheckReturnV2(path As String)
+        Dim source As String = IO.File.ReadAllText(path)
+        If RoutePrintSchema(source, 1) <> "UNSUPPORTED_SCHEMA" OrElse
+           RoutePrintSchema(source, 2) <> "V2" OrElse
+           SelectV2Family("return_note") <> "UNSUPPORTED_JOBTYPE" Then
+            Throw New InvalidOperationException("Retur v2 terbuka sebelum dispatcher/formatter siap.")
+        End If
+        Dim original As JObject = ParseReturnV2(source)
+        Dim payload As JObject = CType(original("payload"), JObject)
+        If CStr(payload("totalSen")) <> "252" OrElse
+           CStr(payload("items")(0)("totalSen")) <> "152" Then
+            Throw New InvalidOperationException("Jumlah retur pecahan salah.")
+        End If
+        Dim reprint As JObject = CType(original.DeepClone(), JObject)
+        reprint("payload")("reprint") = JObject.Parse("{""date"":""2026-09-29"",""time"":""09:30:00"",""processor"":{""userId"":""43"",""name"":""KASIR ULANG""}}")
+        ParseReturnV2(reprint.ToString(Formatting.None))
+        Dim mutations As (Name As String, Edit As Action(Of JObject))() = {
+            ("dua salinan", Sub(j) j("copies") = 2),
+            ("schema lama", Sub(j) j("schemaVersion") = 1),
+            ("header toko palsu", Sub(j) j("store")("name") = "TOKO KINI"),
+            ("transaksi palsu", Sub(j) j("payload")("transactionId") = "xxxxxxxxxxxxxxxx"),
+            ("nama kosong", Sub(j) j("payload")("items")(0)("name") = vbTab & vbCrLf),
+            ("kasir kosong", Sub(j) j("payload")("originalProcessor")("name") = ChrW(&H200B)),
+            ("harga angka JSON", Sub(j) j("payload")("items")(0)("priceSen") = 101),
+            ("baris tidak cocok", Sub(j) j("payload")("items")(0)("totalSen") = "200"),
+            ("total tidak cocok", Sub(j) j("payload")("totalSen") = "251"),
+            ("tanggal mustahil", Sub(j) j("payload")("date") = "2026-02-30"),
+            ("jam mustahil", Sub(j) j("payload")("time") = "24:00:00"),
+            ("ID aktor bukan angka", Sub(j) j("payload")("originalProcessor")("userId") = "42x")
+        }
+        For Each scenario In mutations
+            Dim changed As JObject = CType(original.DeepClone(), JObject)
+            scenario.Edit(changed)
+            Dim rejected As Boolean = False
+            Try
+                ParseReturnV2(changed.ToString(Formatting.None))
+            Catch ex As Exception
+                rejected = True
+            End Try
+            If Not rejected Then Throw New InvalidOperationException("Retur v2 menerima " & scenario.Name)
+        Next
+        Dim duplicate As String = source.Replace("""jobId"": ""return-1""", """jobId"": ""return-1"", ""jobId"": ""return-2""")
+        If duplicate = source Then Throw New InvalidOperationException("Fixture tidak memuat jobId kanonik.")
+        Dim duplicateRejected As Boolean = False
+        Try
+            ParseReturnV2(duplicate)
+        Catch ex As Exception
+            duplicateRejected = True
+        End Try
+        If Not duplicateRejected Then Throw New InvalidOperationException("Retur v2 menerima kunci JSON duplikat.")
     End Sub
 
     Private Sub CheckGoSaleV2(folder As String)

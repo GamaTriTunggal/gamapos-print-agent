@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "jobId": "return-1",
+  "jobType": "return_note",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {"name": "", "address": "", "contact": ""},
+  "payload": {
+    "transactionId": "IN/260928/000001",
+    "receiptNo": "26090001",
+    "date": "2026-09-28",
+    "time": "10:11:12",
+    "customer": {"id": "CS9001", "name": "PELANGGAN", "address": "JL. SATU", "contact": "0812"},
+    "items": [
+      {"itemId": "VJ0001", "name": "BARANG A", "quantity100": "150", "priceSen": "101", "totalSen": "152"},
+      {"itemId": "VJ0002", "name": "BARANG B", "quantity100": "100", "priceSen": "100", "totalSen": "100"}
+    ],
+    "totalSen": "252",
+    "originalProcessor": {"userId": "42", "name": "KASIR ASAL"}
+  }
+}
