@@ -326,6 +326,16 @@ Module Program
 
     ' Deserialize amplop job JSON lalu dispatch sesuai jobType. Mengembalikan body JSON response.
     Private Function Dispatch(body As String) As String
+        ' Schema 2 harus memilih parser/formatter tersendiri. Jangan biarkan
+        ' payload v2 bernama cashier_receipt jatuh ke formatter v1 (yang akan
+        ' membaca field berbeda dan dapat mencetak total nol/salah).
+        Dim schemaResult As String = CheckPrintSchema(body, SchemaVersion)
+        If schemaResult <> "OK" Then
+            If schemaResult = "BAD_PAYLOAD" Then
+                Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""JSON nota tidak sah.""}"
+            End If
+            Return "{""ok"":false,""error"":""UNSUPPORTED_SCHEMA"",""message"":""Versi nota belum didukung oleh agent ini.""}"
+        End If
         Dim job As PrintJob = Nothing
         Try
             job = JsonConvert.DeserializeObject(Of PrintJob)(body)

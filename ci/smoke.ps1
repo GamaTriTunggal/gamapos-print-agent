@@ -135,6 +135,12 @@ try {
         # Amplop rusak -> BAD_PAYLOAD, bukan 500.
         $bad = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":1}' -TimeoutSec 10
         if ($bad.ok -ne $false -or $bad.error -ne "BAD_PAYLOAD") { Fail "amplop rusak tidak BAD_PAYLOAD: $($bad | ConvertTo-Json -Compress)" } else { Ok "amplop rusak -> BAD_PAYLOAD" }
+        # Schema 2 belum diiklankan/dirender. Walau jobType sama, jangan
+        # menafsirkan payload v2 sebagai v1 dan mencetak total kosong/salah.
+        $v2 = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":2,"jobType":"cashier_receipt","payload":{}}' -TimeoutSec 10
+        if ($v2.ok -ne $false -or $v2.error -ne "UNSUPPORTED_SCHEMA") { Fail "schema 2 tidak ditahan: $($v2 | ConvertTo-Json -Compress)" } else { Ok "schema 2 -> UNSUPPORTED_SCHEMA" }
+        $duplicate = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":2,"schemaVersion":1,"jobType":"cashier_receipt","payload":{}}' -TimeoutSec 10
+        if ($duplicate.ok -ne $false -or $duplicate.error -ne "BAD_PAYLOAD") { Fail "schema duplikat tidak ditahan: $($duplicate | ConvertTo-Json -Compress)" } else { Ok "schema duplikat -> BAD_PAYLOAD" }
     } else {
         Fail "printer virtual tidak bisa dibuat — cetak fixtures tidak teruji"
     }

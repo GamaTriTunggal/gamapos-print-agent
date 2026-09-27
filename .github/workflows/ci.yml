@@ -22,6 +22,8 @@ jobs:
           if ($hits) { $hits | ForEach-Object { Write-Host $_ }; throw "jalur kode uninstall/hapus printer ditemukan" }
       - name: Build (Release, net48)
         run: dotnet build src/SpikeTransport/SpikeTransport.vbproj -c Release --nologo
+      - name: Gerbang schema v1/v2 tanpa printer
+        run: dotnet run --project ci/SchemaGateTests/SchemaGateTests.vbproj -c Release --nologo -- fixtures
       - name: Smoke (listener :9111, bentuk endpoint, 17 fixtures ke printer virtual)
         shell: pwsh
         run: ./ci/smoke.ps1 -Exe (Resolve-Path src/SpikeTransport/bin/Release/net48/GamaPrintAgent.SpikeTransport.exe)

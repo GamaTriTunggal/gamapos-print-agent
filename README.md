@@ -25,6 +25,15 @@ Ceklis rilis: [`docs/RELEASE.md`](docs/RELEASE.md) · jurnal tiap rilis: [`docs/
 Satu rilis penuh = SELURUH armada dalam ≤ 6 jam (+ saat PC dimulai ulang) tanpa jalan pulang otomatis —
 karena itu pilot dulu lewat GitHub **pre-release** (armada dan `releases/latest` mengabaikannya).
 
+Pengaman lokal D-024 DR-08/P-604 (belum dirilis): `POST /print` memeriksa
+`schemaVersion` sebelum memilih formatter. Schema 2/future ditolak sebagai
+`UNSUPPORTED_SCHEMA`; JSON duplikat/rusak ditolak sebagai `BAD_PAYLOAD`,
+termasuk bila `jobType` sama dengan nota v1. `/health` tetap mengumumkan
+schema 1; belum ada parser/formatter v2 atau izin rilis. Uji murni lintas
+platform: `dotnet run --project ci/SchemaGateTests/SchemaGateTests.vbproj
+-c Release -- fixtures` (11 kasus + 17 fixture v1). Build Linux lulus;
+smoke Windows dan printer fisik masih gerbang terpisah.
+
 ## Dua fungsi agent — jangan dicampur
 
 | Fungsi | Printer apa pun? | Butuh "resep"? |
