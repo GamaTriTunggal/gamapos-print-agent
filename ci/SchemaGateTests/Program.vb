@@ -8,9 +8,10 @@ Imports System.Linq
 
 Module Program
     Sub Main(args As String())
-        If args.Length < 1 OrElse args.Length > 3 OrElse Not IO.Directory.Exists(args(0)) OrElse
+        If args.Length < 1 OrElse args.Length > 4 OrElse Not IO.Directory.Exists(args(0)) OrElse
            (args.Length >= 2 AndAlso Not IO.Directory.Exists(args(1))) OrElse
-           (args.Length = 3 AndAlso Not IO.Directory.Exists(args(2))) Then
+           (args.Length >= 3 AndAlso Not IO.Directory.Exists(args(2))) OrElse
+           (args.Length = 4 AndAlso Not IO.Directory.Exists(args(3))) Then
             Throw New ArgumentException("Diperlukan jalur direktori fixtures v1.")
         End If
         Dim cases As (Name As String, Body As String, Expected As String)() = {
@@ -73,11 +74,9 @@ Module Program
         CheckSaleV2(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
         CheckReceivableV2(IO.Path.Combine(args(0), "v2"))
         CheckReturnV2(IO.Path.Combine(args(0), "v2", "return_note.sample.json"))
-        If args.Length = 2 Then CheckGoReceivableV2(args(1))
-        If args.Length = 3 Then
-            CheckGoReceivableV2(args(1))
-            CheckGoSaleV2(args(2))
-        End If
+        If args.Length >= 2 Then CheckGoReceivableV2(args(1))
+        If args.Length >= 3 Then CheckGoSaleV2(args(2))
+        If args.Length = 4 Then CheckGoReturnV2(args(3))
         CheckNameLayout()
         CheckMoneyFormat()
         CheckItemLayout()
@@ -187,6 +186,48 @@ Module Program
             Throw New InvalidOperationException("Job Go salinan nota gagal diparse atau dicatat lengkap.")
         End If
         Console.WriteLine("Go→agent sale v2: corrected reprint parsed and preflighted.")
+    End Sub
+
+    Private Sub CheckGoReturnV2(folder As String)
+        Dim expected As String() = {"return_committed.json", "return_fractional.json", "return_reprint.json"}
+        Dim files As String() = IO.Directory.GetFiles(folder, "*.json")
+        If files.Length <> expected.Length OrElse
+           Not expected.All(Function(name) files.Any(Function(path) IO.Path.GetFileName(path) = name)) Then
+            Throw New InvalidOperationException("Korpus Go retur v2 tidak lengkap.")
+        End If
+        Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        Dim jobs As New Dictionary(Of String, JObject)(StringComparer.Ordinal)
+        For Each name As String In expected
+            Dim root As JObject = ParseReturnV2(IO.File.ReadAllText(IO.Path.Combine(folder, name)))
+            Dim plan As ReturnV2CorePlan = BuildReturnV2CorePlan(root, 40.0F, characters)
+            If CStr(root("jobType")) <> "return_note" OrElse CStr(root("printerRole")) <> "CASHIER" OrElse
+               plan.Title <> "NOTA KEMBALI BARANG" OrElse plan.ItemLines.Count = 0 OrElse
+               plan.TotalLine.Length > 40 OrElse SelectV2Family("return_note") <> "UNSUPPORTED_JOBTYPE" Then
+                Throw New InvalidOperationException("Job Go retur belum aman untuk layout: " & name)
+            End If
+            jobs.Add(name, root)
+        Next
+        Dim fractional As JObject = CType(jobs("return_fractional.json")("payload"), JObject)
+        If CStr(fractional("totalSen")) <> "252" OrElse
+           CStr(fractional("items")(0)("totalSen")) <> "152" OrElse
+           CStr(fractional("items")(1)("totalSen")) <> "100" Then
+            Throw New InvalidOperationException("Residu sen produsen Go berubah di agent.")
+        End If
+        Dim committed As JObject = CType(jobs("return_committed.json")("payload"), JObject)
+        Dim reprint As JObject = CType(jobs("return_reprint.json")("payload"), JObject)
+        If CStr(committed("customer")("name")) <> "PIUTANG" OrElse
+           CStr(committed("originalProcessor")("name")) <> "KASIR AWAL" OrElse
+           committed.Property("reprint") IsNot Nothing OrElse
+           CStr(reprint("reprint")("processor")("name")) <> "Kasir Ulang" OrElse
+           CStr(reprint("reprint")("time")) <> "09:03:04" OrElse
+           CStr(committed("transactionId")) <> CStr(reprint("transactionId")) OrElse
+           CStr(committed("receiptNo")) <> CStr(reprint("receiptNo")) OrElse
+           CStr(committed("totalSen")) <> CStr(reprint("totalSen")) OrElse
+           Not JToken.DeepEquals(committed("items"), reprint("items")) OrElse
+           Not JToken.DeepEquals(committed("originalProcessor"), reprint("originalProcessor")) Then
+            Throw New InvalidOperationException("Salinan Go→agent mengubah bukti retur asal.")
+        End If
+        Console.WriteLine("Go→agent return v2: 3 synthetic jobs parsed and preflighted; printer still disabled.")
     End Sub
 
     Private Sub CheckGoReceivableV2(folder As String)
