@@ -13,6 +13,8 @@ Module SchemaGate
                 Return "SALE"
             Case "receivable_selected", "receivable_selected_card", "receivable_proof"
                 Return "RECEIVABLE"
+            Case "return_note"
+                Return "RETURN"
             Case Else
                 Return "UNSUPPORTED_JOBTYPE"
         End Select

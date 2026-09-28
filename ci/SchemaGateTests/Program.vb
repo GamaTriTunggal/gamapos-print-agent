@@ -60,7 +60,7 @@ Module Program
             (Name:="receivable_selected", Family:="RECEIVABLE"),
             (Name:="receivable_selected_card", Family:="RECEIVABLE"),
             (Name:="receivable_proof", Family:="RECEIVABLE"),
-            (Name:="return_note", Family:="UNSUPPORTED_JOBTYPE"),
+            (Name:="return_note", Family:="RETURN"),
             (Name:="Cashier_Receipt", Family:="UNSUPPORTED_JOBTYPE")}
             If SelectV2Family(scenario.Name) <> scenario.Family Then
                 Throw New InvalidOperationException("Keluarga job v2 salah: " & scenario.Name)
@@ -94,8 +94,8 @@ Module Program
         Dim source As String = IO.File.ReadAllText(path)
         If RoutePrintSchema(source, 1) <> "UNSUPPORTED_SCHEMA" OrElse
            RoutePrintSchema(source, 2) <> "V2" OrElse
-           SelectV2Family("return_note") <> "UNSUPPORTED_JOBTYPE" Then
-            Throw New InvalidOperationException("Retur v2 terbuka sebelum dispatcher/formatter siap.")
+           SelectV2Family("return_note") <> "RETURN" Then
+            Throw New InvalidOperationException("Retur v2 melewati pagar schema aktif atau salah keluarga.")
         End If
         Dim original As JObject = ParseReturnV2(source)
         Dim payload As JObject = CType(original("payload"), JObject)
@@ -223,7 +223,7 @@ Module Program
             Dim plan As ReturnV2CorePlan = BuildReturnV2CorePlan(root, 40.0F, characters)
             If CStr(root("jobType")) <> "return_note" OrElse CStr(root("printerRole")) <> "CASHIER" OrElse
                plan.Title <> "NOTA KEMBALI BARANG" OrElse plan.ItemLines.Count = 0 OrElse
-               plan.TotalLine.Length > 40 OrElse SelectV2Family("return_note") <> "UNSUPPORTED_JOBTYPE" Then
+               plan.TotalLine.Length > 40 OrElse SelectV2Family("return_note") <> "RETURN" Then
                 Throw New InvalidOperationException("Job Go retur belum aman untuk layout: " & name)
             End If
             jobs.Add(name, root)

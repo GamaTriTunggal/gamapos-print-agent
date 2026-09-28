@@ -561,6 +561,8 @@ Module Program
                 Return DispatchSaleV2(body)
             Case "RECEIVABLE"
                 Return DispatchReceivableV2(body)
+            Case "RETURN"
+                Return DispatchReturnV2(body)
             Case Else
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":""Jenis nota v2 belum didukung.""}"
         End Select
@@ -603,6 +605,23 @@ Module Program
         Catch ex As Exception
             Console.WriteLine("   PRINT_FAILED v2: " & ex.GetType().Name)
             Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":""Cetak bukti piutang v2 gagal.""}"
+        End Try
+    End Function
+
+    Private Function DispatchReturnV2(body As String) As String
+        Dim root As JObject
+        Try
+            root = ParseReturnV2(body)
+        Catch
+            Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""Retur v2 tidak sah.""}"
+        End Try
+        Try
+            Dim transactionID As String = CStr(root("payload")("transactionId"))
+            WithRolePrinter(CStr(root("printerRole")), Sub() PrintReturnV2Receipt(root))
+            Return "{""ok"":true,""jobType"":""return_note"",""transactionId"":" & JsonString(transactionID) & "}"
+        Catch ex As Exception
+            Console.WriteLine("   PRINT_FAILED v2: " & ex.GetType().Name)
+            Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":""Cetak retur v2 gagal.""}"
         End Try
     End Function
 
