@@ -80,6 +80,7 @@ Module Program
         CheckSaleV2(IO.Path.Combine(args(0), "v2", "sale_cash.sample.json"))
         CheckReceivableV2(IO.Path.Combine(args(0), "v2"))
         CheckReturnV2(IO.Path.Combine(args(0), "v2", "return_note.sample.json"))
+        CheckPhysicalSamples(IO.Path.Combine(args(0), "v2"))
         If args.Length >= 2 Then CheckGoReceivableV2(args(1))
         If args.Length >= 3 Then CheckGoSaleV2(args(2))
         If args.Length = 4 Then CheckGoReturnV2(args(3))
@@ -88,6 +89,38 @@ Module Program
         CheckItemLayout()
         CheckMetadataLayout()
         Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale/receivable/return v2 parser accepted/rejected; return core and amount/name/money/item/metadata/correction layout passed.")
+    End Sub
+
+    Private Sub CheckPhysicalSamples(folder As String)
+        Dim expected As String() = {
+            "sale_cash.sample.json", "sale_split_edc.sample.json", "sale_kasbon_dp0.sample.json",
+            "receivable_selected.sample.json", "receivable_selected_card.sample.json",
+            "receivable_proof.sample.json", "return_note.sample.json"}
+        Dim files As String() = IO.Directory.GetFiles(folder, "*.sample.json")
+        If files.Length <> expected.Length OrElse
+           Not expected.All(Function(name) files.Any(Function(path) IO.Path.GetFileName(path) = name)) Then
+            Throw New InvalidOperationException("Keluarga fixture uji kertas v2 tidak lengkap.")
+        End If
+        Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        For Each path As String In files
+            Dim body As String = IO.File.ReadAllText(path)
+            Dim kind As String = CStr(JObject.Parse(body)("jobType"))
+            Select Case SelectV2Family(kind)
+                Case "SALE"
+                    Dim root As JObject = ParseSaleV2(body)
+                    Dim payload As JObject = CType(root("payload"), JObject)
+                    For Each row As SaleAmountRow In BuildSaleAmountRows(kind,
+                        CStr(payload("paymentMethod")), CStr(payload("noncashMethod")), CType(payload("amounts"), JObject))
+                        LayoutSaleAmountLine(row.Caption, row.Sen, 40, 40.0F, characters)
+                    Next
+                Case "RECEIVABLE"
+                    BuildReceivableV2Plan(ParseReceivableV2(body), 40.0F, 20.0F, characters, characters)
+                Case "RETURN"
+                    BuildReturnV2CorePlan(ParseReturnV2(body), 40.0F, characters)
+                Case Else
+                    Throw New InvalidOperationException("Keluarga fixture uji kertas tidak dikenal: " & kind)
+            End Select
+        Next
     End Sub
 
     Private Sub CheckReturnV2(path As String)
