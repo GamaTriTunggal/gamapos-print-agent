@@ -88,7 +88,9 @@ Module Program
         CheckMoneyFormat()
         CheckItemLayout()
         CheckMetadataLayout()
-        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 passed; sale/receivable/return v2 parser accepted/rejected; return core and amount/name/money/item/metadata/correction layout passed.")
+        Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 + " &
+                          IO.Directory.GetFiles(IO.Path.Combine(args(0), "v2"), "*.sample.json").Length &
+                          " fixtures v2 passed; sale/receivable/return v2 parser accepted/rejected; sale sample and return core/layout passed.")
     End Sub
 
     Private Sub CheckPhysicalSamples(folder As String)
@@ -112,10 +114,41 @@ Module Program
                 Case "SALE"
                     Dim root As JObject = ParseSaleV2(body)
                     Dim payload As JObject = CType(root("payload"), JObject)
+                    Dim store As JObject = CType(root("store"), JObject)
+                    Dim customer As JObject = CType(payload("customer"), JObject)
+                    LayoutCenteredSaleText(CStr(store("name")), "NO NAME", 40.0F, characters)
+                    LayoutCenteredSaleText(CStr(store("address")), "", 40.0F, characters)
+                    LayoutCenteredSaleText(CStr(store("contact")), "", 40.0F, characters)
+                    LayoutSaleCustomer("PEMBELI  : ", CStr(customer("name")), 40.0F, characters)
+                    LayoutSaleCustomer("ALAMAT   : ", CStr(customer("address")), 40.0F, characters)
+                    LayoutSaleCustomer("NO HP    : ", CStr(customer("contact")), 40.0F, characters)
+                    LayoutSaleCustomer("PO       : ", CStr(customer("poNo")), 40.0F, characters)
+                    LayoutSaleReceiptLine(CStr(payload("receiptNo")), CStr(payload("date")),
+                                          CStr(payload("time")), False, 40.0F, characters)
+                    Dim reprint As JObject = TryCast(payload("reprint"), JObject)
+                    If reprint IsNot Nothing Then
+                        LayoutSaleReceiptLine("", CStr(reprint("date")), CStr(reprint("time")),
+                                              True, 40.0F, characters)
+                        LayoutReprintName(CStr(reprint("processor")("name")), 40.0F, characters)
+                    End If
+                    Dim itemLineCount As Integer = 0
+                    For Each token As JToken In CType(payload("items"), JArray)
+                        Dim item As JObject = CType(token, JObject)
+                        itemLineCount += BuildSaleItemLines(Long.Parse(CStr(item("quantity100")), CultureInfo.InvariantCulture),
+                            CStr(item("unit")), CStr(item("name")),
+                            Long.Parse(CStr(item("priceSen")), CultureInfo.InvariantCulture),
+                            Long.Parse(CStr(item("totalSen")), CultureInfo.InvariantCulture),
+                            40.0F, 40, characters).Count
+                    Next
+                    LayoutOriginalName(CStr(payload("originalProcessor")("name")), 25.0F, 40.0F, characters)
+                    LayoutSaleCorrections(reprint, 40.0F, characters)
                     For Each row As SaleAmountRow In BuildSaleAmountRows(kind,
                         CStr(payload("paymentMethod")), CStr(payload("noncashMethod")), CType(payload("amounts"), JObject))
                         LayoutSaleAmountLine(row.Caption, row.Sen, 40, 40.0F, characters)
                     Next
+                    If IO.Path.GetFileName(path) = "sale_long_item.sample.json" AndAlso itemLineCount < 4 Then
+                        Throw New InvalidOperationException("Fixture nama barang panjang tidak menguji bungkus item.")
+                    End If
                 Case "RECEIVABLE"
                     BuildReceivableV2Plan(ParseReceivableV2(body), 40.0F, 20.0F, characters, characters)
                 Case "RETURN"
