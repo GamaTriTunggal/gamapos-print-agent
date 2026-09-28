@@ -94,8 +94,10 @@ Module Program
     Private Sub CheckPhysicalSamples(folder As String)
         Dim expected As String() = {
             "sale_cash.sample.json", "sale_split_edc.sample.json", "sale_kasbon_dp0.sample.json",
+            "sale_corrected_reprint.sample.json", "receivable_fifo_edc.sample.json",
             "receivable_selected.sample.json", "receivable_selected_card.sample.json",
-            "receivable_proof.sample.json", "return_note.sample.json"}
+            "receivable_selected_reprint.sample.json", "receivable_proof.sample.json",
+            "return_note.sample.json", "return_reprint.sample.json"}
         Dim files As String() = IO.Directory.GetFiles(folder, "*.sample.json")
         If files.Length <> expected.Length OrElse
            Not expected.All(Function(name) files.Any(Function(path) IO.Path.GetFileName(path) = name)) Then
