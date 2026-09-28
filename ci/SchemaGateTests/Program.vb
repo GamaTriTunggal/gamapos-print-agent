@@ -93,8 +93,9 @@ Module Program
 
     Private Sub CheckPhysicalSamples(folder As String)
         Dim expected As String() = {
-            "sale_cash.sample.json", "sale_split_edc.sample.json", "sale_kasbon_dp0.sample.json",
-            "sale_corrected_reprint.sample.json", "receivable_fifo_edc.sample.json",
+            "sale_cash.sample.json", "sale_edc_only.sample.json", "sale_split_edc.sample.json",
+            "sale_split_wire.sample.json", "sale_kasbon_dp0.sample.json", "sale_kasbon_dp.sample.json",
+            "sale_long_item.sample.json", "sale_corrected_reprint.sample.json", "receivable_fifo_edc.sample.json",
             "receivable_selected.sample.json", "receivable_selected_card.sample.json",
             "receivable_selected_reprint.sample.json", "receivable_proof.sample.json",
             "return_note.sample.json", "return_reprint.sample.json"}

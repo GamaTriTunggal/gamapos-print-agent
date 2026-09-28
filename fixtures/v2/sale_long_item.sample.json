@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "jobId": "6123456789abcdef0123456789abcdef",
+  "jobType": "cashier_receipt",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {"name":"TOKO BANGUNAN UJI DENGAN NAMA CUKUP PANJANG","address":"JALAN KEMERDEKAAN NOMOR 123 KECAMATAN UJI","contact":"081234567890"},
+  "payload": {
+    "eventId":"6123456789abcdef0123456789abcdef",
+    "transactionId":"IN/260927/000008",
+    "receiptNo":"26092708",
+    "date":"2026-09-27",
+    "time":"14:37",
+    "customer":{"name":"PELANGGAN UJI DENGAN NAMA YANG PANJANG","address":"JALAN PELANGGAN NOMOR 456","contact":"081345678901","poNo":"PO-123456789"},
+    "items":[{"name":"Semen Portland Tipe Satu Kemasan Empat Puluh Kilogram untuk Proyek Renovasi Bangunan Uji","quantity100":"100","unit":"sak","priceSen":"1975200","totalSen":"1975200"}],
+    "amounts":{"grossSen":"1975200","discountSen":"0","roundingSen":"25200","netSen":"1950000",
+      "principalAppliedSen":"1950000","remainingSen":"0","cashSen":"1950000","noncashSen":"0",
+      "customerFeeSen":"0","merchantFeeSen":"0","customerPaysSen":"1950000",
+      "merchantReceivesSen":"1950000","tenderSen":"2000000","changeSen":"50000"},
+    "paymentMethod":"CASH","noncashMethod":"",
+    "originalProcessor":{"userId":"2","name":"NAMA KASIR PANJANG SEKALI UNTUK PENGUJIAN POSISI HORMAT KAMI"}
+  }
+}

@@ -29,11 +29,16 @@ melayani transaksi. Gunakan hanya fixture sintetis, bukan data pelanggan.
   .\fixtures\v2\return_note.sample.json "NAMA PRINTER UJI"
 ```
 
-Ulangi untuk sepuluh contoh sintetis lainnya:
+Ulangi untuk empat belas contoh sintetis lainnya:
 
 - `sale_cash.sample.json` — penjualan tunai;
 - `sale_split_edc.sample.json` — tunai + EDC, termasuk dua biaya;
+- `sale_edc_only.sample.json` — pembayaran EDC tunggal dengan dua biaya;
+- `sale_split_wire.sample.json` — tunai + transfer, tanpa biaya EDC;
 - `sale_kasbon_dp0.sample.json` — kasbon tanpa DP;
+- `sale_kasbon_dp.sample.json` — kasbon dengan DP tunai dan sisa utang;
+- `sale_long_item.sample.json` — nama barang, toko, pelanggan, dan kasir
+  panjang untuk memeriksa pemenggalan dan posisi footer;
 - `sale_corrected_reprint.sample.json` — cetak ulang penjualan dengan nama
   pemroses panjang dan catatan koreksi pelanggan/metode;
 - `receivable_selected.sample.json` — pelunasan bon terpilih tunai;
@@ -46,10 +51,9 @@ Ulangi untuk sepuluh contoh sintetis lainnya:
 - `return_reprint.sample.json` — cetak ulang retur, termasuk identitas
   pemroses awal dan pencetak ulang.
 
-Kesebelas fixture bawaan, termasuk `return_note.sample.json`, masih contoh
-awal. EDC penjualan tunggal, transfer campuran, DP positif, nama item panjang,
-retur tanpa nota, serta kombinasi lain memerlukan fixture sintetis tambahan
-dari korpus Go→agent. Jangan menganggap sebelas contoh ini sebagai matriks
+Kelima belas fixture bawaan, termasuk `return_note.sample.json`, masih contoh
+awal. Retur tanpa nota serta kombinasi lain memerlukan fixture sintetis tambahan
+dari korpus Go→agent. Jangan menganggap lima belas contoh ini sebagai matriks
 cetak akhir.
 
 Untuk tiap cetakan, catat commit agent, model/driver printer, lebar kertas,

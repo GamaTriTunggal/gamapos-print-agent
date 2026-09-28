@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "jobId": "5123456789abcdef0123456789abcdef",
+  "jobType": "kasbon_receipt",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {"name":"TOKO UJI","address":"JALAN UJI","contact":"0812"},
+  "payload": {
+    "eventId":"5123456789abcdef0123456789abcdef",
+    "transactionId":"IN/260927/000007",
+    "receiptNo":"26092707",
+    "date":"2026-09-27",
+    "time":"14:36",
+    "customer":{"name":"PELANGGAN UJI","address":"JALAN DUA","contact":"0813","poNo":""},
+    "items":[{"name":"Semen Uji","quantity100":"100","unit":"sak","priceSen":"1975200","totalSen":"1975200"}],
+    "amounts":{"grossSen":"1975200","discountSen":"0","roundingSen":"25200","netSen":"1950000",
+      "principalAppliedSen":"600000","remainingSen":"1350000","cashSen":"600000","noncashSen":"0",
+      "customerFeeSen":"0","merchantFeeSen":"0","customerPaysSen":"600000",
+      "merchantReceivesSen":"600000","tenderSen":"600000","changeSen":"0"},
+    "paymentMethod":"CREDIT","noncashMethod":"",
+    "originalProcessor":{"userId":"2","name":"KASIR UJI"}
+  }
+}
