@@ -1,0 +1,44 @@
+# Uji kertas nota v2 tanpa memasang agent
+
+Alat ini khusus PC Windows uji dengan printer nota fisik. Ia memanggil
+parser/renderer schema 2 dari assembly hasil build secara langsung;
+`Program.Main` agent **tidak dijalankan**. Alat tidak membuka port 9111,
+menulis autostart, mengganti printer default, memasang driver, atau
+mengiklankan kemampuan v2. Jangan jalankan pada PC toko yang sedang
+melayani transaksi. Gunakan hanya fixture sintetis, bukan data pelanggan.
+
+## Persiapan operator
+
+1. Pastikan printer nota uji terpasang, kertas cukup, dan nama persisnya
+   terlihat sebagai printer **default Windows**. Catat printer default
+   sebelumnya bila Anda mengubahnya sendiri, lalu pulihkan sesudah uji.
+2. Dari repo agent, build `src/SpikeTransport/SpikeTransport.vbproj` dan
+   `ci/V2PhysicalProbe/V2PhysicalProbe.vbproj` pada konfigurasi Release.
+   Untuk menjalankan di PC lain, salin seluruh folder output masing-masing,
+   bukan hanya file `.exe`, beserta folder fixture sintetis `fixtures/v2`.
+3. Jalankan dari PowerShell dengan path lengkap (contoh di bawah). Tahap
+   `--verify` hanya memeriksa parser dan printer default, **tidak mencetak**.
+   Tahap `--print` meminta Anda mengetik `CETAK` sebelum satu job dikirim.
+
+```powershell
+& .\ci\V2PhysicalProbe\bin\Release\net48\V2PhysicalProbe.exe --verify `
+  .\src\SpikeTransport\bin\Release\net48\GamaPrintAgent.SpikeTransport.exe `
+  .\fixtures\v2\return_note.sample.json "NAMA PRINTER UJI"
+& .\ci\V2PhysicalProbe\bin\Release\net48\V2PhysicalProbe.exe --print `
+  .\src\SpikeTransport\bin\Release\net48\GamaPrintAgent.SpikeTransport.exe `
+  .\fixtures\v2\return_note.sample.json "NAMA PRINTER UJI"
+```
+
+Ulangi untuk `sale_cash.sample.json`, `receivable_selected.sample.json`,
+dan `receivable_proof.sample.json`. Varian EDC/split/DP, nama panjang,
+cetak ulang dan koreksi memerlukan fixture sintetis tambahan dari korpus
+Go→agent; jangan menganggap empat contoh bawaan mencakup semua kasus.
+
+Untuk tiap cetakan, catat commit agent, model/driver printer, lebar kertas,
+nama fixture, ukuran/font yang terlihat, hasil angka/identitas, bagian
+yang terpotong, dan foto kertas. Cocokkan uang terhadap fixture, termasuk
+sen, diskon, pembulatan, fee, saldo, serta nama pemroses jika relevan.
+Simpan bukti privat secara lokal, bukan di Git. Hasil `--print` sukses
+hanya berarti API printer tidak melempar galat; **bukan** bukti tampilan
+kertas benar. Ini juga belum menguji HTTP `/print`, role mapping,
+capability `/health`, atau kompatibilitas agent yang terpasang.
