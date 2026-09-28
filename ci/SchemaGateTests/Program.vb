@@ -110,7 +110,9 @@ Module Program
            plan.ReprintLine IsNot Nothing OrElse plan.ItemLines.Count <> 2 OrElse
            plan.ItemLines(0)(0) <> "1,5 BARANG A" OrElse
            Not plan.ItemLines(0).Last().EndsWith("1,52", StringComparison.Ordinal) OrElse
-           Not plan.TotalLine.EndsWith("2,52", StringComparison.Ordinal) Then
+           Not plan.TotalLine.EndsWith("2,52", StringComparison.Ordinal) OrElse
+           plan.OriginalName.Count <> 1 OrElse plan.OriginalName(0).Text <> "KASIR ASAL" OrElse
+           plan.OriginalName(0).X <> 25.0F OrElse plan.ReprintName.Count <> 0 Then
             Throw New InvalidOperationException("Layout inti retur asli tidak cocok.")
         End If
         Dim reprint As JObject = CType(original.DeepClone(), JObject)
@@ -119,8 +121,21 @@ Module Program
         Dim reprintPlan As ReturnV2CorePlan = BuildReturnV2CorePlan(reprint, 40.0F, characters)
         If reprintPlan.ReprintLine Is Nothing OrElse
            Not reprintPlan.ReprintLine.StartsWith("CETAK ULANG:", StringComparison.Ordinal) OrElse
-           reprintPlan.TotalLine <> plan.TotalLine Then
+           reprintPlan.TotalLine <> plan.TotalLine OrElse
+           reprintPlan.OriginalName(0).Text <> "KASIR ASAL" OrElse
+           reprintPlan.ReprintName.Count <> 1 OrElse
+           reprintPlan.ReprintName(0).Text <> "Dicetak ulang oleh: KASIR ULANG" OrElse
+           reprintPlan.ReprintName(0).X <> 40.0F - reprintPlan.ReprintName(0).Text.Length Then
             Throw New InvalidOperationException("Layout salinan retur mengubah nilai asal.")
+        End If
+        Dim longName As JObject = CType(reprint.DeepClone(), JObject)
+        longName("payload")("originalProcessor")("name") = "NAMA PEMROSES ASAL YANG SANGAT PANJANG SEKALI"
+        longName("payload")("reprint")("processor")("name") = "NAMA PEMROSES CETAK ULANG YANG SANGAT PANJANG"
+        Dim longPlan As ReturnV2CorePlan = BuildReturnV2CorePlan(longName, 40.0F, characters)
+        If longPlan.OriginalName.Count < 2 OrElse longPlan.ReprintName.Count < 2 OrElse
+           longPlan.OriginalName.Any(Function(line) line.X < 0.0F OrElse line.X + line.Text.Length > 40.0F) OrElse
+           longPlan.ReprintName.Any(Function(line) line.X < 0.0F OrElse line.X + line.Text.Length > 40.0F) Then
+            Throw New InvalidOperationException("Nama panjang retur melampaui area cetak.")
         End If
         For Each action As Action In {
             Sub() BuildReturnV2CorePlan(original, 39.0F, characters),

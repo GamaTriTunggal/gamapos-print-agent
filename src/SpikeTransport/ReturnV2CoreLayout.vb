@@ -1,5 +1,6 @@
-' Rencana bagian inti nota retur v2 tanpa printer. Footer menunggu keputusan
-' posisi nama pemroses; jalur v1 dan dispatcher tidak memakai modul ini.
+' Rencana nota retur v2 tanpa printer. Footer mengikuti keputusan pemilik:
+' nama pemroses di bawah TANDA TERIMA, nama cetak ulang di bawahnya.
+' Jalur v1 dan dispatcher belum memakai modul ini.
 Option Strict On
 Option Explicit On
 
@@ -15,20 +16,27 @@ Friend Class ReturnV2CorePlan
     Friend ReadOnly ReprintLine As String
     Friend ReadOnly ItemLines As List(Of List(Of String))
     Friend ReadOnly TotalLine As String
+    Friend ReadOnly OriginalName As List(Of PositionedNameLine)
+    Friend ReadOnly ReprintName As List(Of PositionedNameLine)
 
     Friend Sub New(title As String, customerLines As List(Of String), receiptLine As String,
-                   reprintLine As String, itemLines As List(Of List(Of String)), totalLine As String)
+                   reprintLine As String, itemLines As List(Of List(Of String)), totalLine As String,
+                   originalName As List(Of PositionedNameLine), reprintName As List(Of PositionedNameLine))
         Me.Title = title
         Me.CustomerLines = customerLines
         Me.ReceiptLine = receiptLine
         Me.ReprintLine = reprintLine
         Me.ItemLines = itemLines
         Me.TotalLine = totalLine
+        Me.OriginalName = originalName
+        Me.ReprintName = reprintName
     End Sub
 End Class
 
 Module ReturnV2CoreLayout
     Private Const ReturnColumns As Integer = 40
+    Friend Const ReturnSignCaption As String = "TANDA TERIMA"
+    Friend Const ReturnBrandingCaption As String = "           powered by GamaPOS           "
     Private Const CustomerNameCaption As String = "PEMBELI  : "
     Private Const CustomerAddressCaption As String = "ALAMAT   : "
     Private Const CustomerContactCaption As String = "NO HP    : "
@@ -46,6 +54,23 @@ Module ReturnV2CoreLayout
         CheckWidth(title, printableWidth, measure)
         CheckWidth(New String("-"c, ReturnColumns), printableWidth, measure)
         CheckWidth(New String("="c, ReturnColumns), printableWidth, measure)
+        CheckWidth("Nota merah untuk customer.", printableWidth, measure)
+        CheckWidth(New String(" "c, 24) & ReturnSignCaption, printableWidth, measure)
+        CheckWidth(New String(" "c, ReturnColumns - 1) & ".", printableWidth, measure)
+        CheckWidth(ReturnBrandingCaption, printableWidth, measure)
+        Dim signCenter As Single = measure(New String(" "c, 24) & ReturnSignCaption) -
+                                   measure(ReturnSignCaption) / 2.0F
+        If Single.IsNaN(signCenter) OrElse Single.IsInfinity(signCenter) OrElse
+           signCenter < 0.0F OrElse signCenter > printableWidth Then
+            Throw New ArgumentException("Posisi tanda terima tidak sah.")
+        End If
+        Dim originalName As List(Of PositionedNameLine) = LayoutOriginalName(
+            CStr(payload("originalProcessor")("name")), signCenter, printableWidth, measure)
+        Dim reprintName As New List(Of PositionedNameLine)()
+        Dim reprint As JObject = TryCast(payload("reprint"), JObject)
+        If reprint IsNot Nothing Then
+            reprintName = LayoutReprintName(CStr(reprint("processor")("name")), printableWidth, measure)
+        End If
 
         Dim customerLines As New List(Of String)()
         customerLines.AddRange(LayoutSaleCustomer(CustomerNameCaption, CStr(customer("name")), printableWidth, measure))
@@ -54,7 +79,6 @@ Module ReturnV2CoreLayout
         Dim receiptLine As String = LayoutSaleReceiptLine(CStr(payload("receiptNo")),
             CStr(payload("date")), CStr(payload("time")), False, printableWidth, measure)
         Dim reprintLine As String = Nothing
-        Dim reprint As JObject = TryCast(payload("reprint"), JObject)
         If reprint IsNot Nothing Then
             reprintLine = LayoutSaleReceiptLine("", CStr(reprint("date")), CStr(reprint("time")),
                                                 True, printableWidth, measure)
@@ -72,7 +96,8 @@ Module ReturnV2CoreLayout
         Dim totalLine As String = LayoutSaleAmountLine(ReturnTotalCaption,
             Long.Parse(CStr(payload("totalSen")), CultureInfo.InvariantCulture),
             ReturnColumns, printableWidth, measure)
-        Return New ReturnV2CorePlan(title, customerLines, receiptLine, reprintLine, itemLines, totalLine)
+        Return New ReturnV2CorePlan(title, customerLines, receiptLine, reprintLine, itemLines,
+                                    totalLine, originalName, reprintName)
     End Function
 
     Private Sub CheckWidth(value As String, printableWidth As Single, measure As Func(Of String, Single))
