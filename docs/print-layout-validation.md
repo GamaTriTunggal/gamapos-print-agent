@@ -58,7 +58,7 @@ tidak mengizinkan aktivasi schema 2, rilis agent, atau perubahan nota schema 1.
 | Kalibrasi PowerPacks 9 pt, 40 karakter | Lulus | Satu baris sintetis; bukan nota lengkap. |
 | Build agent `2f03f8e` | Lulus, 0 warning | Linux dapat mengompilasi net48, tidak menjalankan printer Windows. |
 | Schema gate | Lulus: 17 fixture v1, 15 fixture v2 | Parser/layout murni; bukan hasil cetak fisik. |
-| Nota penjualan v2 setelah `2f03f8e` | Belum diuji | Perlu `--print`, hasil konsol, dan inspeksi kertas. |
+| Nota penjualan v2 setelah pull `2f03f8e` | Belum terkonfirmasi | `--verify` lulus; `--print` masih `ArgumentException`, tanpa kertas. Log build `.exe` setelah pull belum diterima, jadi versi binary dan tahap galat belum terbukti. Jangan mengulang cetak sebelum build dan preflight diagnostik. |
 | Nota piutang dan retur v2 | Belum diuji | Masing-masing perlu uji fisik; font retur 10 pt belum dikalibrasi pada foto ini. |
 | Aktivasi/HTTP/role mapping/rilis | Belum diuji/diizinkan | Jangan aktifkan dari bukti kalibrasi ini. |
 

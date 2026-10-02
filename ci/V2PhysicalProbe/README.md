@@ -18,6 +18,9 @@ melayani transaksi. Gunakan hanya fixture sintetis, bukan data pelanggan.
    bukan hanya file `.exe`, beserta folder fixture sintetis `fixtures/v2`.
 3. Jalankan dari PowerShell dengan path lengkap (contoh di bawah). Tahap
    `--verify` hanya memeriksa parser dan printer default, **tidak mencetak**.
+   `--preflight` untuk nota penjualan memakai metrik printer dan menjalankan
+   seluruh perencanaan layout tanpa `Printer.Print` atau `EndDoc`; ini juga
+   **tidak mencetak**. Pakai bila `--print` gagal, sebelum mencoba lagi.
    Tahap `--print` meminta Anda mengetik `CETAK` sebelum satu job dikirim.
 
 ```powershell
@@ -27,6 +30,16 @@ melayani transaksi. Gunakan hanya fixture sintetis, bukan data pelanggan.
 & .\ci\V2PhysicalProbe\bin\Release\net48\V2PhysicalProbe.exe --print `
   .\src\SpikeTransport\bin\Release\net48\GamaPrintAgent.SpikeTransport.exe `
   .\fixtures\v2\return_note.sample.json "NAMA PRINTER UJI"
+```
+
+Jika cetak penjualan gagal, **jangan langsung mengulang `--print`**. Setelah
+membangun ulang agent dan probe dari commit yang sama, jalankan diagnostik
+tanpa kertas berikut dan catat hasilnya:
+
+```powershell
+& .\ci\V2PhysicalProbe\bin\Release\net48\V2PhysicalProbe.exe --preflight `
+  .\src\SpikeTransport\bin\Release\net48\GamaPrintAgent.SpikeTransport.exe `
+  .\fixtures\v2\sale_cash.sample.json "NAMA PRINTER UJI"
 ```
 
 Ulangi untuk empat belas contoh sintetis lainnya:

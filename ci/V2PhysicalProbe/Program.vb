@@ -13,8 +13,9 @@ Module Program
     Private Const AgentNamespace As String = "GamaPrintAgent.SpikeTransport."
 
     Function Main(args As String()) As Integer
-        If args.Length <> 4 OrElse (args(0) <> "--verify" AndAlso args(0) <> "--print") Then
-            Console.Error.WriteLine("Pakai: V2PhysicalProbe.exe --verify|--print AGENT_EXE FIXTURE_JSON NAMA_PRINTER_DEFAULT")
+        If args.Length <> 4 OrElse
+           (args(0) <> "--verify" AndAlso args(0) <> "--preflight" AndAlso args(0) <> "--print") Then
+            Console.Error.WriteLine("Pakai: V2PhysicalProbe.exe --verify|--preflight|--print AGENT_EXE FIXTURE_JSON NAMA_PRINTER_DEFAULT")
             Return 2
         End If
         Try
@@ -50,6 +51,13 @@ Module Program
                 Console.WriteLine("Verifikasi selesai; belum ada kertas dicetak.")
                 Return 0
             End If
+            If args(0) = "--preflight" Then
+                If family <> "Sale" Then Throw New ArgumentException("Preflight diagnostik baru tersedia untuk nota penjualan.")
+                Dim preflight As MethodInfo = FindMethod(agent, "SaleV2Receipt", "PreflightSaleV2Receipt")
+                preflight.Invoke(Nothing, New Object() {body})
+                Console.WriteLine("Preflight penjualan v2 selesai; Printer.Print dan EndDoc tidak dipanggil.")
+                Return 0
+            End If
             Console.Write("Untuk mencetak SATU fixture sintetis, ketik CETAK: ")
             If Console.ReadLine() <> "CETAK" Then
                 Console.WriteLine("Dibatalkan; tidak ada perintah cetak.")
@@ -60,12 +68,32 @@ Module Program
             Console.WriteLine("Perintah cetak selesai. Periksa kertas fisik; ini bukan bukti tata letak otomatis.")
             Return 0
         Catch ex As TargetInvocationException
-            Console.Error.WriteLine("Gagal: " & If(ex.InnerException, ex).GetType().Name)
+            Dim failure As Exception = If(ex.InnerException, ex)
+            Dim safeReason As String = If(args(0) = "--preflight", SafePreflightReason(failure), "")
+            Console.Error.WriteLine("Gagal: " & failure.GetType().Name & safeReason)
         Catch ex As Exception
             ' Parser/driver dapat memasukkan isi fixture ke pesan galat.
             Console.Error.WriteLine("Gagal: " & ex.GetType().Name & ". Periksa path, printer, dan fixture uji.")
         End Try
         Return 1
+    End Function
+
+    Private Function SafePreflightReason(failure As Exception) As String
+        ' Hanya pesan konstan dari layout yang boleh tampil; pesan driver/payload tidak dicetak.
+        Select Case failure.Message
+            Case "Identitas nota melampaui area cetak.", "Baris jumlah melampaui kolom nota.",
+                 "Baris jumlah melampaui area cetak.", "Baris item melampaui area cetak.",
+                 "Nama item melampaui area cetak.", "Teks/header nota tidak sah untuk area cetak.",
+                 "Metrik area cetak tidak sah.", "Metrik lebar cetak tidak sah.",
+                 "Metrik lebar item tidak sah.", "Kolom identitas nota bertumpuk.",
+                 "Kolom identitas nota tidak sah.", "Metrik lebar nama tidak sah.",
+                 "Metrik lebar teks tidak sah.", "Metrik area item tidak sah.",
+                 "Karakter item melampaui area cetak.", "Karakter header/pelanggan melampaui area cetak.",
+                 "Satu karakter nama melampaui area cetak."
+                Return " — " & failure.Message
+            Case Else
+                Return " — tahap layout/driver belum teridentifikasi; detail disembunyikan"
+        End Select
     End Function
 
     Private Function FamilyFor(jobType As String) As String

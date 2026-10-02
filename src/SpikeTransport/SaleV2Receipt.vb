@@ -16,10 +16,16 @@ Module SaleV2Receipt
     End Sub
 
     Friend Sub PrintSaleV2Receipt(root As JObject)
-        RunSta(Sub() RenderSaleV2(root))
+        RunSta(Sub() RenderSaleV2(root, False))
     End Sub
 
-    Private Sub RenderSaleV2(root As JObject)
+    ' Jalankan seluruh perencanaan dengan metrik printer asli, tanpa Printer.Print/EndDoc.
+    Friend Sub PreflightSaleV2Receipt(body As String)
+        Dim root As JObject = ParseSaleV2(body)
+        RunSta(Sub() RenderSaleV2(root, True))
+    End Sub
+
+    Private Sub RenderSaleV2(root As JObject, preflightOnly As Boolean)
         Dim payload As JObject = CType(root("payload"), JObject)
         Dim amounts As JObject = CType(payload("amounts"), JObject)
         Dim storeJson As JObject = CType(root("store"), JObject)
@@ -86,6 +92,8 @@ Module SaleV2Receipt
             amountLines.Add(LayoutSaleAmountLine(row.Caption, row.Sen, TotCol, printable, measure))
         Next
         Dim correctionLines As List(Of String) = LayoutSaleCorrections(reprint, printable, measure)
+
+        If preflightOnly Then Return
 
         printer.Font = New Font(FontCourier, 18, FontStyle.Regular)
         printer.CurrentX = 0
