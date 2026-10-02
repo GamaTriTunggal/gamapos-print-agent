@@ -70,6 +70,10 @@ Module Program
         Catch ex As TargetInvocationException
             Dim failure As Exception = If(ex.InnerException, ex)
             Dim safeReason As String = If(args(0) = "--preflight", SafePreflightReason(failure), "")
+            If args(0) = "--print" AndAlso failure.Message.StartsWith("SALE_V2_STAGE:", StringComparison.Ordinal) Then
+                safeReason = " — tahap " & failure.Message.Substring("SALE_V2_STAGE:".Length) &
+                             ", penyebab " & If(failure.InnerException, failure).GetType().Name
+            End If
             Console.Error.WriteLine("Gagal: " & failure.GetType().Name & safeReason)
         Catch ex As Exception
             ' Parser/driver dapat memasukkan isi fixture ke pesan galat.

@@ -42,6 +42,12 @@ tanpa kertas berikut dan catat hasilnya:
   .\fixtures\v2\sale_cash.sample.json "NAMA PRINTER UJI"
 ```
 
+Jika preflight lulus tetapi cetak gagal, probe melaporkan nama tahap tetap
+(`store-name`, `store-details`, `customer`, `receipt`, `items`, `amounts`,
+`corrections`, `footer`, atau `end-doc`) tanpa isi nota atau pesan driver.
+Jangan mengulang job hanya untuk mengejar keberhasilan; laporkan tahap dan
+apakah ada kertas keluar.
+
 Ulangi untuk empat belas contoh sintetis lainnya:
 
 - `sale_cash.sample.json` — penjualan tunai;

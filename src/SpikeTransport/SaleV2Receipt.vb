@@ -95,33 +95,54 @@ Module SaleV2Receipt
 
         If preflightOnly Then Return
 
-        printer.Font = New Font(FontCourier, 18, FontStyle.Regular)
-        printer.CurrentX = 0
-        printer.CurrentY = 0
-        PrintPositioned(printer, storeNameLines)
-        printer.Font = normal
-        PrintPositioned(printer, storeDetails)
-        printer.Print()
-        For Each line As String In customerLines
-            printer.Print(line)
-        Next
-        If customerLines.Count > 0 Then printer.Print()
-        printer.Print(receiptLine)
-        If reprintLine IsNot Nothing Then printer.Print(reprintLine)
-        printer.Print(Line2())
-        PrintSaleItems(printer, itemLayouts)
-        For index As Integer = 0 To amountRows.Count - 1
-            If amountRows(index).SeparatorBefore Then printer.Print(Line1())
-            printer.Print(amountLines(index))
-        Next
-        If correctionLines.Count > 0 Then
-            printer.Print(Line1())
-            For Each line As String In correctionLines
-                printer.Print(line)
-            Next
-        End If
-        PrintSaleFooter(printer, originalLines, reprintLines)
-        printer.EndDoc()
+        PrintSaleStage("store-name", Sub()
+                                          printer.Font = New Font(FontCourier, 18, FontStyle.Regular)
+                                          printer.CurrentX = 0
+                                          printer.CurrentY = 0
+                                          PrintPositioned(printer, storeNameLines)
+                                      End Sub)
+        PrintSaleStage("store-details", Sub()
+                                             printer.Font = normal
+                                             PrintPositioned(printer, storeDetails)
+                                             printer.Print()
+                                         End Sub)
+        PrintSaleStage("customer", Sub()
+                                        For Each line As String In customerLines
+                                            printer.Print(line)
+                                        Next
+                                        If customerLines.Count > 0 Then printer.Print()
+                                    End Sub)
+        PrintSaleStage("receipt", Sub()
+                                       printer.Print(receiptLine)
+                                       If reprintLine IsNot Nothing Then printer.Print(reprintLine)
+                                       printer.Print(Line2())
+                                   End Sub)
+        PrintSaleStage("items", Sub() PrintSaleItems(printer, itemLayouts))
+        PrintSaleStage("amounts", Sub()
+                                       For index As Integer = 0 To amountRows.Count - 1
+                                           If amountRows(index).SeparatorBefore Then printer.Print(Line1())
+                                           printer.Print(amountLines(index))
+                                       Next
+                                   End Sub)
+        PrintSaleStage("corrections", Sub()
+                                           If correctionLines.Count > 0 Then
+                                               printer.Print(Line1())
+                                               For Each line As String In correctionLines
+                                                   printer.Print(line)
+                                               Next
+                                           End If
+                                       End Sub)
+        PrintSaleStage("footer", Sub() PrintSaleFooter(printer, originalLines, reprintLines))
+        PrintSaleStage("end-doc", Sub() printer.EndDoc())
+    End Sub
+
+    Private Sub PrintSaleStage(stage As String, action As Action)
+        Try
+            action()
+        Catch ex As Exception
+            ' Kode tahap tetap, tanpa isi nota; probe tidak menampilkan pesan driver/exception.
+            Throw New InvalidOperationException("SALE_V2_STAGE:" & stage, ex)
+        End Try
     End Sub
 
     Private Sub PrintPositioned(printer As Printer, lines As List(Of PositionedNameLine))
