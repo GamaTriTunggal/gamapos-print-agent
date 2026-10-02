@@ -57,6 +57,9 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
 
 ## Build, uji, rilis
 
+- Sebelum mengubah font, kolom, atau preflight nota, baca
+  `docs/print-layout-validation.md`. `ScaleWidth` saja tidak cukup untuk
+  memutuskan ukuran font; hasil kertas pada printer sasaran adalah gerbangnya.
 - Build lintas-platform: `dotnet build src/SpikeTransport/SpikeTransport.vbproj -c Release`
   (paket `Microsoft.NETFramework.ReferenceAssemblies` membuatnya jalan di Linux/CI; exe tetap
   hanya jalan di Windows). PowerPacks di-vendor di `lib/`.
@@ -78,6 +81,7 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
 
 ## Rujukan
 
+- Bukti dan aturan layout fisik: `docs/print-layout-validation.md`.
 - Papan: `gamapos-go-2/docs/analysis/board-printer-onboarding.md` (PR-xx, T-x, tabel skenario).
 - Kontrak: `gamapos-go-2/docs/reference/print-agent-contract.md`.
 - Keputusan: `gamapos-go-2/docs/constitution.md` K-02 + amandemen 5 Sep 2026.

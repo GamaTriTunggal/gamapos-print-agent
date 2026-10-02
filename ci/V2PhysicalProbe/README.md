@@ -65,6 +65,8 @@ Bold)=4320,703`, tetapi kalibrasi fisik 40 karakter 9 pt tercetak utuh dalam
 satu baris. Karena itu preflight v2 memakai batas logis 40 kolom dan font v1
 (9 pt penjualan/piutang, 10 pt retur), bukan memperkecil font menurut
 `ScaleWidth`. Cetak setiap keluarga nota tetap perlu pemeriksaan fisik.
+Keputusan, batas bukti, dan status tiap gerbang tercatat di
+[`docs/print-layout-validation.md`](../../docs/print-layout-validation.md).
 Simpan bukti privat secara lokal, bukan di Git. Hasil `--print` sukses
 hanya berarti API printer tidak melempar galat; **bukan** bukti tampilan
 kertas benar. Ini juga belum menguji HTTP `/print`, role mapping,
