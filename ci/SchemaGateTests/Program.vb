@@ -85,29 +85,12 @@ Module Program
         If args.Length >= 3 Then CheckGoSaleV2(args(2))
         If args.Length = 4 Then CheckGoReturnV2(args(3))
         CheckNameLayout()
-        CheckV2FontSize()
         CheckMoneyFormat()
         CheckItemLayout()
         CheckMetadataLayout()
         Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 + " &
                           IO.Directory.GetFiles(IO.Path.Combine(args(0), "v2"), "*.sample.json").Length &
                           " fixtures v2 passed; sale/receivable/return v2 parser accepted/rejected; sale sample and return core/layout passed.")
-    End Sub
-
-    Private Sub CheckV2FontSize()
-        Dim measured As Func(Of Integer, Single) = Function(points As Integer) CSng(points * 480)
-        If ChooseV2BodyFontSize(3600.0F, 9, measured) <> 7 OrElse
-           ChooseV2BodyFontSize(5000.0F, 9, measured) <> 9 OrElse
-           ChooseV2BodyFontSize(3600.0F, 10, measured) <> 7 Then
-            Throw New InvalidOperationException("Font v2 tidak menyesuaikan lebar TM-U220.")
-        End If
-        Dim rejected As Boolean = False
-        Try
-            ChooseV2BodyFontSize(3200.0F, 9, measured)
-        Catch ex As ArgumentException
-            rejected = True
-        End Try
-        If Not rejected Then Throw New InvalidOperationException("Printer sempit tidak ditolak sebelum cetak.")
     End Sub
 
     Private Sub CheckPhysicalSamples(folder As String)

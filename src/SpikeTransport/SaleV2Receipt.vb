@@ -40,12 +40,15 @@ Module SaleV2Receipt
         Dim printer As New Printer()
         ' Semua teks dinamis harus direncanakan sebelum Printer.Print pertama.
         printer.Font = New Font(FontCourier, 18, FontStyle.Regular)
-        Dim nameWidth As Single = Math.Min(CSng(printer.ScaleWidth), CSng(printer.TextWidth(StrDup(StoreNameCol, " "))))
+        Dim nameWidth As Single = CSng(printer.TextWidth(StrDup(StoreNameCol, " ")))
         Dim measureName As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
         Dim storeNameLines As List(Of PositionedNameLine) =
             LayoutCenteredSaleText(store.name, "NO NAME", nameWidth, measureName)
-        Dim normal As Font = SelectV2BodyFont(printer, 9)
-        Dim printable As Single = Math.Min(CSng(printer.ScaleWidth), CSng(printer.TextWidth(StrDup(TotCol, " "))))
+        Dim normal As New Font(FontCourier, 9, FontStyle.Bold)
+        printer.Font = normal
+        ' PowerPacks/TM-U220 mencetak 40 karakter 9 pt utuh walau TextWidth(40) > ScaleWidth.
+        ' Ukur batas logis 40 kolom; kelayakan fisiknya dibuktikan pada printer uji.
+        Dim printable As Single = CSng(printer.TextWidth(StrDup(TotCol, " ")))
         Dim measure As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
         Dim storeDetails As New List(Of PositionedNameLine)()
         storeDetails.AddRange(LayoutCenteredSaleText(store.address, "", printable, measure))
