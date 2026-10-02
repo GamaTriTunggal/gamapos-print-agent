@@ -57,8 +57,12 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
 
 ## Build, uji, rilis
 
-- Sebelum mengubah font, kolom, atau preflight nota, baca
-  `docs/print-layout-validation.md`. `ScaleWidth` saja tidak cukup untuk
+- Sebelum mengubah font, posisi, wrapping, pagination, preflight, atau renderer
+  cetakan, wajib baca `docs/printer-v1-formatting.md` pada bagian printer terkait
+  dan `docs/print-layout-validation.md`. V1 adalah baseline operasional yang
+  sudah teruji. Pertahankan mekanisme kolom, font, dan susunannya pada bagian
+  yang tidak perlu berubah; penggantian dengan koordinat atau pengukuran baru
+  memerlukan pembandingan fisik, bukan asumsi kesetaraan. `ScaleWidth` saja tidak cukup untuk
   memutuskan ukuran font; hasil kertas pada printer sasaran adalah gerbangnya.
   PowerPacks membuang Font lama saat diganti: jangan cache/reuse objeknya;
   renderer v2 memakai `SetV2ReceiptFont`.
@@ -83,6 +87,7 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
 
 ## Rujukan
 
+- Format dan logika v1 per printer: [docs/printer-v1-formatting.md](docs/printer-v1-formatting.md).
 - Bukti dan aturan layout fisik: `docs/print-layout-validation.md`.
 - Papan: `gamapos-go-2/docs/analysis/board-printer-onboarding.md` (PR-xx, T-x, tabel skenario).
 - Kontrak: `gamapos-go-2/docs/reference/print-agent-contract.md`.
