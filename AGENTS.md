@@ -5,3 +5,5 @@ Saat menyentuh font, kolom, preflight, atau renderer nota, baca
 `docs/print-layout-validation.md` lebih dulu. Jangan menyimpulkan ukuran font
 dari `Printer.ScaleWidth` saja: bandingkan dengan hasil kertas pada printer
 sasaran. Uji sintetis dan build tidak menggantikan persetujuan rilis.
+PowerPacks memiliki Font aktif dan membuangnya saat diganti; gunakan
+`SetV2ReceiptFont` untuk v2, tanpa memakai ulang objek Font lama.

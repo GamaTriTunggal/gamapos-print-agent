@@ -45,13 +45,12 @@ Module SaleV2Receipt
 
         Dim printer As New Printer()
         ' Semua teks dinamis harus direncanakan sebelum Printer.Print pertama.
-        printer.Font = New Font(FontCourier, 18, FontStyle.Regular)
+        SetV2ReceiptFont(printer, 18, FontStyle.Regular)
         Dim nameWidth As Single = CSng(printer.TextWidth(StrDup(StoreNameCol, " ")))
         Dim measureName As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
         Dim storeNameLines As List(Of PositionedNameLine) =
             LayoutCenteredSaleText(store.name, "NO NAME", nameWidth, measureName)
-        Dim normal As New Font(FontCourier, 9, FontStyle.Bold)
-        printer.Font = normal
+        SetV2ReceiptFont(printer, 9, FontStyle.Bold)
         ' PowerPacks/TM-U220 mencetak 40 karakter 9 pt utuh walau TextWidth(40) > ScaleWidth.
         ' Ukur batas logis 40 kolom; kelayakan fisiknya dibuktikan pada printer uji.
         Dim printable As Single = CSng(printer.TextWidth(StrDup(TotCol, " ")))
@@ -93,16 +92,24 @@ Module SaleV2Receipt
         Next
         Dim correctionLines As List(Of String) = LayoutSaleCorrections(reprint, printable, measure)
 
-        If preflightOnly Then Return
+        If preflightOnly Then
+            ' Uji transisi font yang dipakai saat cetak, tanpa Print/EndDoc.
+            SetV2ReceiptFont(printer, 18, FontStyle.Regular)
+            Dim largeWidth As Single = CSng(printer.TextWidth("M"))
+            SetV2ReceiptFont(printer, 9, FontStyle.Bold)
+            Dim normalWidth As Single = CSng(printer.TextWidth("M"))
+            If largeWidth <= 0 OrElse normalWidth <= 0 Then Throw New ArgumentException("Metrik pergantian font tidak sah.")
+            Return
+        End If
 
         PrintSaleStage("store-name", Sub()
-                                          printer.Font = New Font(FontCourier, 18, FontStyle.Regular)
+                                          SetV2ReceiptFont(printer, 18, FontStyle.Regular)
                                           printer.CurrentX = 0
                                           printer.CurrentY = 0
                                           PrintPositioned(printer, storeNameLines)
                                       End Sub)
         PrintSaleStage("store-details", Sub()
-                                             printer.Font = normal
+                                             SetV2ReceiptFont(printer, 9, FontStyle.Bold)
                                              PrintPositioned(printer, storeDetails)
                                              printer.Print()
                                          End Sub)

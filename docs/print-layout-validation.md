@@ -49,6 +49,36 @@ tidak mengizinkan aktivasi schema 2, rilis agent, atau perubahan nota schema 1.
    teks panjang, angka, footer, dan keterbacaan. Catat model, driver, kertas,
    commit, fixture, hasil konsol, serta foto secara privat. Printer lain tidak
    otomatis mewarisi hasil TM-U220 ini.
+5. PowerPacks **memiliki objek Font aktif**. Jangan menyimpan lalu memakai
+   ulang objek tersebut setelah mengganti `Printer.Font`, dan jangan
+   memanggil `Dispose()` pada font yang masih dipakai printer. Renderer v2
+   memakai `SetV2ReceiptFont` untuk membuat objek baru hanya saat atribut
+   font berubah. Simpan ukuran/gaya yang diinginkan, bukan objek Font lama.
+
+## Kepemilikan Font: penyebab kegagalan tahap store-details
+
+Setelah build agent/probe `5d1e732` berhasil di Windows, uji cetak penjualan
+melaporkan `SALE_V2_STAGE:store-details`, penyebab `ArgumentException`.
+Preflight Windows sebelumnya lulus; kegagalan ini terletak pada transisi
+font/tahap cetak, bukan diselesaikan oleh perubahan batas lebar.
+
+Inspeksi IL DLL lokal `lib/Microsoft.VisualBasic.PowerPacks.dll` membuktikan:
+
+- `Printer.set_Font` meneruskan objek ke `GraphicsFactory.set_Font`.
+- Setter itu memanggil `Font.Dispose()` pada font lama ketika font berbeda,
+  lalu menyimpan referensi objek baru tanpa mengkloningnya.
+- Kode penjualan v2 menyimpan objek 9 pt (`normal`), memasangnya untuk
+  preflight, lalu memasang 18 pt saat mencetak nama toko. Pergantian itu
+  membuang objek `normal`; penggunaan ulangnya pada `store-details` salah.
+  Renderer v1 membuat objek baru pada pergantian tersebut. Nota piutang v2
+  memiliki pola penggunaan ulang serupa dan diperbaiki dengan helper yang sama.
+
+SHA-256 DLL yang diperiksa:
+`81edea696a5d42d8641eabd03c57d11c4236915b484157d52743046344430a50`.
+Inspeksi DLL membuktikan perilaku kepemilikan objek; keberhasilan perbaikan
+di Windows dan cetakan penuh tetap perlu hasil probe/kertas. Mode
+`--preflight` setelah perbaikan juga mengukur teks sesudah transisi
+9 → 18 → 9 pt untuk mendeteksi objek Font yang tidak lagi sah, tanpa mencetak.
 
 ## Status bukti saat dokumen dibuat
 
@@ -59,7 +89,8 @@ tidak mengizinkan aktivasi schema 2, rilis agent, atau perubahan nota schema 1.
 | Build agent `2f03f8e` | Lulus, 0 warning | Linux dapat mengompilasi net48, tidak menjalankan printer Windows. |
 | Schema gate | Lulus: 17 fixture v1, 15 fixture v2 | Parser/layout murni; bukan hasil cetak fisik. |
 | `--preflight` penjualan pada binary `799c36e` | Lulus di Windows | Agent dan probe dibangun ulang; semua layout direncanakan tanpa `Printer.Print`/`EndDoc`. |
-| Cetak penjualan v2 setelah build terkonfirmasi | Belum diuji | Percobaan sebelumnya masih `ArgumentException` tanpa kertas, tetapi provenance binary saat itu belum terbukti. Penanda tahap cetak akan membedakan panggilan PowerPacks/driver saat uji berikutnya. |
+| Cetak penjualan v2 pada `5d1e732` | Gagal | Build agent/probe terkonfirmasi; galat di `store-details`, penyebab `ArgumentException`. |
+| Perbaikan kepemilikan Font | Menunggu Windows/kertas | Build agent/probe dan schema gate lulus lokal; transisi font dan nota penuh perlu diuji kembali. |
 | Nota piutang dan retur v2 | Belum diuji | Masing-masing perlu uji fisik; font retur 10 pt belum dikalibrasi pada foto ini. |
 | Aktivasi/HTTP/role mapping/rilis | Belum diuji/diizinkan | Jangan aktifkan dari bukti kalibrasi ini. |
 

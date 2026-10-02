@@ -21,28 +21,26 @@ Module ReceivableV2Receipt
 
     Private Sub RenderReceivableV2(root As JObject)
         Dim printer As New Printer()
-        Dim large As New Font(FontCourier, 18, FontStyle.Regular)
-        Dim normal As New Font(FontCourier, 9, FontStyle.Bold)
         ' Metrik font dan batas logis 40 kolom; seluruh preflight sebelum Print pertama.
-        printer.Font = large
+        SetV2ReceiptFont(printer, 18, FontStyle.Regular)
         Dim nameWidth As Single = CSng(printer.TextWidth(StrDup(StoreNameCol, " ")))
-        printer.Font = normal
+        SetV2ReceiptFont(printer, 9, FontStyle.Bold)
         Dim printable As Single = CSng(printer.TextWidth(StrDup(TotCol, " ")))
         Dim measureName As Func(Of String, Single) = Function(value As String)
-                                                         printer.Font = large
+                                                         SetV2ReceiptFont(printer, 18, FontStyle.Regular)
                                                          Return CSng(printer.TextWidth(value))
                                                      End Function
         Dim measure As Func(Of String, Single) = Function(value As String)
-                                                     printer.Font = normal
+                                                     SetV2ReceiptFont(printer, 9, FontStyle.Bold)
                                                      Return CSng(printer.TextWidth(value))
                                                  End Function
         Dim plan As ReceivableV2PrintPlan = BuildReceivableV2Plan(root, printable, nameWidth, measure, measureName)
 
-        printer.Font = large
+        SetV2ReceiptFont(printer, 18, FontStyle.Regular)
         printer.CurrentX = 0
         printer.CurrentY = 0
         PrintProofPositioned(printer, plan.StoreName)
-        printer.Font = normal
+        SetV2ReceiptFont(printer, 9, FontStyle.Bold)
         PrintProofPositioned(printer, plan.StoreDetails)
         printer.Print()
         PrintProofPositioned(printer, plan.Title)

@@ -20,7 +20,7 @@ Module ReturnV2Receipt
 
     Private Sub RenderReturnV2(root As JObject)
         Dim printer As New Printer()
-        printer.Font = New Font(FontCourier, 10, FontStyle.Bold)
+        SetV2ReceiptFont(printer, 10, FontStyle.Bold)
         Dim printable As Single = CSng(printer.TextWidth(StrDup(TotCol, " ")))
         Dim measure As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
         ' Semua data dinamis, baris dan nama direncanakan sebelum Print pertama.

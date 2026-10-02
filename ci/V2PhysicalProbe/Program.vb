@@ -55,7 +55,7 @@ Module Program
                 If family <> "Sale" Then Throw New ArgumentException("Preflight diagnostik baru tersedia untuk nota penjualan.")
                 Dim preflight As MethodInfo = FindMethod(agent, "SaleV2Receipt", "PreflightSaleV2Receipt")
                 preflight.Invoke(Nothing, New Object() {body})
-                Console.WriteLine("Preflight penjualan v2 selesai; Printer.Print dan EndDoc tidak dipanggil.")
+                Console.WriteLine("Preflight layout dan pergantian font penjualan v2 selesai; Printer.Print dan EndDoc tidak dipanggil.")
                 Return 0
             End If
             Console.Write("Untuk mencetak SATU fixture sintetis, ketik CETAK: ")
@@ -93,7 +93,7 @@ Module Program
                  "Kolom identitas nota tidak sah.", "Metrik lebar nama tidak sah.",
                  "Metrik lebar teks tidak sah.", "Metrik area item tidak sah.",
                  "Karakter item melampaui area cetak.", "Karakter header/pelanggan melampaui area cetak.",
-                 "Satu karakter nama melampaui area cetak."
+                 "Satu karakter nama melampaui area cetak.", "Metrik pergantian font tidak sah."
                 Return " — " & failure.Message
             Case Else
                 Return " — tahap layout/driver belum teridentifikasi; detail disembunyikan"

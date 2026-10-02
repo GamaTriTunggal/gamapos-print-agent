@@ -60,6 +60,8 @@ Menambah printer yang didukung TIDAK boleh lagi menuntut rilis agent (setelah PR
 - Sebelum mengubah font, kolom, atau preflight nota, baca
   `docs/print-layout-validation.md`. `ScaleWidth` saja tidak cukup untuk
   memutuskan ukuran font; hasil kertas pada printer sasaran adalah gerbangnya.
+  PowerPacks membuang Font lama saat diganti: jangan cache/reuse objeknya;
+  renderer v2 memakai `SetV2ReceiptFont`.
 - Build lintas-platform: `dotnet build src/SpikeTransport/SpikeTransport.vbproj -c Release`
   (paket `Microsoft.NETFramework.ReferenceAssemblies` membuatnya jalan di Linux/CI; exe tetap
   hanya jalan di Windows). PowerPacks di-vendor di `lib/`.

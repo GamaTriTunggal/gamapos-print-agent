@@ -19,7 +19,8 @@ melayani transaksi. Gunakan hanya fixture sintetis, bukan data pelanggan.
 3. Jalankan dari PowerShell dengan path lengkap (contoh di bawah). Tahap
    `--verify` hanya memeriksa parser dan printer default, **tidak mencetak**.
    `--preflight` untuk nota penjualan memakai metrik printer dan menjalankan
-   seluruh perencanaan layout tanpa `Printer.Print` atau `EndDoc`; ini juga
+   seluruh perencanaan layout serta transisi font 9 → 18 → 9 pt tanpa
+   `Printer.Print` atau `EndDoc`; ini juga
    **tidak mencetak**. Pakai bila `--print` gagal, sebelum mencoba lagi.
    Tahap `--print` meminta Anda mengetik `CETAK` sebelum satu job dikirim.
 
