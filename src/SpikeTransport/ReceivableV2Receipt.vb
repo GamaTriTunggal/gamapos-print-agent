@@ -22,7 +22,7 @@ Module ReceivableV2Receipt
     Private Sub RenderReceivableV2(root As JObject)
         Dim printer As New Printer()
         Dim large As New Font(FontCourier, 18, FontStyle.Regular)
-        Dim normal As New Font(FontCourier, 9, FontStyle.Bold)
+        Dim normal As Font = SelectV2BodyFont(printer, 9)
         ' Metrik font dan area printer nyata; seluruh preflight sebelum Print pertama.
         printer.Font = large
         Dim nameWidth As Single = Math.Min(CSng(printer.ScaleWidth), CSng(printer.TextWidth(StrDup(StoreNameCol, " "))))

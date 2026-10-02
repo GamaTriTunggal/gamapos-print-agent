@@ -60,6 +60,11 @@ Untuk tiap cetakan, catat commit agent, model/driver printer, lebar kertas,
 nama fixture, ukuran/font yang terlihat, hasil angka/identitas, bagian
 yang terpotong, dan foto kertas. Cocokkan uang terhadap fixture, termasuk
 sen, diskon, pembulatan, fee, saldo, serta nama pemroses jika relevan.
+Renderer v2 memilih font badan terbesar (7–9 pt penjualan/piutang, 7–10 pt
+retur) yang masih memuat 40 kolom pada area cetak driver. Pada TM-U220 uji
+yang melaporkan `ScaleWidth=3600`, Courier New 9 pt Bold membutuhkan
+`TextWidth(40 spasi)=4320,703`; kandidat 7 pt harus dibuktikan **terbaca dan
+tidak terpotong** pada kertas, bukan dianggap lolos hanya karena API sukses.
 Simpan bukti privat secara lokal, bukan di Git. Hasil `--print` sukses
 hanya berarti API printer tidak melempar galat; **bukan** bukti tampilan
 kertas benar. Ini juga belum menguji HTTP `/print`, role mapping,

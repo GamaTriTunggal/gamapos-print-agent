@@ -44,7 +44,7 @@ Module SaleV2Receipt
         Dim measureName As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
         Dim storeNameLines As List(Of PositionedNameLine) =
             LayoutCenteredSaleText(store.name, "NO NAME", nameWidth, measureName)
-        printer.Font = New Font(FontCourier, 9, FontStyle.Bold)
+        Dim normal As Font = SelectV2BodyFont(printer, 9)
         Dim printable As Single = Math.Min(CSng(printer.ScaleWidth), CSng(printer.TextWidth(StrDup(TotCol, " "))))
         Dim measure As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
         Dim storeDetails As New List(Of PositionedNameLine)()
@@ -88,7 +88,7 @@ Module SaleV2Receipt
         printer.CurrentX = 0
         printer.CurrentY = 0
         PrintPositioned(printer, storeNameLines)
-        printer.Font = New Font(FontCourier, 9, FontStyle.Bold)
+        printer.Font = normal
         PrintPositioned(printer, storeDetails)
         printer.Print()
         For Each line As String In customerLines

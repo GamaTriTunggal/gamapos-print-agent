@@ -20,7 +20,7 @@ Module ReturnV2Receipt
 
     Private Sub RenderReturnV2(root As JObject)
         Dim printer As New Printer()
-        printer.Font = New Font(FontCourier, 10, FontStyle.Bold)
+        printer.Font = SelectV2BodyFont(printer, 10)
         Dim printable As Single = Math.Min(CSng(printer.ScaleWidth),
                                            CSng(printer.TextWidth(StrDup(TotCol, " "))))
         Dim measure As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))

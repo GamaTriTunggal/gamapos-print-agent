@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <Compile Include="../../src/SpikeTransport/SchemaGate.vb" Link="SchemaGate.vb" />
+    <Compile Include="../../src/SpikeTransport/V2FontSize.vb" Link="V2FontSize.vb" />
     <Compile Include="../../src/SpikeTransport/PrintCapabilities.vb" Link="PrintCapabilities.vb" />
     <Compile Include="../../src/SpikeTransport/SaleV2Parser.vb" Link="SaleV2Parser.vb" />
     <Compile Include="../../src/SpikeTransport/ReceivableV2Parser.vb" Link="ReceivableV2Parser.vb" />
