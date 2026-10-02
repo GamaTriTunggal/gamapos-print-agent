@@ -75,8 +75,9 @@ Inspeksi IL DLL lokal `lib/Microsoft.VisualBasic.PowerPacks.dll` membuktikan:
 
 SHA-256 DLL yang diperiksa:
 `81edea696a5d42d8641eabd03c57d11c4236915b484157d52743046344430a50`.
-Inspeksi DLL membuktikan perilaku kepemilikan objek; keberhasilan perbaikan
-di Windows dan cetakan penuh tetap perlu hasil probe/kertas. Mode
+Inspeksi DLL membuktikan perilaku kepemilikan objek. Pada `35d8119`, pemilik
+berhasil menjalankan preflight dan mencetak fixture penjualan tunai; bukti
+visual bagian utama dicatat di bawah, footer lengkap masih perlu foto. Mode
 `--preflight` setelah perbaikan juga mengukur teks sesudah transisi
 9 → 18 → 9 pt untuk mendeteksi objek Font yang tidak lagi sah, tanpa mencetak.
 
@@ -90,9 +91,17 @@ di Windows dan cetakan penuh tetap perlu hasil probe/kertas. Mode
 | Schema gate | Lulus: 17 fixture v1, 15 fixture v2 | Parser/layout murni; bukan hasil cetak fisik. |
 | `--preflight` penjualan pada binary `799c36e` | Lulus di Windows | Agent dan probe dibangun ulang; semua layout direncanakan tanpa `Printer.Print`/`EndDoc`. |
 | Cetak penjualan v2 pada `5d1e732` | Gagal | Build agent/probe terkonfirmasi; galat di `store-details`, penyebab `ArgumentException`. |
-| Perbaikan kepemilikan Font | Menunggu Windows/kertas | Build agent/probe dan schema gate lulus lokal; transisi font dan nota penuh perlu diuji kembali. |
+| Perbaikan kepemilikan Font pada `35d8119` | Lulus preflight dan pengiriman cetak Windows | Build agent/probe, preflight transisi font, dan `--print` berhasil; kertas tercetak. |
+| Visual `sale_cash.sample.json` pada `35d8119` | Bagian utama lulus; footer belum terkonfirmasi | Belanja 19.752 − pembulatan 252 = nota 19.500; diterima 20.000, kembalian 500. Tepi kanan nilai utuh. Nama/branding bagian bawah melengkung dekat printer. |
 | Nota piutang dan retur v2 | Belum diuji | Masing-masing perlu uji fisik; font retur 10 pt belum dikalibrasi pada foto ini. |
 | Aktivasi/HTTP/role mapping/rilis | Belum diuji/diizinkan | Jangan aktifkan dari bukti kalibrasi ini. |
+
+Foto dan rincian pemeriksaan disimpan privat di repo utama:
+`.local/discount-rounding/physical-print-20261002/sale_cash-35d8119.{jpg,md}`.
+SHA-256 foto:
+`6bd49dd7491e42c7309889dea2fa38316580ce01a45fd064e7075b8efb5cff3d`.
+Fixture ini tidak memuat diskon; hasilnya membuktikan pembulatan tunai dan
+angka yang terlihat, belum membuktikan seluruh kombinasi pembayaran.
 
 Jalankan hanya fixture sintetis melalui
 [`ci/V2PhysicalProbe/README.md`](../ci/V2PhysicalProbe/README.md). Simpan
