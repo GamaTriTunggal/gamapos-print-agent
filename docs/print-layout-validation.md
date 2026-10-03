@@ -253,3 +253,56 @@ masih mengirim field lama; itu diperbaiki sesuai kontrak baru dan penolakan
 kedua field ditambahkan sebelum CI ulang lulus.
 Audit membandingkan fixture sebelum/sesudah: tepat 13 job hanya kehilangan
 dua kunci; semua nilai lainnya dan dua fixture retur tidak berubah.
+
+### Foto penjualan dan contoh metadata panjang — 3 Oktober 2026 (P-604 / DR-08)
+
+Pemilik mengirim `IMG_3917.HEIC` setelah instruksi mengambil checkpoint
+kontrak minimal, kemudian `IMG_3918.HEIC` untuk contoh nama panjang.
+Keduanya berhasil diinspeksi setelah decoding HEIC lokal, tanpa mengubah
+foto sumber. Identitas commit/binary di Windows belum diverifikasi ulang
+melalui hasil konsol pada pesan foto; bukti berikut berlaku untuk cetakan
+yang terlihat, bukan seluruh kombinasi v2.
+
+- Foto tunai: TOKO dan nama Siti tampak sejajar dengan anchor center
+  masing-masing; total belanja Rp19.752, pembulatan Rp252, total nota
+  Rp19.500. Tidak ada UANG DITERIMA/KEMBALIAN; footer terlihat utuh.
+  Diskon nol pada contoh ini, sehingga bukan bukti cetak diskon positif.
+- Foto nama panjang: header toko, PEMBELI, item dan nama pemroses terbaca
+  utuh; lanjutan PEMBELI sejajar setelah caption, nama pemroses panjang
+  rata kanan. ALAMAT dan PO pelanggan masih satu baris pada contoh ini:
+  **belum membuktikan wrapping fisik kedua field tersebut**.
+- Foto privat tidak dimasukkan ke Git. SHA-256 `IMG_3917.HEIC`:
+  `ac5e330e1837d361f45ba0be2b5ad38bc7c19e7ab1624150110cbbcd490b4930`;
+  `IMG_3918.HEIC`:
+  `677ef906f31f3495147e3ba2f3b827ecba6c1f700cedd79710f610474490c7ad`.
+
+Pemilik menyetujui satu contoh gabungan berikutnya:
+`fixtures/v2/sale_customer_metadata_long.sample.json`. PEMBELI dan ALAMAT
+panjang menguji pembungkusan per kata; PO panjang tanpa spasi menguji
+pemenggalan karakter. Tes schema gate mengharuskan masing-masing lebih
+dari satu baris, caption di awal, lanjutan sejajar, lebar maksimal 40
+kolom, dan rekonstruksi teks persis tanpa kehilangan/duplikasi. Nilai uang
+sama dengan contoh tunai pendek. Checkpoint ini **hanya menambah fixture,
+tes, dan dokumentasi**: renderer, font, parser, kontrak, v1, serta aplikasi
+Go tidak diubah.
+
+Validasi Linux:
+
+```text
+dotnet run --project ci/SchemaGateTests/SchemaGateTests.vbproj -c Release --no-restore -- fixtures
+dotnet build src/SpikeTransport/SpikeTransport.vbproj -c Release --no-restore
+dotnet build ci/V2PhysicalProbe/V2PhysicalProbe.vbproj -c Release --no-restore
+git diff --check
+```
+
+Schema gate lulus 11 kasus + 7 rute + 17 fixture v1 + 16 fixture v2.
+Validator Go juga menerima seluruh 16 fixture yang sama, melalui skrip
+lokal `physical-metadata-20261003/check-fixtures.go`; skrip checkpoint
+lama untuk 15 fixture tidak ditimpa. Kedua build lulus, 0 warning/error.
+Log privat di repo Go:
+`.local/discount-rounding/physical-metadata-20261003/`.
+Wrapping dengan ukuran karakter pada tes Linux bukan pengganti ukuran font
+Windows atau foto kertas. Contoh metadata baru **belum diuji fisik**;
+cetak ulang berkoreksi, piutang/retur, dan smoke HTTP Windows tetap belum
+dibuktikan oleh kedua foto tersebut. Tidak ada aktivasi schema2, rilis,
+pemasangan agent, atau penutupan papan pada checkpoint ini.

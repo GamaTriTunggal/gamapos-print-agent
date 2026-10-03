@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "jobId": "f0000000000000000000000000000001",
+  "jobType": "cashier_receipt",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {"name":"TOKO","address":"JL. SATU","contact":"0812"},
+  "payload": {
+    "eventId":"f0000000000000000000000000000001",
+    "transactionId":"IN/261003/000009",
+    "receiptNo":"26100309",
+    "date":"2026-10-03",
+    "time":"15:09",
+    "customer":{
+      "name":"PELANGGAN UJI DENGAN NAMA YANG PANJANG",
+      "address":"JALAN PELANGGAN NOMOR 456 BLOK A KELURAHAN UJI KECAMATAN CONTOH KOTA SINTETIS 12345",
+      "contact":"0813",
+      "poNo":"PO-UJI-PROYEKRENOVASITOKOBANGUNAN-ABCDEFGHIJKLMNOPQRSTUVWXYZ-000123456789"
+    },
+    "items":[{"name":"Semen","quantity100":"100","unit":"sak","priceSen":"1975200","totalSen":"1975200"}],
+    "amounts":{"grossSen":"1975200","discountSen":"0","roundingSen":"25200","netSen":"1950000",
+      "principalAppliedSen":"1950000","remainingSen":"0","cashSen":"1950000","noncashSen":"0",
+      "customerFeeSen":"0","merchantFeeSen":"0","customerPaysSen":"1950000",
+      "merchantReceivesSen":"1950000"},
+    "paymentMethod":"CASH","noncashMethod":"",
+    "originalProcessor":{"userId":"2","name":"Siti"}
+  }
+}

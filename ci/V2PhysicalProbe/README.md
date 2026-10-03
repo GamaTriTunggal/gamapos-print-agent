@@ -54,11 +54,18 @@ Untuk checkpoint alignment penjualan (3 Oktober 2026), mulai dengan **satu**
 keadaan rata, termasuk TOKO dan nama Siti di bawah HORMAT KAMI. Kandidat ini
 memakai posisi kolom v1 untuk header/footer penjualan; build/preflight sukses
 belum membuktikan posisi di kertas. Setelah contoh pendek diperiksa, gunakan
-`sale_long_item.sample.json` dan `sale_corrected_reprint.sample.json` untuk
-nama panjang/rata kanan serta penanda pencetak ulang. Nota piutang dan retur
+`sale_long_item.sample.json` untuk nama panjang/rata kanan, lalu
+`sale_customer_metadata_long.sample.json` untuk PEMBELI, ALAMAT, dan PO
+lebih dari satu baris. Pada contoh metadata panjang, caption hanya muncul
+di baris pertama; lanjutan sejajar dengan nilai setelah caption, bukan
+dengan tepi kiri nota. PO sengaja tanpa spasi agar pemenggalan token juga
+diuji. Pastikan alamat berakhir `12345` dan PO berakhir `000123456789`, tanpa
+huruf/angka hilang atau terulang. Nilai contoh tetap Rp19.752 − Rp252 =
+Rp19.500. Berikutnya gunakan `sale_corrected_reprint.sample.json` untuk
+penanda pencetak ulang. Nota piutang dan retur
 belum memakai perbaikan posisi penjualan ini.
 
-Ulangi untuk empat belas contoh sintetis lainnya:
+Ulangi untuk lima belas contoh sintetis lainnya:
 
 - `sale_cash.sample.json` — penjualan tunai;
 - `sale_split_edc.sample.json` — tunai + EDC, termasuk dua biaya;
@@ -68,6 +75,8 @@ Ulangi untuk empat belas contoh sintetis lainnya:
 - `sale_kasbon_dp.sample.json` — kasbon dengan DP tunai dan sisa utang;
 - `sale_long_item.sample.json` — nama barang, toko, pelanggan, dan kasir
   panjang untuk memeriksa pemenggalan dan posisi footer;
+- `sale_customer_metadata_long.sample.json` — PEMBELI dan ALAMAT panjang,
+  serta PO panjang tanpa spasi, untuk memeriksa lanjutan sejajar dan teks utuh;
 - `sale_corrected_reprint.sample.json` — cetak ulang penjualan dengan nama
   pemroses panjang dan catatan koreksi pelanggan/metode;
 - `receivable_selected.sample.json` — pelunasan bon terpilih tunai;
@@ -80,9 +89,9 @@ Ulangi untuk empat belas contoh sintetis lainnya:
 - `return_reprint.sample.json` — cetak ulang retur, termasuk identitas
   pemroses awal dan pencetak ulang.
 
-Kelima belas fixture bawaan, termasuk `return_note.sample.json`, masih contoh
+Keenam belas fixture bawaan, termasuk `return_note.sample.json`, masih contoh
 awal. Retur tanpa nota serta kombinasi lain memerlukan fixture sintetis tambahan
-dari korpus Go→agent. Jangan menganggap lima belas contoh ini sebagai matriks
+dari korpus Go→agent. Jangan menganggap enam belas contoh ini sebagai matriks
 cetak akhir.
 
 Untuk tiap cetakan, catat commit agent, model/driver printer, lebar kertas,

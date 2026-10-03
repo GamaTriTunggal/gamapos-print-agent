@@ -99,7 +99,7 @@ Module Program
         Dim expected As String() = {
             "sale_cash.sample.json", "sale_edc_only.sample.json", "sale_split_edc.sample.json",
             "sale_split_wire.sample.json", "sale_kasbon_dp0.sample.json", "sale_kasbon_dp.sample.json",
-            "sale_long_item.sample.json", "sale_corrected_reprint.sample.json", "receivable_fifo_edc.sample.json",
+            "sale_long_item.sample.json", "sale_customer_metadata_long.sample.json", "sale_corrected_reprint.sample.json", "receivable_fifo_edc.sample.json",
             "receivable_selected.sample.json", "receivable_selected_card.sample.json",
             "receivable_selected_reprint.sample.json", "receivable_proof.sample.json",
             "return_note.sample.json", "return_reprint.sample.json"}
@@ -151,6 +151,11 @@ Module Program
                     If IO.Path.GetFileName(path) = "sale_long_item.sample.json" AndAlso itemLineCount < 4 Then
                         Throw New InvalidOperationException("Fixture nama barang panjang tidak menguji bungkus item.")
                     End If
+                    If IO.Path.GetFileName(path) = "sale_customer_metadata_long.sample.json" Then
+                        CheckWrappedCustomerSample("PEMBELI  : ", CStr(customer("name")), False, characters)
+                        CheckWrappedCustomerSample("ALAMAT   : ", CStr(customer("address")), False, characters)
+                        CheckWrappedCustomerSample("PO       : ", CStr(customer("poNo")), True, characters)
+                    End If
                 Case "RECEIVABLE"
                     BuildReceivableV2Plan(ParseReceivableV2(body), 40.0F, 20.0F, characters, characters)
                 Case "RETURN"
@@ -159,6 +164,25 @@ Module Program
                     Throw New InvalidOperationException("Keluarga fixture uji kertas tidak dikenal: " & kind)
             End Select
         Next
+    End Sub
+
+    Private Sub CheckWrappedCustomerSample(caption As String, value As String, unbroken As Boolean,
+                                          measure As Func(Of String, Single))
+        ' P-604: fixture harus benar-benar menguji lanjutan sejajar dan tanpa teks hilang.
+        Dim lines As List(Of String) = LayoutSaleCustomer(caption, value, 40.0F, measure)
+        Dim indent As String = New String(" "c, caption.Length)
+        If lines.Count < 2 OrElse Not lines(0).StartsWith(caption, StringComparison.Ordinal) OrElse
+           lines.Any(Function(line) line.Length > 40) OrElse
+           lines.Skip(1).Any(Function(line) Not line.StartsWith(indent, StringComparison.Ordinal)) Then
+            Throw New InvalidOperationException("Fixture metadata pelanggan tidak menguji wrapping 40 kolom yang sejajar.")
+        End If
+        If unbroken AndAlso value.Contains(" "c) Then
+            Throw New InvalidOperationException("Fixture PO harus berupa token panjang tanpa spasi.")
+        End If
+        Dim reconstructed As String = String.Join(If(unbroken, "", " "), lines.Select(Function(line) line.Substring(caption.Length)))
+        If reconstructed <> value Then
+            Throw New InvalidOperationException("Wrapping metadata pelanggan membuang atau mengulang teks.")
+        End If
     End Sub
 
     Private Sub CheckReturnV2(path As String)
