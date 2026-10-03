@@ -139,6 +139,11 @@ literal `0`.
 Ini catatan kompatibilitas v1, bukan anjuran menggunakan `Double` untuk
 perhitungan uang baru.
 
+Keputusan pemilik 3 Oktober 2026 setelah uji fisik: v2 tidak menambahkan
+baris “UANG DITERIMA” dan “KEMBALIAN” pada nota penjualan maupun bukti piutang.
+`tenderSen` dan `changeSen` tetap wajib dalam payload dan tetap divalidasi;
+yang dihapus hanya tampilan cetaknya, bukan data atau perhitungan pembayaran.
+
 ### Perbedaan logika nota
 
 | Jenis | Perilaku v1 |
@@ -182,8 +187,9 @@ Kandidat penjualan v2 pada checkpoint 3 Oktober 2026 memakai
 `LayoutSaleHeaderColumns`, `LayoutSaleOriginalNameColumns`, dan
 `LayoutSaleReprintNameColumns` untuk menghasilkan teks dengan spasi kolom.
 Caption tetap kolom 25; Siti dimulai pada kolom 28, dengan toleransi setengah
-kolom karena panjang nama/caption genap-ganjil. Ini tidak mengubah v1 atau
-menyatakan v2 sudah lulus fisik; hasil dan batas uji dicatat di
+kolom karena panjang nama/caption genap-ganjil. Pemilik menerima hasil fisik
+contoh penjualan tunai `a4e560d` pada 3 Oktober 2026. Ini tidak mengubah v1
+atau membuktikan seluruh variasi v2; hasil dan batas uji dicatat di
 [print-layout-validation.md](print-layout-validation.md).
 
 Footer retur hanya menggunakan `TANDA TERIMA`, keterangan nota merah, dan
@@ -317,7 +323,9 @@ utuh. Foto v2 berikutnya yang dikirim pemilik memperlihatkan nama Siti
 bergeser ke kanan dari pusat “HORMAT KAMI”; alignment belum lulus. Header v2
 juga memakai mekanisme posisi berbeda dari v1 dan belum boleh dinyatakan
 setara berdasarkan rumus saja. Hasil ini tidak boleh dicatat sebagai masalah
-desain v1.
+desain v1. Pada 3 Oktober, pemilik menyatakan cetakan perbaikan `a4e560d`
+sudah oke; penerimaan tersebut terbatas pada contoh penjualan tunai yang
+dikirim, bukan seluruh variasi nama/cetak ulang/piutang/retur.
 
 Bukti terperinci berada di
 [print-layout-validation.md](print-layout-validation.md). Foto pelanggan dan

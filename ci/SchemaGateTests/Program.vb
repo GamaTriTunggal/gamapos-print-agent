@@ -89,6 +89,7 @@ Module Program
         CheckItemLayout()
         CheckMetadataLayout()
         CheckSaleColumnLayout()
+        CheckTenderChangeNotPrinted(IO.Path.Combine(args(0), "v2"))
         Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 + " &
                           IO.Directory.GetFiles(IO.Path.Combine(args(0), "v2"), "*.sample.json").Length &
                           " fixtures v2 passed; sale/receivable/return v2 parser accepted/rejected; sale sample and return core/layout passed; sale column planning passed (not physical).")
@@ -375,10 +376,22 @@ Module Program
         AcceptProof("selected dengan kredit", selected)
         AcceptProof("FIFO transfer", fifo)
         CheckProofRows("selected kredit dan diskon", selected,
-            "BON 101=-100|BON 102=1100", "TOTAL BON=1000|DISKON (-)=100|-TOTAL BAYAR=900|UANG DITERIMA=1000|KEMBALIAN=100")
+            "BON 101=-100|BON 102=1100", "TOTAL BON=1000|DISKON (-)=100|-TOTAL BAYAR=900")
         CheckProofRows("FIFO fee ditanggung toko", fifo,
             "BON 101=400", "TOTAL BON=2000|BAYAR=400|-SISA BON=1600")
         CheckReceivableLayout(selected, fifo)
+
+        Dim fifoCash As JObject = CType(fifo.DeepClone(), JObject)
+        fifoCash("payload")("paymentMethod") = "CASH"
+        Dim fifoCashAmounts As JObject = CType(fifoCash("payload")("amounts"), JObject)
+        fifoCashAmounts("transferFeeSen") = "0"
+        fifoCashAmounts("cashSen") = "400"
+        fifoCashAmounts("noncashSen") = "0"
+        fifoCashAmounts("merchantReceivesSen") = "400"
+        fifoCashAmounts("tenderSen") = "500"
+        fifoCashAmounts("changeSen") = "100"
+        CheckProofRows("FIFO tunai dengan kembalian tanpa baris tambahan", fifoCash,
+            "BON 101=400", "TOTAL BON=2000|BAYAR=400|-SISA BON=1600")
 
         Dim card As JObject = CType(selected.DeepClone(), JObject)
         card("jobType") = "receivable_selected_card"
@@ -581,7 +594,7 @@ Module Program
         Dim baseline As JObject = JObject.Parse(source)
         Accept("cash", baseline)
         CheckAmountRows("cash rounding", baseline,
-            "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|UANG DITERIMA=2000000|KEMBALIAN=50000")
+            "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000")
 
         Dim discounted As JObject = CType(baseline.DeepClone(), JObject)
         Dim discountedAmounts As JObject = CType(discounted("payload")("amounts"), JObject)
@@ -592,7 +605,7 @@ Module Program
         discountedAmounts("changeSen") = "60000"
         Accept("cash discount plus rounding", discounted)
         CheckAmountRows("cash discount plus rounding", discounted,
-            "TOTAL BELANJA=1975200|DISKON (-)=10000|PEMBULATAN (-)=25200|-TOTAL NOTA=1940000|UANG DITERIMA=2000000|KEMBALIAN=60000")
+            "TOTAL BELANJA=1975200|DISKON (-)=10000|PEMBULATAN (-)=25200|-TOTAL NOTA=1940000")
 
         Dim edc As JObject = CType(baseline.DeepClone(), JObject)
         Dim payload As JObject = CType(edc("payload"), JObject)
@@ -886,6 +899,44 @@ Module Program
                 rejected = True
             End Try
             If Not rejected Then Throw New InvalidOperationException("Item yang tidak muat/metrik rusak diterima.")
+        Next
+    End Sub
+
+    Private Sub CheckTenderChangeNotPrinted(folder As String)
+        ' P-604: data tetap ada; hanya dua baris cetak yang dihapus atas keputusan pemilik.
+        For Each path As String In IO.Directory.GetFiles(folder, "*.sample.json")
+            Dim root As JObject = JObject.Parse(IO.File.ReadAllText(path))
+            Dim kind As String = CStr(root("jobType"))
+            Dim family As String = SelectV2Family(kind)
+            If family <> "SALE" AndAlso family <> "RECEIVABLE" Then Continue For
+            Dim original As JToken = root.DeepClone()
+            Dim payload As JObject = CType(root("payload"), JObject)
+            Dim amounts As JObject = CType(payload("amounts"), JObject)
+            If amounts("tenderSen") Is Nothing OrElse amounts("changeSen") Is Nothing Then
+                Throw New InvalidOperationException("Data audit tender/kembalian hilang dari fixture.")
+            End If
+            Dim captions As String()
+            If family = "SALE" Then
+                ParseSaleV2(root.ToString(Formatting.None))
+                captions = BuildSaleAmountRows(kind, CStr(payload("paymentMethod")),
+                    CStr(payload("noncashMethod")), amounts).Select(Function(row) row.Caption).ToArray()
+            Else
+                ParseReceivableV2(root.ToString(Formatting.None))
+                captions = BuildReceivableAmountRows(kind, CStr(payload("paymentMethod")),
+                    amounts).Select(Function(row) row.Caption).ToArray()
+            End If
+            If captions.Contains("UANG DITERIMA") OrElse captions.Contains("KEMBALIAN") OrElse
+               Not JToken.DeepEquals(original, root) Then
+                Throw New InvalidOperationException("Baris tender/kembalian tercetak atau data transaksi berubah.")
+            End If
+            ' Hilangnya baris cetak tidak melonggarkan persamaan tender - change = cash.
+            amounts("changeSen") = (Long.Parse(CStr(amounts("changeSen")), CultureInfo.InvariantCulture) + 1L).
+                ToString(CultureInfo.InvariantCulture)
+            If family = "SALE" Then
+                Reject("kembalian berubah satu sen", root.ToString(Formatting.None))
+            Else
+                RejectProof("kembalian berubah satu sen", root.ToString(Formatting.None))
+            End If
         Next
     End Sub
 

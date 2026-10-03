@@ -95,6 +95,7 @@ lengkap; foto berikutnya menunjukkan nama tidak selaras (lihat checkpoint
 | Cetak penjualan v2 pada `5d1e732` | Gagal | Build agent/probe terkonfirmasi; galat di `store-details`, penyebab `ArgumentException`. |
 | Perbaikan kepemilikan Font pada `35d8119` | Lulus preflight dan pengiriman cetak Windows | Build agent/probe, preflight transisi font, dan `--print` berhasil; kertas tercetak. |
 | Visual `sale_cash.sample.json` pada `35d8119` | Angka utama lulus; alignment nama gagal pada foto lengkap | Belanja 19.752 − pembulatan 252 = nota 19.500; diterima 20.000, kembalian 500. Tepi kanan nilai utuh. Foto berikutnya memperlihatkan Siti bergeser ke kanan dari HORMAT KAMI. |
+| Cetakan penjualan tunai setelah `a4e560d` | Diterima pemilik pada 3 Oktober 2026 | Pemilik mengirim foto HEIC dan menyatakan hasil “sudah oke”. Penerimaan contoh ini bukan bukti seluruh variasi penjualan/piutang/retur. |
 | Nota piutang dan retur v2 | Belum diuji | Masing-masing perlu uji fisik; font retur 10 pt belum dikalibrasi pada foto ini. |
 | Aktivasi/HTTP/role mapping/rilis | Belum diuji/diizinkan | Jangan aktifkan dari bukti kalibrasi ini. |
 
@@ -151,7 +152,7 @@ teks kosong, kelipatan lebar kolom, Unicode, dan input kolom tidak sah.
 Perbandingan diff terhadap `5f5ba69` pada renderer v1, parser/rumus uang,
 capability dan dispatch tidak menunjukkan perubahan.
 
-**Belum lulus fisik:** Windows build/preflight/cetak kandidat ini belum
+**Status saat checkpoint dibuat:** Windows build/preflight/cetak kandidat ini belum
 dijalankan. Smoke HTTP Windows dan pengujian fisik piutang/retur juga tidak
 dijalankan pada checkpoint Linux ini. Tes kolom bukan bukti bahwa kertas
 sudah tepat. Jangan aktifkan v2 atau menyatakan papan selesai dari hasil ini.
@@ -162,6 +163,41 @@ seluruh kertas rata sampai footer. Bandingkan TOKO terhadap area isi nota dan
 Siti terhadap HORMAT KAMI, bukan terhadap perspektif tepi foto. Setelah itu,
 fixture `sale_long_item.sample.json` dan `sale_corrected_reprint.sample.json`
 menguji wrapping/nama panjang serta penanda pencetak ulang.
+
+### Tindak lanjut uji fisik dan keputusan baris pembayaran — 3 Oktober 2026
+
+Sesudah instruksi mengambil `a4e560d`, pemilik mengirim `IMG_3914.HEIC` dan
+menyatakan “hasilnya, sudah oke”. Konfirmasi itu menjadi bukti penerimaan
+manusia atas contoh penjualan tunai, bukan hasil tes layout otomatis. Foto
+HEIC disimpan privat di repo utama:
+`.local/discount-rounding/physical-print-20261003/sale_cash-a4e560d.HEIC`.
+SHA-256:
+`d31982d3ef8421f8289b96e960c42c2c6ceed1d68120c52a73f356cca2c331ae`.
+Format HEIC tidak dapat dibaca oleh alat inspeksi gambar sesi ini; penerimaan
+visual dicatat dari konfirmasi pemilik, bukan klaim inspeksi independen agent.
+Tidak ada hasil konsol build/preflight baru pada pesan ini.
+
+Pada pesan yang sama, pemilik meminta tidak menambahkan “UANG DITERIMA” dan
+“KEMBALIAN”, mengikuti format aplikasi cetak yang sudah digunakan. Checkpoint
+berikutnya menghapus kedua caption dari `BuildSaleAmountRows` dan
+`BuildReceivableAmountRows`, termasuk tunai dan cetak ulang. Baris diskon,
+pembulatan, biaya, bagian tunai/nontunai, BAYAR, dan sisa utang tidak berubah.
+Angka `tenderSen`/`changeSen` tetap ada dalam fixture/payload immutable;
+persamaan `tender - change = cash` dan penolakan selisih satu sen tetap berlaku.
+Tidak ada perubahan data transaksi, kontrak JSON, parser, atau renderer v1.
+
+Build agent dan probe Linux serta schema gate dijalankan dengan perintah
+checkpoint di atas. Tes mengunci baris tunai/diskon/piutang selected/FIFO
+tanpa kedua caption; seluruh fixture penjualan/piutang juga diperiksa agar
+perakitan baris tidak memutasi payload dan parser menolak perubahan kembalian
+satu sen. Ekspektasi tes baris diubah karena keputusan eksplisit pemilik,
+bukan untuk menutupi regresi. Fixture dan golden tidak direkam ulang.
+
+Penerimaan alignment `a4e560d` tidak digugurkan oleh penghapusan dua baris
+angka; posisi header/footer tidak diubah lagi. Namun cetakan setelah
+penghapusan baris **belum diuji fisik**. Nama panjang, cetak ulang, piutang,
+retur, dan smoke HTTP Windows tetap memiliki gerbang tersendiri. Ini bukan
+izin aktivasi/rilis schema2 atau penutupan papan.
 
 Jalankan hanya fixture sintetis melalui
 [`ci/V2PhysicalProbe/README.md`](../ci/V2PhysicalProbe/README.md). Simpan

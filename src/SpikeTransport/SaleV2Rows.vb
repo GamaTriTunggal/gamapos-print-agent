@@ -37,10 +37,9 @@ Module SaleV2Rows
         ElseIf method = "SPLIT" Then
             rows.Add(New SaleAmountRow("TUNAI", Sen(amounts, "cashSen")))
             rows.Add(New SaleAmountRow(If(noncashMethod = "EDC", "EDC", "TRANSFER"), Sen(amounts, "noncashSen")))
-        ElseIf method = "CASH" AndAlso Sen(amounts, "changeSen") > 0 Then
-            rows.Add(New SaleAmountRow("UANG DITERIMA", Sen(amounts, "tenderSen")))
-            rows.Add(New SaleAmountRow("KEMBALIAN", Sen(amounts, "changeSen")))
         End If
+        ' P-604: pemilik 3 Okt 2026 mempertahankan format v1 tanpa baris
+        ' uang diterima/kembalian. Field auditnya tetap ada dan divalidasi parser.
         Return rows
     End Function
 

@@ -54,10 +54,9 @@ Module ReceivableV2Rows
             If Sen(amounts, "customerFeeSen") > 0 Then
                 rows.Add(New ReceivableAmountRow("TOTAL DITAGIH", Sen(amounts, "customerPaysSen"), True))
             End If
-        ElseIf method = "CASH" AndAlso Sen(amounts, "changeSen") > 0 Then
-            rows.Add(New ReceivableAmountRow("UANG DITERIMA", Sen(amounts, "tenderSen")))
-            rows.Add(New ReceivableAmountRow("KEMBALIAN", Sen(amounts, "changeSen")))
         End If
+        ' P-604: keputusan pemilik 3 Okt 2026: kedua angka tetap diaudit
+        ' dalam payload, tetapi tidak ditambah sebagai baris cetak baru.
         Return rows
     End Function
 
