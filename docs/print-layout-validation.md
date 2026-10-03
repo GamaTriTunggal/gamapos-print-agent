@@ -203,3 +203,53 @@ Jalankan hanya fixture sintetis melalui
 [`ci/V2PhysicalProbe/README.md`](../ci/V2PhysicalProbe/README.md). Simpan
 foto, dump, dan data pelanggan di luar Git. Perbarui tabel status dengan
 bukti baru; jangan mengganti “belum diuji” dengan “lulus” berdasarkan asumsi.
+
+### Penyelarasan kontrak cetak minimal — 3 Oktober 2026 (P-604 / DR-08)
+
+Sesudah checkpoint penghapusan baris `7dbc4d2`, pemilik menyetujui penghapusan
+`tenderSen`/`changeSen` dari kontrak printer, bukan hanya tampilan.
+Catatan sebelumnya bahwa kedua field tetap wajib dalam payload adalah
+riwayat checkpoint lama, **bukan kebijakan terbaru**.
+Desain tanpa “UANG DITERIMA”/“KEMBALIAN” disengaja oleh pemilik untuk
+menyederhanakan nota: nilai belanja/piutang setelah pengurangan, bukan
+rincian pertukaran uang fisik. Jangan menambahkannya kembali tanpa keputusan.
+
+Pengirim Go penjualan/piutang dan kedua parser agent sekarang selaras:
+field tidak dikirim dan ditolak jika disisipkan. Audit pembayaran server,
+persamaan uang diterima − kembalian = kas, serta aturan larangan lebih
+bayar piutang tetap dipertahankan. Fixture sintetis hanya menghapus kedua
+kunci; nilai total, alokasi, diskon, pembulatan, dan biaya tidak diubah.
+Fixture retur, golden regresi, kontrak v1, renderer, font dan kolom tidak diubah.
+
+Validasi Linux:
+
+- `dotnet build src/SpikeTransport/SpikeTransport.vbproj -c Release --no-restore`
+  dan `dotnet build ci/V2PhysicalProbe/V2PhysicalProbe.vbproj -c Release --no-restore`:
+  keduanya lulus, 0 warning/error.
+- `dotnet run --project ci/SchemaGateTests/SchemaGateTests.vbproj -c Release -- fixtures`:
+  11 kasus schema + 7 rute + 17 fixture v1 + 15 fixture v2 lulus;
+  parser menolak kedua field lama, builder tidak mencetak kedua caption atau
+  memutasi payload. Persamaan jumlah/alokasi dan penolakan selisih kas
+  tetap diuji. Gerbang `/health` tetap schema1.
+- Validator Go juga menerima seluruh 15 fixture agent v2 yang sama.
+  Tes produsen Go memeriksa cetak pertama/ulang, semua metode penjualan,
+  selected/FIFO tunai/transfer/EDC, tidak adanya kedua kunci, snapshot
+  tidak berubah, dan penolakan snapshot uang tidak konsisten.
+
+Bukti dan batas CI utama dicatat pada papan/register repo Go; log privat di
+`.local/discount-rounding/print-payment-contract-20261003/`.
+Tidak ada migrasi, akses data pelanggan, perubahan produksi, push repo Go,
+atau rilis/aktivasi agent. Windows smoke dan cetakan fisik kandidat ini
+**belum diulang**; tes Linux tidak menggantikannya. Papan tetap terbuka.
+
+CI repo Go: `make ci TEST_PG_DSN=` lulus pada worktree HEAD `d338587c`
+ditambah hanya perubahan checkpoint, memakai cache lint terisolasi.
+Tes integrasi PostgreSQL yang memerlukan DSN dilewati. Pemeriksaan khusus
+P-591 tetap menguji penolakan cicilan berlebih satu sen untuk semua metode.
+CI working tree awal mencakup perubahan docs sesi lain dan cache lint
+lama; log kegagalannya disimpan, tidak diklaim hijau.
+Percobaan terisolasi pertama menemukan fixture route cetak ulang yang
+masih mengirim field lama; itu diperbaiki sesuai kontrak baru dan penolakan
+kedua field ditambahkan sebelum CI ulang lulus.
+Audit membandingkan fixture sebelum/sesudah: tepat 13 job hanya kehilangan
+dua kunci; semua nilai lainnya dan dua fixture retur tidak berubah.

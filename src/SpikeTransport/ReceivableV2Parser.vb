@@ -73,9 +73,9 @@ Module ReceivableV2Parser
         End If
 
         Dim amounts As JObject = Exact(payload("amounts"), "amounts",
-            "totalBeforeSen,discountSen,roundingSen,transferFeeSen,stampFeeSen,netPaymentSen,remainingSen,cashSen,noncashSen,customerFeeSen,merchantFeeSen,customerPaysSen,merchantReceivesSen,tenderSen,changeSen")
+            "totalBeforeSen,discountSen,roundingSen,transferFeeSen,stampFeeSen,netPaymentSen,remainingSen,cashSen,noncashSen,customerFeeSen,merchantFeeSen,customerPaysSen,merchantReceivesSen")
         Dim money As New Dictionary(Of String, Long)(StringComparer.Ordinal)
-        For Each name As String In {"totalBeforeSen", "discountSen", "roundingSen", "transferFeeSen", "stampFeeSen", "netPaymentSen", "remainingSen", "cashSen", "noncashSen", "customerFeeSen", "merchantFeeSen", "customerPaysSen", "merchantReceivesSen", "tenderSen", "changeSen"}
+        For Each name As String In {"totalBeforeSen", "discountSen", "roundingSen", "transferFeeSen", "stampFeeSen", "netPaymentSen", "remainingSen", "cashSen", "noncashSen", "customerFeeSen", "merchantFeeSen", "customerPaysSen", "merchantReceivesSen"}
             money(name) = If(name = "merchantReceivesSen", SignedCent(amounts, name), Cent(amounts, name))
         Next
 
@@ -128,13 +128,11 @@ Module ReceivableV2Parser
         Dim pays As Decimal = CDec(money("customerPaysSen"))
         If (selected AndAlso money("totalBeforeSen") = 0) OrElse
            net <> CDec(money("cashSen")) + CDec(money("noncashSen")) OrElse
-           pays <> net + CDec(money("customerFeeSen")) OrElse
-           CDec(money("cashSen")) <> CDec(money("tenderSen")) - CDec(money("changeSen")) Then
+           pays <> net + CDec(money("customerFeeSen")) Then
             Throw New ArgumentException("Komposisi uang bukti tidak cocok.")
         End If
         If selected AndAlso net = 0D AndAlso
-           (pays <> 0D OrElse money("merchantReceivesSen") <> 0 OrElse
-            money("tenderSen") <> 0 OrElse money("changeSen") <> 0) Then
+           (pays <> 0D OrElse money("merchantReceivesSen") <> 0) Then
             Throw New ArgumentException("Pembayaran selected nol mempunyai kas atau fee.")
         End If
         Select Case method
@@ -143,13 +141,13 @@ Module ReceivableV2Parser
                     Throw New ArgumentException("Tunai mempunyai nontunai/EDC fee.")
                 End If
             Case "WIRE"
-                If money("cashSen") <> 0 OrElse money("tenderSen") <> 0 OrElse money("changeSen") <> 0 OrElse
+                If money("cashSen") <> 0 OrElse
                    money("customerFeeSen") <> 0 OrElse money("merchantFeeSen") <> 0 Then
                     Throw New ArgumentException("Transfer mempunyai kas/EDC fee.")
                 End If
             Case "EDC"
-                If money("noncashSen") = 0 OrElse money("cashSen") <> 0 OrElse money("tenderSen") <> 0 OrElse
-                   money("changeSen") <> 0 OrElse (Not selected AndAlso money("transferFeeSen") <> 0) Then
+                If money("noncashSen") = 0 OrElse money("cashSen") <> 0 OrElse
+                   (Not selected AndAlso money("transferFeeSen") <> 0) Then
                     Throw New ArgumentException("EDC mempunyai kas/biaya transfer yang tidak sah.")
                 End If
         End Select

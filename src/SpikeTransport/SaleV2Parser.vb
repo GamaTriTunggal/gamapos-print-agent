@@ -90,10 +90,10 @@ Module SaleV2Parser
         Next
 
         Dim amounts As JObject = Exact(payload("amounts"), "amounts",
-            "grossSen,discountSen,roundingSen,netSen,principalAppliedSen,remainingSen,cashSen,noncashSen,customerFeeSen,merchantFeeSen,customerPaysSen,merchantReceivesSen,tenderSen,changeSen")
+            "grossSen,discountSen,roundingSen,netSen,principalAppliedSen,remainingSen,cashSen,noncashSen,customerFeeSen,merchantFeeSen,customerPaysSen,merchantReceivesSen")
         Dim money As New Dictionary(Of String, Long)(StringComparer.Ordinal)
         For Each propertyName As String In {"grossSen", "discountSen", "roundingSen", "netSen", "principalAppliedSen", "remainingSen",
-            "cashSen", "noncashSen", "customerFeeSen", "merchantFeeSen", "customerPaysSen", "merchantReceivesSen", "tenderSen", "changeSen"}
+            "cashSen", "noncashSen", "customerFeeSen", "merchantFeeSen", "customerPaysSen", "merchantReceivesSen"}
             money(propertyName) = Cent(amounts, propertyName)
         Next
         Dim gross As Decimal = CDec(money("grossSen"))
@@ -102,8 +102,7 @@ Module SaleV2Parser
            CDec(money("principalAppliedSen")) + CDec(money("remainingSen")) <> CDec(money("netSen")) OrElse
            CDec(money("cashSen")) + CDec(money("noncashSen")) <> CDec(money("principalAppliedSen")) OrElse
            CDec(money("principalAppliedSen")) + CDec(money("customerFeeSen")) <> CDec(money("customerPaysSen")) OrElse
-           CDec(money("customerPaysSen")) - CDec(money("merchantFeeSen")) <> CDec(money("merchantReceivesSen")) OrElse
-           CDec(money("tenderSen")) - CDec(money("changeSen")) <> CDec(money("cashSen")) Then
+           CDec(money("customerPaysSen")) - CDec(money("merchantFeeSen")) <> CDec(money("merchantReceivesSen")) Then
             Throw New ArgumentException("Hubungan jumlah nota tidak cocok.")
         End If
         If money("netSen") <= 0 Then Throw New ArgumentException("Neto nota harus positif.")

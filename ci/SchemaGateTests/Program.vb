@@ -388,9 +388,7 @@ Module Program
         fifoCashAmounts("cashSen") = "400"
         fifoCashAmounts("noncashSen") = "0"
         fifoCashAmounts("merchantReceivesSen") = "400"
-        fifoCashAmounts("tenderSen") = "500"
-        fifoCashAmounts("changeSen") = "100"
-        CheckProofRows("FIFO tunai dengan kembalian tanpa baris tambahan", fifoCash,
+        CheckProofRows("FIFO tunai tanpa baris uang diterima/kembalian", fifoCash,
             "BON 101=400", "TOTAL BON=2000|BAYAR=400|-SISA BON=1600")
 
         Dim card As JObject = CType(selected.DeepClone(), JObject)
@@ -403,8 +401,6 @@ Module Program
         cardAmounts("merchantFeeSen") = "5"
         cardAmounts("customerPaysSen") = "920"
         cardAmounts("merchantReceivesSen") = "915"
-        cardAmounts("tenderSen") = "0"
-        cardAmounts("changeSen") = "0"
         AcceptProof("selected EDC", card)
         CheckProofRows("selected EDC", card,
             "BON 101=-100|BON 102=1100", "TOTAL BON=1000|DISKON (-)=100|-TOTAL BAYAR=900|BIAYA EDC=20|-TOTAL DITAGIH=920")
@@ -420,8 +416,6 @@ Module Program
         wireAmounts("noncashSen") = "800"
         wireAmounts("customerPaysSen") = "800"
         wireAmounts("merchantReceivesSen") = "800"
-        wireAmounts("tenderSen") = "0"
-        wireAmounts("changeSen") = "0"
         selectedWire("payload")("allocations")(1)("roundingSen") = "25"
         selectedWire("payload")("allocations")(1)("transferFeeSen") = "25"
         selectedWire("payload")("allocations")(1)("stampFeeSen") = "50"
@@ -433,7 +427,7 @@ Module Program
         zero("payload")("allocations")(1)("discountSen") = "1000"
         Dim zeroAmounts As JObject = CType(zero("payload")("amounts"), JObject)
         zeroAmounts("discountSen") = "1000"
-        For Each name As String In {"netPaymentSen", "cashSen", "customerPaysSen", "merchantReceivesSen", "tenderSen", "changeSen"}
+        For Each name As String In {"netPaymentSen", "cashSen", "customerPaysSen", "merchantReceivesSen"}
             zeroAmounts(name) = "0"
         Next
         AcceptProof("selected nol", zero)
@@ -602,7 +596,6 @@ Module Program
         For Each name As String In {"netSen", "principalAppliedSen", "cashSen", "customerPaysSen", "merchantReceivesSen"}
             discountedAmounts(name) = "1940000"
         Next
-        discountedAmounts("changeSen") = "60000"
         Accept("cash discount plus rounding", discounted)
         CheckAmountRows("cash discount plus rounding", discounted,
             "TOTAL BELANJA=1975200|DISKON (-)=10000|PEMBULATAN (-)=25200|-TOTAL NOTA=1940000")
@@ -618,8 +611,6 @@ Module Program
         amounts("merchantFeeSen") = "250"
         amounts("customerPaysSen") = "1950500"
         amounts("merchantReceivesSen") = "1950250"
-        amounts("tenderSen") = "0"
-        amounts("changeSen") = "0"
         Accept("edc fees", edc)
         CheckAmountRows("edc fees", edc,
             "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|BIAYA EDC=500|-TOTAL DIBAYAR=1950500")
@@ -631,8 +622,6 @@ Module Program
         payload("paymentMethod") = "SPLIT"
         amounts("cashSen") = "1000000"
         amounts("noncashSen") = "950000"
-        amounts("tenderSen") = "1050000"
-        amounts("changeSen") = "50000"
         Accept("split edc", split)
         CheckAmountRows("split edc", split,
             "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|BIAYA EDC=500|-TOTAL DIBAYAR=1950500|TUNAI=1000000|EDC=950000")
@@ -660,8 +649,6 @@ Module Program
         amounts("cashSen") = "0"
         amounts("customerPaysSen") = "0"
         amounts("merchantReceivesSen") = "0"
-        amounts("tenderSen") = "0"
-        amounts("changeSen") = "0"
         Accept("DP0", credit)
         CheckAmountRows("DP0", credit,
             "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|BAYAR=0|SISA UTANG=1950000")
@@ -675,7 +662,6 @@ Module Program
         amounts("cashSen") = "600000"
         amounts("customerPaysSen") = "600000"
         amounts("merchantReceivesSen") = "600000"
-        amounts("tenderSen") = "600000"
         Accept("DP positif", deposit)
         CheckAmountRows("DP positif", deposit,
             "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000|BAYAR=600000|SISA UTANG=1350000")
@@ -740,11 +726,10 @@ Module Program
         payload = CType(fraction("payload"), JObject)
         payload("items") = JArray.Parse("[{""name"":""A"",""quantity100"":""50"",""unit"":""PCS"",""priceSen"":""1"",""totalSen"":""1""},{""name"":""B"",""quantity100"":""50"",""unit"":""PCS"",""priceSen"":""1"",""totalSen"":""0""},{""name"":""C"",""quantity100"":""50"",""unit"":""PCS"",""priceSen"":""1"",""totalSen"":""1""}]")
         amounts = CType(payload("amounts"), JObject)
-        For Each name As String In {"grossSen", "netSen", "principalAppliedSen", "cashSen", "customerPaysSen", "merchantReceivesSen", "tenderSen"}
+        For Each name As String In {"grossSen", "netSen", "principalAppliedSen", "cashSen", "customerPaysSen", "merchantReceivesSen"}
             amounts(name) = "2"
         Next
         amounts("roundingSen") = "0"
-        amounts("changeSen") = "0"
         Accept("residu satu sen", fraction)
 
         amounts = CType(CType(edc("payload"), JObject)("amounts"), JObject)
@@ -903,7 +888,7 @@ Module Program
     End Sub
 
     Private Sub CheckTenderChangeNotPrinted(folder As String)
-        ' P-604: data tetap ada; hanya dua baris cetak yang dihapus atas keputusan pemilik.
+        ' P-604: kontrak printer sengaja tidak membawa data uang diterima/kembalian.
         For Each path As String In IO.Directory.GetFiles(folder, "*.sample.json")
             Dim root As JObject = JObject.Parse(IO.File.ReadAllText(path))
             Dim kind As String = CStr(root("jobType"))
@@ -912,8 +897,8 @@ Module Program
             Dim original As JToken = root.DeepClone()
             Dim payload As JObject = CType(root("payload"), JObject)
             Dim amounts As JObject = CType(payload("amounts"), JObject)
-            If amounts("tenderSen") Is Nothing OrElse amounts("changeSen") Is Nothing Then
-                Throw New InvalidOperationException("Data audit tender/kembalian hilang dari fixture.")
+            If amounts("tenderSen") IsNot Nothing OrElse amounts("changeSen") IsNot Nothing Then
+                Throw New InvalidOperationException("Data uang diterima/kembalian ikut terkirim ke printer.")
             End If
             Dim captions As String()
             If family = "SALE" Then
@@ -929,14 +914,15 @@ Module Program
                Not JToken.DeepEquals(original, root) Then
                 Throw New InvalidOperationException("Baris tender/kembalian tercetak atau data transaksi berubah.")
             End If
-            ' Hilangnya baris cetak tidak melonggarkan persamaan tender - change = cash.
-            amounts("changeSen") = (Long.Parse(CStr(amounts("changeSen")), CultureInfo.InvariantCulture) + 1L).
-                ToString(CultureInfo.InvariantCulture)
-            If family = "SALE" Then
-                Reject("kembalian berubah satu sen", root.ToString(Formatting.None))
-            Else
-                RejectProof("kembalian berubah satu sen", root.ToString(Formatting.None))
-            End If
+            For Each name As String In {"tenderSen", "changeSen"}
+                Dim obsolete As JObject = CType(root.DeepClone(), JObject)
+                CType(obsolete("payload")("amounts"), JObject)(name) = "0"
+                If family = "SALE" Then
+                    Reject("field pembayaran tidak boleh dikirim: " & name, obsolete.ToString(Formatting.None))
+                Else
+                    RejectProof("field pembayaran tidak boleh dikirim: " & name, obsolete.ToString(Formatting.None))
+                End If
+            Next
         Next
     End Sub
 

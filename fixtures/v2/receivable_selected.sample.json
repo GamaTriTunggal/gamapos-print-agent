@@ -15,7 +15,7 @@
       {"receiptNo":"101","beforeSen":"-100","principalAppliedSen":"-100","afterSen":"0","discountSen":"0","roundingSen":"0","transferFeeSen":"0","stampFeeSen":"0"},
       {"receiptNo":"102","beforeSen":"1100","principalAppliedSen":"1100","afterSen":"0","discountSen":"100","roundingSen":"0","transferFeeSen":"0","stampFeeSen":"0"}
     ],
-    "amounts": {"totalBeforeSen":"1000","discountSen":"100","roundingSen":"0","transferFeeSen":"0","stampFeeSen":"0","netPaymentSen":"900","remainingSen":"0","cashSen":"900","noncashSen":"0","customerFeeSen":"0","merchantFeeSen":"0","customerPaysSen":"900","merchantReceivesSen":"900","tenderSen":"1000","changeSen":"100"},
+    "amounts": {"totalBeforeSen":"1000","discountSen":"100","roundingSen":"0","transferFeeSen":"0","stampFeeSen":"0","netPaymentSen":"900","remainingSen":"0","cashSen":"900","noncashSen":"0","customerFeeSen":"0","merchantFeeSen":"0","customerPaysSen":"900","merchantReceivesSen":"900"},
     "paymentMethod": "CASH",
     "originalProcessor": {"userId":"7","name":"KASIR ASLI"}
   }

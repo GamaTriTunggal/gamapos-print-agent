@@ -16,7 +16,7 @@
     "amounts":{"grossSen":"1975200","discountSen":"0","roundingSen":"25200","netSen":"1950000",
       "principalAppliedSen":"1950000","remainingSen":"0","cashSen":"1000000","noncashSen":"950000",
       "customerFeeSen":"0","merchantFeeSen":"0","customerPaysSen":"1950000",
-      "merchantReceivesSen":"1950000","tenderSen":"1050000","changeSen":"50000"},
+      "merchantReceivesSen":"1950000"},
     "paymentMethod":"SPLIT","noncashMethod":"WIRE",
     "originalProcessor":{"userId":"2","name":"KASIR UJI"}
   }

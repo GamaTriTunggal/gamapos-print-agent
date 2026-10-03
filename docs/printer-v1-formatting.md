@@ -139,10 +139,29 @@ literal `0`.
 Ini catatan kompatibilitas v1, bukan anjuran menggunakan `Double` untuk
 perhitungan uang baru.
 
-Keputusan pemilik 3 Oktober 2026 setelah uji fisik: v2 tidak menambahkan
-baris “UANG DITERIMA” dan “KEMBALIAN” pada nota penjualan maupun bukti piutang.
-`tenderSen` dan `changeSen` tetap wajib dalam payload dan tetap divalidasi;
-yang dihapus hanya tampilan cetaknya, bukan data atau perhitungan pembayaran.
+Keputusan desain pemilik, ditegaskan 3 Oktober 2026 setelah uji fisik:
+“UANG DITERIMA” dan “KEMBALIAN” **sengaja tidak dimasukkan** dalam desain
+nota agar tampilan cetak sederhana. Nota penjualan menggambarkan total
+nilai belanja setelah diskon/pembulatan dan komponen nota yang berlaku;
+bukti piutang menggambarkan nilai pembayaran/alokasi piutang setelah
+pengurangan yang berlaku. Ini bukan kekurangan v1 yang boleh “dilengkapi”
+atas inisiatif implementer. Penambahan memerlukan keputusan pemilik.
+
+V2 mengikuti keputusan tersebut: kedua baris tidak dicetak dan
+`tenderSen`/`changeSen` tidak dikirim dalam kontrak printer penjualan/piutang.
+Parser menolak kedua field sebagai field asing. Snapshot, data audit, dan
+perhitungan uang diterima/kembalian tetap milik server aplikasi; penghapusan
+dari proyeksi cetak tidak menghapus data tersebut atau mengubah pembayaran.
+Nota v1, font, posisi kolom, dan renderer yang sudah teruji tidak diubah.
+
+Riwayat kesalahan: `BuildReceivableAmountRows` sempat menambahkan kedua
+baris untuk CASH dengan kembalian positif. Selected tunai bisa memakai
+uang fisik lebih besar dari tagihan, tetapi pelunasan tetap sebesar tagihan
+dan selisih dikembalikan; itu bukan izin melebihi saldo piutang.
+FIFO membentuk tender sama dengan nominal kas dan kembalian nol, sehingga
+baris tambahan tersebut tidak muncul pada hasil FIFO yang sah.
+Kedua baris dihapus pada `7dbc4d2`; kemudian pengirim Go dan parser agent
+diselaraskan untuk menghapus field dari kontrak cetak atas persetujuan pemilik.
 
 ### Perbedaan logika nota
 

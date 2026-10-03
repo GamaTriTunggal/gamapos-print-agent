@@ -16,7 +16,7 @@
     "amounts":{"grossSen":"1975200","discountSen":"0","roundingSen":"25200","netSen":"1950000",
       "principalAppliedSen":"1950000","remainingSen":"0","cashSen":"1950000","noncashSen":"0",
       "customerFeeSen":"0","merchantFeeSen":"0","customerPaysSen":"1950000",
-      "merchantReceivesSen":"1950000","tenderSen":"2000000","changeSen":"50000"},
+      "merchantReceivesSen":"1950000"},
     "paymentMethod":"CASH","noncashMethod":"",
     "originalProcessor":{"userId":"2","name":"NAMA KASIR PANJANG SEKALI UNTUK PENGUJIAN POSISI HORMAT KAMI"}
   }

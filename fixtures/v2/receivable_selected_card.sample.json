@@ -18,7 +18,7 @@
     "amounts":{"totalBeforeSen":"1000","discountSen":"100","roundingSen":"0","transferFeeSen":"0","stampFeeSen":"0",
       "netPaymentSen":"900","remainingSen":"0","cashSen":"0","noncashSen":"900",
       "customerFeeSen":"20","merchantFeeSen":"5","customerPaysSen":"920",
-      "merchantReceivesSen":"915","tenderSen":"0","changeSen":"0"},
+      "merchantReceivesSen":"915"},
     "paymentMethod":"EDC",
     "originalProcessor":{"userId":"7","name":"KASIR UJI"}
   }
