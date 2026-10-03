@@ -178,6 +178,14 @@ Nama kasir di bawahnya adalah tambahan **v2**, bukan fitur footer penjualan
 v1. Penempatannya harus memakai acuan caption yang sama, bukan asumsi
 kesetaraan antara `TAB` dan `CurrentX`.
 
+Kandidat penjualan v2 pada checkpoint 3 Oktober 2026 memakai
+`LayoutSaleHeaderColumns`, `LayoutSaleOriginalNameColumns`, dan
+`LayoutSaleReprintNameColumns` untuk menghasilkan teks dengan spasi kolom.
+Caption tetap kolom 25; Siti dimulai pada kolom 28, dengan toleransi setengah
+kolom karena panjang nama/caption genap-ganjil. Ini tidak mengubah v1 atau
+menyatakan v2 sudah lulus fisik; hasil dan batas uji dicatat di
+[print-layout-validation.md](print-layout-validation.md).
+
 Footer retur hanya menggunakan `TANDA TERIMA`, keterangan nota merah, dan
 ruang tanda tangan khusus. Bukti piutang biasa memiliki susunan lain: nama
 toko dan operator di bagian bawah. Jangan menyeragamkan footer semua jenis.

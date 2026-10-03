@@ -46,18 +46,15 @@ Module SaleV2Receipt
         Dim printer As New Printer()
         ' Semua teks dinamis harus direncanakan sebelum Printer.Print pertama.
         SetV2ReceiptFont(printer, 18, FontStyle.Regular)
-        Dim nameWidth As Single = CSng(printer.TextWidth(StrDup(StoreNameCol, " ")))
-        Dim measureName As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
-        Dim storeNameLines As List(Of PositionedNameLine) =
-            LayoutCenteredSaleText(store.name, "NO NAME", nameWidth, measureName)
+        Dim storeNameLines As List(Of String) = LayoutSaleHeaderColumns(store.name, "NO NAME", StoreNameCol)
         SetV2ReceiptFont(printer, 9, FontStyle.Bold)
         ' PowerPacks/TM-U220 mencetak 40 karakter 9 pt utuh walau TextWidth(40) > ScaleWidth.
         ' Ukur batas logis 40 kolom; kelayakan fisiknya dibuktikan pada printer uji.
         Dim printable As Single = CSng(printer.TextWidth(StrDup(TotCol, " ")))
         Dim measure As Func(Of String, Single) = Function(value As String) CSng(printer.TextWidth(value))
-        Dim storeDetails As New List(Of PositionedNameLine)()
-        storeDetails.AddRange(LayoutCenteredSaleText(store.address, "", printable, measure))
-        storeDetails.AddRange(LayoutCenteredSaleText(store.contact, "", printable, measure))
+        Dim storeDetails As New List(Of String)()
+        storeDetails.AddRange(LayoutSaleHeaderColumns(store.address, "", TotCol))
+        storeDetails.AddRange(LayoutSaleHeaderColumns(store.contact, "", TotCol))
         Dim customerLines As New List(Of String)()
         customerLines.AddRange(LayoutSaleCustomer(CapCustName, customer.name, printable, measure))
         customerLines.AddRange(LayoutSaleCustomer(CapCustAddr, customer.address, printable, measure))
@@ -80,10 +77,9 @@ Module SaleV2Receipt
         Next
         Dim originalName As String = CStr(payload("originalProcessor")("name"))
         Dim reprintName As String = If(reprint Is Nothing, Nothing, CStr(reprint("processor")("name")))
-        Dim footCenter As Single = CSng(printer.TextWidth(StrDup(24, " ") & Foot2)) - CSng(printer.TextWidth(Foot2)) / 2.0F
-        Dim originalLines As List(Of PositionedNameLine) = LayoutOriginalName(originalName, footCenter, printable, measure)
-        Dim reprintLines As New List(Of PositionedNameLine)()
-        If reprintName IsNot Nothing Then reprintLines = LayoutReprintName(reprintName, printable, measure)
+        Dim originalLines As List(Of String) = LayoutSaleOriginalNameColumns(originalName, Foot2, TotCol)
+        Dim reprintLines As New List(Of String)()
+        If reprintName IsNot Nothing Then reprintLines = LayoutSaleReprintNameColumns(reprintName, TotCol)
         Dim amountRows As List(Of SaleAmountRow) = BuildSaleAmountRows(CStr(root("jobType")),
                   CStr(payload("paymentMethod")), CStr(payload("noncashMethod")), amounts)
         Dim amountLines As New List(Of String)()
@@ -106,11 +102,11 @@ Module SaleV2Receipt
                                           SetV2ReceiptFont(printer, 18, FontStyle.Regular)
                                           printer.CurrentX = 0
                                           printer.CurrentY = 0
-                                          PrintPositioned(printer, storeNameLines)
+                                          PrintSaleColumnLines(printer, storeNameLines)
                                       End Sub)
         PrintSaleStage("store-details", Sub()
                                              SetV2ReceiptFont(printer, 9, FontStyle.Bold)
-                                             PrintPositioned(printer, storeDetails)
+                                             PrintSaleColumnLines(printer, storeDetails)
                                              printer.Print()
                                          End Sub)
         PrintSaleStage("customer", Sub()
@@ -152,10 +148,9 @@ Module SaleV2Receipt
         End Try
     End Sub
 
-    Private Sub PrintPositioned(printer As Printer, lines As List(Of PositionedNameLine))
-        For Each line As PositionedNameLine In lines
-            printer.CurrentX = line.X
-            printer.Print(line.Text)
+    Private Sub PrintSaleColumnLines(printer As Printer, lines As List(Of String))
+        For Each line As String In lines
+            printer.Print(T(1), line)
         Next
     End Sub
 
@@ -168,21 +163,15 @@ Module SaleV2Receipt
         Next
     End Sub
 
-    Private Sub PrintSaleFooter(printer As Printer, originalLines As List(Of PositionedNameLine),
-                                reprintLines As List(Of PositionedNameLine))
+    Private Sub PrintSaleFooter(printer As Printer, originalLines As List(Of String),
+                                reprintLines As List(Of String))
         printer.Print(T(1), Line1())
-        printer.Print(T(6), Foot1, T(25), Foot2)
+        printer.Print(T(6), Foot1, T(SaleFooterCaptionColumn), Foot2)
         printer.Print(T(1), ".")
         printer.Print(T(1), ".")
         printer.Print(T(1), ".")
-        For Each line As PositionedNameLine In originalLines
-            printer.CurrentX = line.X
-            printer.Print(line.Text)
-        Next
-        For Each line As PositionedNameLine In reprintLines
-            printer.CurrentX = line.X
-            printer.Print(line.Text)
-        Next
+        PrintSaleColumnLines(printer, originalLines)
+        PrintSaleColumnLines(printer, reprintLines)
         printer.Print(T(1), FootGama)
     End Sub
 End Module

@@ -88,9 +88,10 @@ Module Program
         CheckMoneyFormat()
         CheckItemLayout()
         CheckMetadataLayout()
+        CheckSaleColumnLayout()
         Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 + " &
                           IO.Directory.GetFiles(IO.Path.Combine(args(0), "v2"), "*.sample.json").Length &
-                          " fixtures v2 passed; sale/receivable/return v2 parser accepted/rejected; sale sample and return core/layout passed.")
+                          " fixtures v2 passed; sale/receivable/return v2 parser accepted/rejected; sale sample and return core/layout passed; sale column planning passed (not physical).")
     End Sub
 
     Private Sub CheckPhysicalSamples(folder As String)
@@ -116,9 +117,9 @@ Module Program
                     Dim payload As JObject = CType(root("payload"), JObject)
                     Dim store As JObject = CType(root("store"), JObject)
                     Dim customer As JObject = CType(payload("customer"), JObject)
-                    LayoutCenteredSaleText(CStr(store("name")), "NO NAME", 40.0F, characters)
-                    LayoutCenteredSaleText(CStr(store("address")), "", 40.0F, characters)
-                    LayoutCenteredSaleText(CStr(store("contact")), "", 40.0F, characters)
+                    LayoutSaleHeaderColumns(CStr(store("name")), "NO NAME", 20)
+                    LayoutSaleHeaderColumns(CStr(store("address")), "", 40)
+                    LayoutSaleHeaderColumns(CStr(store("contact")), "", 40)
                     LayoutSaleCustomer("PEMBELI  : ", CStr(customer("name")), 40.0F, characters)
                     LayoutSaleCustomer("ALAMAT   : ", CStr(customer("address")), 40.0F, characters)
                     LayoutSaleCustomer("NO HP    : ", CStr(customer("contact")), 40.0F, characters)
@@ -129,7 +130,7 @@ Module Program
                     If reprint IsNot Nothing Then
                         LayoutSaleReceiptLine("", CStr(reprint("date")), CStr(reprint("time")),
                                               True, 40.0F, characters)
-                        LayoutReprintName(CStr(reprint("processor")("name")), 40.0F, characters)
+                        LayoutSaleReprintNameColumns(CStr(reprint("processor")("name")), 40)
                     End If
                     Dim itemLineCount As Integer = 0
                     For Each token As JToken In CType(payload("items"), JArray)
@@ -140,7 +141,7 @@ Module Program
                             Long.Parse(CStr(item("totalSen")), CultureInfo.InvariantCulture),
                             40.0F, 40, characters).Count
                     Next
-                    LayoutOriginalName(CStr(payload("originalProcessor")("name")), 25.0F, 40.0F, characters)
+                    LayoutSaleOriginalNameColumns(CStr(payload("originalProcessor")("name")), "HORMAT KAMI", 40)
                     LayoutSaleCorrections(reprint, 40.0F, characters)
                     For Each row As SaleAmountRow In BuildSaleAmountRows(kind,
                         CStr(payload("paymentMethod")), CStr(payload("noncashMethod")), CType(payload("amounts"), JObject))
@@ -885,6 +886,76 @@ Module Program
                 rejected = True
             End Try
             If Not rejected Then Throw New InvalidOperationException("Item yang tidak muat/metrik rusak diterima.")
+        Next
+    End Sub
+
+    Private Sub CheckSaleColumnLayout()
+        ' Acuan posisi dari TAB v1: header 20/40 kolom dan caption pada TAB(25).
+        For Each scenario In New (Text As String, Columns As Integer, Spaces As Integer)() {
+            ("TOKO", 20, 8), ("ABCDE", 20, 7), ("JL. SATU", 40, 16), ("0812", 40, 18)}
+            Dim lines = LayoutSaleHeaderColumns(scenario.Text, "", scenario.Columns)
+            If lines.Count <> 1 OrElse lines(0) <> New String(" "c, scenario.Spaces) & scenario.Text Then
+                Throw New InvalidOperationException("Posisi kolom header berbeda dari TAB v1.")
+            End If
+        Next
+        If LayoutSaleHeaderColumns("", "", 40).Count <> 0 OrElse
+           LayoutSaleHeaderColumns("", "NO NAME", 20).Single() <> "      NO NAME" Then
+            Throw New InvalidOperationException("Header kosong/fallback berubah.")
+        End If
+        For Each length In {20, 40, 41}
+            Dim text As String = New String("A"c, length)
+            Dim lines = LayoutSaleHeaderColumns(text, "", 20)
+            If lines.Count <> CInt(Math.Ceiling(length / 20.0)) OrElse
+               String.Concat(lines.Select(Function(line) line.TrimStart())) <> text OrElse
+               lines.Any(Function(line) line.Length > 20) Then
+                Throw New InvalidOperationException("Header panjang/kelipatan kolom terpotong atau menambah baris kosong.")
+            End If
+        Next
+        Dim siti = LayoutSaleOriginalNameColumns("Siti", "HORMAT KAMI", 40)
+        If SaleFooterCaptionColumn <> 25 OrElse siti.Single() <> New String(" "c, 27) & "Siti" Then
+            Throw New InvalidOperationException("Siti tidak berada di TAB(28), di tengah caption dengan toleransi setengah kolom.")
+        End If
+        For Each scenario In New (Length As Integer, Spaces As Integer)() {(21, 19), (22, 18), (25, 15), (40, 0)}
+            Dim name As String = New String("N"c, scenario.Length)
+            If LayoutSaleOriginalNameColumns(name, "HORMAT KAMI", 40).Single() <>
+               New String(" "c, scenario.Spaces) & name Then
+                Throw New InvalidOperationException("Batas center/rata kanan nama pemroses salah.")
+            End If
+        Next
+        Dim longName As String = "SATU DUA TIGA EMPAT LIMA ENAM TUJUH DELAPAN SEMBILAN SEPULUH"
+        Dim wrapped = LayoutSaleOriginalNameColumns(longName, "HORMAT KAMI", 40)
+        Dim reprint = LayoutSaleReprintNameColumns(longName, 40)
+        If wrapped.Count < 2 OrElse reprint.Count < 2 OrElse
+           String.Join(" ", wrapped.Select(Function(line) line.TrimStart())) <> longName OrElse
+           String.Join(" ", reprint.Select(Function(line) line.TrimStart())) <> "Dicetak ulang oleh: " & longName OrElse
+           wrapped.Concat(reprint).Any(Function(line) line.Length <> 40) Then
+            Throw New InvalidOperationException("Nama panjang/cetak ulang tidak utuh atau tidak rata kanan.")
+        End If
+        If LayoutSaleOriginalNameColumns(vbTab, "HORMAT KAMI", 40).Count <> 0 OrElse
+           LayoutSaleReprintNameColumns("", 40).Count <> 0 Then
+            Throw New InvalidOperationException("Nama kosong mencetak baris tambahan.")
+        End If
+        Dim unicodeName As String = String.Concat(Enumerable.Repeat("😊", 30))
+        For Each lines In {LayoutSaleHeaderColumns(unicodeName, "", 20),
+                           LayoutSaleOriginalNameColumns(unicodeName, "HORMAT KAMI", 40)}
+            If String.Concat(lines.Select(Function(line) line.TrimStart())) <> unicodeName OrElse
+               lines.Any(Function(line) line.Length > 40 OrElse Char.IsHighSurrogate(line(line.Length - 1))) Then
+                Throw New InvalidOperationException("Header/footer kolom memotong Unicode.")
+            End If
+        Next
+        For Each action As Action In {
+            Sub() LayoutSaleHeaderColumns("A", "", 0),
+            Sub() LayoutSaleHeaderColumns("A", "", 41),
+            Sub() LayoutSaleOriginalNameColumns("Siti", "", 40),
+            Sub() LayoutSaleOriginalNameColumns("Siti", "HORMAT KAMI", 30),
+            Sub() LayoutSaleReprintNameColumns("Siti", 0)}
+            Dim rejected As Boolean = False
+            Try
+                action()
+            Catch ex As ArgumentException
+                rejected = True
+            End Try
+            If Not rejected Then Throw New InvalidOperationException("Kolom/caption tak sah diterima.")
         Next
     End Sub
 

@@ -9,6 +9,52 @@ Imports System.Globalization
 Imports Newtonsoft.Json.Linq
 
 Module SaleV2MetadataLayout
+    Friend Const SaleFooterCaptionColumn As Integer = 25
+
+    ' P-604: header/footer penjualan memakai spasi kolom seperti TAB v1, bukan
+    ' CurrentX dari TextWidth. Wrapping/normalisasi v2 tetap dijalankan sebelum cetak.
+    Friend Function LayoutSaleHeaderColumns(raw As String, fallback As String,
+                                           columns As Integer) As List(Of String)
+        CheckSaleColumns(columns)
+        Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        Return ToSaleColumnLines(LayoutCenteredSaleText(raw, fallback, CSng(columns), characters), columns)
+    End Function
+
+    Friend Function LayoutSaleOriginalNameColumns(raw As String, caption As String,
+                                                 columns As Integer) As List(Of String)
+        CheckSaleColumns(columns)
+        If String.IsNullOrEmpty(caption) OrElse caption <> NormalizeProcessorName(caption) OrElse
+           SaleFooterCaptionColumn + caption.Length - 1 > columns Then
+            Throw New ArgumentException("Caption footer melampaui kolom nota.")
+        End If
+        Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        Dim center As Single = CSng(SaleFooterCaptionColumn - 1) + CSng(caption.Length) / 2.0F
+        Return ToSaleColumnLines(LayoutOriginalName(raw, center, CSng(columns), characters), columns)
+    End Function
+
+    Friend Function LayoutSaleReprintNameColumns(raw As String, columns As Integer) As List(Of String)
+        CheckSaleColumns(columns)
+        Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
+        Return ToSaleColumnLines(LayoutReprintName(raw, CSng(columns), characters), columns)
+    End Function
+
+    Private Sub CheckSaleColumns(columns As Integer)
+        If columns < 1 OrElse columns > 40 Then Throw New ArgumentException("Jumlah kolom nota tidak sah.")
+    End Sub
+
+    Private Function ToSaleColumnLines(lines As List(Of PositionedNameLine), columns As Integer) As List(Of String)
+        Dim result As New List(Of String)(lines.Count)
+        For Each line As PositionedNameLine In lines
+            ' Setengah kolom dibulatkan ke kiri seperti pembagian integer header v1.
+            Dim spaces As Integer = CInt(Math.Floor(line.X))
+            If spaces < 0 OrElse spaces + line.Text.Length > columns Then
+                Throw New ArgumentException("Teks melampaui kolom nota.")
+            End If
+            result.Add(StrDup(spaces, " ") & line.Text)
+        Next
+        Return result
+    End Function
+
     Friend Function LayoutCenteredSaleText(raw As String, fallback As String, printableWidth As Single,
                                            measure As Func(Of String, Single)) As List(Of PositionedNameLine)
         Dim value As String = NormalizeProcessorName(raw)

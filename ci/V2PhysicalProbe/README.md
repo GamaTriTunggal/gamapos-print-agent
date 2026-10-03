@@ -49,6 +49,15 @@ Jika preflight lulus tetapi cetak gagal, probe melaporkan nama tahap tetap
 Jangan mengulang job hanya untuk mengejar keberhasilan; laporkan tahap dan
 apakah ada kertas keluar.
 
+Untuk checkpoint alignment penjualan (3 Oktober 2026), mulai dengan **satu**
+`sale_cash.sample.json` setelah preflight lulus. Foto seluruh struk dalam
+keadaan rata, termasuk TOKO dan nama Siti di bawah HORMAT KAMI. Kandidat ini
+memakai posisi kolom v1 untuk header/footer penjualan; build/preflight sukses
+belum membuktikan posisi di kertas. Setelah contoh pendek diperiksa, gunakan
+`sale_long_item.sample.json` dan `sale_corrected_reprint.sample.json` untuk
+nama panjang/rata kanan serta penanda pencetak ulang. Nota piutang dan retur
+belum memakai perbaikan posisi penjualan ini.
+
 Ulangi untuk empat belas contoh sintetis lainnya:
 
 - `sale_cash.sample.json` — penjualan tunai;

@@ -77,7 +77,9 @@ SHA-256 DLL yang diperiksa:
 `81edea696a5d42d8641eabd03c57d11c4236915b484157d52743046344430a50`.
 Inspeksi DLL membuktikan perilaku kepemilikan objek. Pada `35d8119`, pemilik
 berhasil menjalankan preflight dan mencetak fixture penjualan tunai; bukti
-visual bagian utama dicatat di bawah, footer lengkap masih perlu foto. Mode
+visual bagian utama dicatat di bawah. Foto awal belum memperlihatkan footer
+lengkap; foto berikutnya menunjukkan nama tidak selaras (lihat checkpoint
+3 Oktober di bawah). Mode
 `--preflight` setelah perbaikan juga mengukur teks sesudah transisi
 9 → 18 → 9 pt untuk mendeteksi objek Font yang tidak lagi sah, tanpa mencetak.
 
@@ -92,7 +94,7 @@ visual bagian utama dicatat di bawah, footer lengkap masih perlu foto. Mode
 | `--preflight` penjualan pada binary `799c36e` | Lulus di Windows | Agent dan probe dibangun ulang; semua layout direncanakan tanpa `Printer.Print`/`EndDoc`. |
 | Cetak penjualan v2 pada `5d1e732` | Gagal | Build agent/probe terkonfirmasi; galat di `store-details`, penyebab `ArgumentException`. |
 | Perbaikan kepemilikan Font pada `35d8119` | Lulus preflight dan pengiriman cetak Windows | Build agent/probe, preflight transisi font, dan `--print` berhasil; kertas tercetak. |
-| Visual `sale_cash.sample.json` pada `35d8119` | Bagian utama lulus; footer belum terkonfirmasi | Belanja 19.752 − pembulatan 252 = nota 19.500; diterima 20.000, kembalian 500. Tepi kanan nilai utuh. Nama/branding bagian bawah melengkung dekat printer. |
+| Visual `sale_cash.sample.json` pada `35d8119` | Angka utama lulus; alignment nama gagal pada foto lengkap | Belanja 19.752 − pembulatan 252 = nota 19.500; diterima 20.000, kembalian 500. Tepi kanan nilai utuh. Foto berikutnya memperlihatkan Siti bergeser ke kanan dari HORMAT KAMI. |
 | Nota piutang dan retur v2 | Belum diuji | Masing-masing perlu uji fisik; font retur 10 pt belum dikalibrasi pada foto ini. |
 | Aktivasi/HTTP/role mapping/rilis | Belum diuji/diizinkan | Jangan aktifkan dari bukti kalibrasi ini. |
 
@@ -102,6 +104,64 @@ SHA-256 foto:
 `6bd49dd7491e42c7309889dea2fa38316580ce01a45fd064e7075b8efb5cff3d`.
 Fixture ini tidak memuat diskon; hasilnya membuktikan pembulatan tunai dan
 angka yang terlihat, belum membuktikan seluruh kombinasi pembayaran.
+
+## Checkpoint alignment penjualan — 3 Oktober 2026
+
+Foto lengkap berikutnya disimpan privat sebagai
+`.local/discount-rounding/physical-print-20261002/sale_cash-full-footer-35d8119.jpg`
+di repo utama. SHA-256:
+`eab3b93a68879cd6b36cd1b825573115d72aa51f4006fc06b3734485b2572f28`.
+Foto ini membuktikan ketidakselarasan Siti dengan caption, bukan kegagalan
+desain v1. Header v2 juga berbeda mekanisme penempatannya dari v1; foto
+perspektif tidak dipakai untuk mengklaim ukuran offset header yang pasti.
+
+Kandidat checkpoint ini mengubah **hanya penempatan header dan nama footer
+tiga nota penjualan v2** (kasir, kasbon, campuran):
+
+- `LayoutSaleHeaderColumns` merencanakan nama toko pada 20 kolom, alamat dan
+  kontak pada 40 kolom. Center berupa spasi karakter, bukan `TextWidth`/`CurrentX`.
+- `LayoutSaleOriginalNameColumns` memakai anchor caption yang sama dengan
+  renderer (`SaleFooterCaptionColumn=25`). Siti dimulai pada kolom 28;
+  perbedaan panjang genap/ganjil memiliki toleransi setengah kolom, dibulatkan
+  ke kiri. Nama yang tidak muat pada posisi center rata kanan; nama lebih
+  panjang dari 40 kolom dibungkus tanpa membuang teks.
+- `LayoutSaleReprintNameColumns` menjaga baris terpisah “Dicetak ulang oleh: …”
+  rata kanan. Semua baris ini dicetak dari `T(1)` dengan spasi yang direncanakan,
+  setara mekanisme pembentukan teks `TAB` v1, tanpa memindahkan `CurrentX` per baris.
+- Normalisasi, wrapping kata/grapheme v2, alamat kosong yang tidak dicetak,
+  dan header tepat kelipatan kolom tanpa baris kosong tambahan tetap dijaga.
+  Ini mengikuti mekanisme posisi v1, bukan menyalin keterbatasan input v1.
+- Font, nilai uang, snapshot, parser, capability aktif schema 1, renderer v1,
+  serta printer LX-310/label tidak diubah. Piutang/retur v2 belum mengikuti
+  perubahan posisi ini dan tetap membutuhkan checkpoint/uji sendiri.
+
+Validasi lokal pada perubahan ini:
+
+```text
+dotnet build src/SpikeTransport/SpikeTransport.vbproj -c Release --no-restore --nologo
+dotnet build ci/V2PhysicalProbe/V2PhysicalProbe.vbproj -c Release --no-restore --nologo
+dotnet run --project ci/SchemaGateTests/SchemaGateTests.vbproj -c Release -- fixtures
+git diff --check
+```
+
+Kedua build Linux lulus dengan 0 warning/0 error. Schema gate lulus 11 kasus,
+7 rute, 17 fixture v1 dan 15 fixture v2, termasuk tes baru posisi kolom TOKO,
+alamat/kontak, Siti, batas center/rata kanan, nama panjang, cetak ulang,
+teks kosong, kelipatan lebar kolom, Unicode, dan input kolom tidak sah.
+Perbandingan diff terhadap `5f5ba69` pada renderer v1, parser/rumus uang,
+capability dan dispatch tidak menunjukkan perubahan.
+
+**Belum lulus fisik:** Windows build/preflight/cetak kandidat ini belum
+dijalankan. Smoke HTTP Windows dan pengujian fisik piutang/retur juga tidak
+dijalankan pada checkpoint Linux ini. Tes kolom bukan bukti bahwa kertas
+sudah tepat. Jangan aktifkan v2 atau menyatakan papan selesai dari hasil ini.
+
+Uji berikutnya: build ulang agent dan probe dari commit kandidat yang sama,
+jalankan `--preflight` lalu cetak **satu** `sale_cash.sample.json`, dan foto
+seluruh kertas rata sampai footer. Bandingkan TOKO terhadap area isi nota dan
+Siti terhadap HORMAT KAMI, bukan terhadap perspektif tepi foto. Setelah itu,
+fixture `sale_long_item.sample.json` dan `sale_corrected_reprint.sample.json`
+menguji wrapping/nama panjang serta penanda pencetak ulang.
 
 Jalankan hanya fixture sintetis melalui
 [`ci/V2PhysicalProbe/README.md`](../ci/V2PhysicalProbe/README.md). Simpan
