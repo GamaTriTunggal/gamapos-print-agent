@@ -4,6 +4,65 @@ Dokumen ini mencatat bukti dan aturan kerja untuk renderer nota schema 2
 (`P-604`). Kontrak bisnis tetap diputuskan di repo utama GamaPOS; dokumen ini
 tidak mengizinkan aktivasi schema 2, rilis agent, atau perubahan nota schema 1.
 
+## Batch footer diterima dan jalur HTTP staging disiapkan — 3 Oktober 2026
+
+Pemilik mengirim `IMG_3927.HEIC` lalu menyetujui hasil pemeriksaan. Setelah
+decoding lokal tanpa mengubah foto sumber, ketujuh contoh terlihat utuh:
+selected tunai/EDC, selected reprint, FIFO transfer/EDC, retur asli/salinan.
+`SYNTHETIC OWNER`, `KASIR ASAL/AWAL` dan kedua baris pencetak ulang lengkap.
+Nama retur berada di pusat TANDA TERIMA; nama piutang panjang rata kanan
+sesuai fallback kolom, bukan dipaksa center di luar tepi kiri.
+Angka yang terlihat cocok dengan fixture (9; 9,20; 14.000; bayar 4/sisa 16;
+tagihan 10.200/sisa 20.000; retur 2,52 dan 1.000).
+SHA-256 foto privat:
+`d4be1432e7d82417e7fc497274abb2edde93cbee6eacd20381594bcd45430bc3`.
+Ini bukti visual tujuh contoh, bukan seluruh input atau integrasi HTTP.
+Konsol/hash binary Windows tidak disertakan pada pesan foto; konteks uji
+adalah instruksi mengambil `330a310`. Tidak meminta ulang tujuh contoh ini.
+
+Pemilik mengizinkan persiapan satu checkpoint berikutnya: kasir staging
+→ cetak pertama tunai berdiskon → cetak ulang nota yang sama. Probe kini
+memiliki `--serve` terpisah dari startup agent. Ia membuka localhost:9111
+sementara setelah konfirmasi, hanya loopback/origin staging, hanya
+cashier_receipt CASH schema2, dua job asli/salinan yang snapshot-nya sama.
+Tidak mengubah autostart, pemetaan/default printer, driver, payload, money,
+formatter atau capability agent normal. Isi nota hanya RAM sesi, tidak log
+atau disk. Renderer/validator memakai assembly agent yang sama dengan uji
+kertas. Retry identik tidak mencetak ulang; konflik, galat ambigu, nota lain,
+origin produksi, schema1, keluarga/metode lain dan sesi kedaluwarsa ditahan.
+Sesi 30 menit; penghentian menunggu renderer yang sedang berjalan.
+
+Tes policy dan HTTP TCP loopback Linux memakai renderer spy, **bukan
+printer fisik**. Termasuk CORS/PNA, body/depth/parser, batas dua job,
+snapshot asli/salinan, printer berubah, retry/konflik/konkurensi, galat
+ambigu, kedaluwarsa dan penghentian. Browser sintetis repo Go memeriksa
+health alat hanya membuka kasir v2, payload tetap, enam job lain tertahan;
+fetch tiruan tersebut bukan bukti CORS browser Windows sebenarnya.
+Build net48 agent/probe dan schema gate dijalankan melalui perintah
+checkpoint sebelumnya; hasil/log privat:
+`.local/discount-rounding/staging-print-bridge-20261003/`.
+Fixture, golden dan renderer v1/v2 tidak diubah. Satu nilai diskon hanya
+dibentuk di RAM tes: 19.752 − 500 − 252 = 19.000, bukan oracle baru.
+
+Build net48 agent/probe lulus 0 warning/error; schema gate lulus 11 kasus
++ 7 rute + 17 fixture v1 + 17 fixture v2 serta policy/HTTP bridge.
+`make ci TEST_PG_DSN=` lulus pada salinan HEAD Go `43257037` + checkpoint
+saja, cache lint terisolasi. Termasuk 12 tes capability browser, 314 tes
+piutang dan dokumentasi 75 dokumen/24 keputusan. Integrasi ber-DSN
+dilewati. Warning Vue readonly pada tes sintetis tetap ada di log; tidak
+mengubah frontend untuk menyembunyikannya. Tidak mengikutkan perubahan
+docs/proposal/docscheck sesi lain. Dokumentasi hasil akhir dicek kembali.
+
+**Belum dijalankan di Windows/browser staging atau diaktifkan.** Remote
+main repo Go terverifikasi `f18dff69`; tujuh commit lokal sampai `43257037`
+memuat handoff/payload minimal yang belum dipush. Push aplikasi untuk
+staging dan push alat ke branch uji memerlukan izin tersendiri. Tidak
+mengklaim halaman staging sekarang sudah bisa mencetak v2. Panduan ada
+di README probe. Jangan menjalankan smoke CI lama pada VM pemilik: skrip
+itu menimpa pemetaan dan menulis autostart. Dispatcher/role mapping agent
+terpasang, kompatibilitas penuh, Unicode ekstrem dan penutupan papan masih
+gerbang terpisah. Ini bukan rilis agent, perubahan produksi atau izin VPS.
+
 ## Nama footer piutang/retur mengikuti kolom — 3 Oktober 2026 (P-604 / DR-08)
 
 Pemilik menyetujui perbaikan **posisi nama saja** setelah batch fisik:

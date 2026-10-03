@@ -232,6 +232,12 @@ Kandidat piutang/retur v2, checkpoint 3 Oktober 2026 setelah foto batch:
   Hasil fisik setelah perbaikan belum dibuktikan; batch uji ulang hanya
   lima bukti piutang dan dua retur, bukan mengulang penjualan.
 
+Tindak lanjut: foto `IMG_3927.HEIC` memperlihatkan ketujuh contoh dengan
+nama utuh dan pemilik menerima pemeriksaan. Center/rata kanan mengikuti
+anchor di atas. Ini bukti footer pada contoh, bukan semua payload/glyph.
+Jalur browser staging terpisah memakai mode probe `--serve`; formatter
+tetap sama, tetapi HTTP/role mapping agent terpasang belum dibuktikan.
+
 ### Catatan koreksi cetak ulang v2 — keputusan 3 Oktober 2026
 
 Snapshot penerbitan mempertahankan identitas/angka asal, **bukan izin

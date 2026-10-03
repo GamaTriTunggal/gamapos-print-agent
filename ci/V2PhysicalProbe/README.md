@@ -2,10 +2,86 @@
 
 Alat ini khusus PC Windows uji dengan printer nota fisik. Ia memanggil
 parser/renderer schema 2 dari assembly hasil build secara langsung;
-`Program.Main` agent **tidak dijalankan**. Alat tidak membuka port 9111,
+`Program.Main` agent **tidak dijalankan**. Mode fixture tidak membuka port 9111;
+mode `--serve` membuka loopback sementara setelah konfirmasi operator. Alat tidak
 menulis autostart, mengganti printer default, memasang driver, atau
 mengiklankan kemampuan v2. Jangan jalankan pada PC toko yang sedang
 melayani transaksi. Gunakan hanya fixture sintetis, bukan data pelanggan.
+
+## Uji kasir staging → kertas, tanpa memasang agent — 3 Oktober 2026
+
+**Jangan jalankan `ci/smoke.ps1` langsung pada VM pemilik.** Skrip tersebut
+untuk runner sekali pakai: membuat printer virtual, menimpa `printers.json`
+dan menjalankan startup agent yang mendaftarkan autostart. Gunakan mode
+terpisah berikut; tidak ada startup agent, instalasi, perubahan default,
+pemetaan, driver, katalog, atau penyimpanan isi nota.
+
+Prasyarat: PC Windows uji, printer default `EPSON TM-U220 Receipt`, dan
+aplikasi staging sudah memiliki handoff/payload minimal yang sesuai agent.
+Saat checkpoint dibuat, aplikasi remote masih `f18dff69`; tujuh commit
+lokal sampai `43257037` belum dipush. Tanpa pembaruan aplikasi yang diizinkan
+terpisah, alat ini **belum cukup** untuk mencetak dari kasir staging.
+
+Sesudah mengambil commit kandidat dan build ulang kedua proyek:
+
+```powershell
+dotnet build .\src\SpikeTransport\SpikeTransport.vbproj -c Release
+dotnet build .\ci\V2PhysicalProbe\V2PhysicalProbe.vbproj -c Release
+& ".\ci\V2PhysicalProbe\bin\Release\net48\V2PhysicalProbe.exe" --serve ".\src\SpikeTransport\bin\Release\net48\GamaPrintAgent.SpikeTransport.exe" "EPSON TM-U220 Receipt"
+```
+
+Jangan melanjutkan bila salah satu build gagal. Ketik `UJI STAGING` untuk
+konfirmasi; terminal akan memberi pesan jalur uji siap. Jika printer
+tidak cocok, port 9111 terpakai atau hak listener tidak tersedia, alat
+berhenti. Laporkan galat; jangan otomatis mematikan agent lain, menjalankan
+sebagai administrator, mengubah URL ACL/driver, atau menimpa konfigurasi.
+Biarkan terminal terbuka, **jangan ubah printer default selama sesi**.
+
+Di browser **VM yang sama**, buka `https://staging.gamapos.id/pos/cashier`.
+Izinkan akses jaringan lokal bila browser meminta. Gunakan barang/pelanggan
+uji, bukan transaksi toko: satu penjualan **TUNAI BERDISKON**, lalu cetak
+ulang nota yang sama dari Daftar Nota. Gunakan barang uji staging yang
+dikonfirmasi masih ada sebelum memulai; jangan mengulang bayar bila nota
+gagal dicetak. Ambil kedua struk sekaligus setelah selesai. Catat nomor
+nota, total/diskon/pembulatan yang ditampilkan aplikasi, hash commit
+aplikasi/agent dan hasil konsol; foto asli/ulang harus cocok dan nama asal
+tetap, baris pencetak ulang hanya pada salinan. Jangan masukkan data
+pelanggan atau screenshot privat ke Git.
+
+Selama alat ini aktif jangan memproses transaksi tanpa diskon atau alur
+pembayaran/cetak lain: alat menolaknya, tetapi transaksi aplikasi dapat
+tetap tersimpan. Probe bukan pengganti agent harian; hanya checkpoint uji
+yang telah disepakati.
+
+Batas alat:
+
+- Hanya peer loopback dan origin tepat `https://staging.gamapos.id`.
+  Produksi, origin kosong/`null` pada POST, schema1, keluarga lain dan
+  pembayaran nontunai ditolak; tidak ada fallback formatter v1.
+- `/health` menyebut `mode:staging-test` dan kemampuan hanya
+  `cashier_receipt` tunai berdiskon schema2. Agent normal tetap mengumumkan schema1.
+  Ini menguji browser → HTTP alat sementara → parser/renderer agent
+  sebenarnya, **bukan dispatcher/role mapping agent terpasang atau izin rilis**.
+- Maksimal dua job: nota asli kemudian salinan snapshot nota yang sama,
+  masing-masing copies=1. Retry jobId/body identik yang sudah sukses tidak
+  mengirim ulang ke printer; jobId sama dengan body berbeda ditolak.
+  Ledger hanya RAM sesi ini, bukan jaminan idempotensi setelah restart.
+- Parser tetap memeriksa semua nilai, body maksimal 1 MiB dan depth parser
+  yang sama; payload/snapshot tidak diubah. Empat request HTTP bersamaan
+  dibatasi; pekerjaan cetak diserialkan. Tidak ada log body/nama/nomor nota.
+- Galat renderer menjadi `PRINT_OUTCOME_UNKNOWN`: kertas mungkin sudah
+  keluar; semua cetak baru ditahan, tidak retry otomatis. Jangan memulai
+  sesi baru untuk mengejar hasil tanpa pemeriksaan. Timeout browser juga
+  bukan bukti tidak ada kertas; jangan ulang checkout.
+- Sesi maksimal 30 menit; Ctrl+C untuk berhenti **setelah cetak selesai**.
+  Penghentian menunggu renderer, tidak membatalkan spooler. Setelah alat
+  ditutup tidak ada port/autostart baru yang bertahan. Agent terpasang
+  tidak di-upgrade/diubah dan tetap hanya mendukung schema1.
+
+Mode ini belum dibuktikan pada Windows/browser staging/printer fisik.
+Tes HTTP Linux menggunakan renderer spy; jangan menulisnya sebagai UAT
+atau aktivasi agent. Foto tujuh fixture sebelumnya adalah bukti renderer
+footer saja, bukan bukti handoff browser ini.
 
 ## Batch uji ulang nama piutang/retur — 3 Oktober 2026
 

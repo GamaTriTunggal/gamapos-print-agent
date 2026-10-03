@@ -1,5 +1,6 @@
 ' Probe manual nota v2, terpisah dari startup agent. Tidak memasang agent,
-' menulis autostart, membuka port, mengganti default printer, atau merilisnya.
+' menulis autostart, mengganti default printer, atau merilisnya.
+' --serve membuka loopback sementara khusus kasir staging setelah konfirmasi.
 Option Strict On
 Option Explicit On
 
@@ -7,15 +8,17 @@ Imports System
 Imports System.Drawing.Printing
 Imports System.IO
 Imports System.Reflection
+Imports System.Threading
 Imports Newtonsoft.Json.Linq
 
 Module Program
     Private Const AgentNamespace As String = "GamaPrintAgent.SpikeTransport."
 
     Function Main(args As String()) As Integer
+        If args.Length = 3 AndAlso args(0) = "--serve" Then Return ServeStaging(args(1), args(2))
         If args.Length <> 4 OrElse
            (args(0) <> "--verify" AndAlso args(0) <> "--preflight" AndAlso args(0) <> "--print") Then
-            Console.Error.WriteLine("Pakai: V2PhysicalProbe.exe --verify|--preflight|--print AGENT_EXE FIXTURE_JSON NAMA_PRINTER_DEFAULT")
+            Console.Error.WriteLine("Pakai: V2PhysicalProbe.exe --verify|--preflight|--print AGENT_EXE FIXTURE_JSON NAMA_PRINTER_DEFAULT; atau --serve AGENT_EXE NAMA_PRINTER_DEFAULT")
             Return 2
         End If
         Try
@@ -80,6 +83,62 @@ Module Program
             Console.Error.WriteLine("Gagal: " & ex.GetType().Name & ". Periksa path, printer, dan fixture uji.")
         End Try
         Return 1
+    End Function
+
+    Private Function ServeStaging(agentPath As String, expectedPrinter As String) As Integer
+        Dim server As V2StagingHttpServer = Nothing
+        Try
+            If Not File.Exists(agentPath) OrElse String.IsNullOrWhiteSpace(expectedPrinter) Then Throw New ArgumentException()
+            expectedPrinter = expectedPrinter.Trim()
+            Dim agent As Assembly = Assembly.LoadFrom(Path.GetFullPath(agentPath))
+            Dim parser = FindMethod(agent, "SaleV2Parser", "ParseSaleV2")
+            Dim renderer = FindMethod(agent, "SaleV2Receipt", "PrintSaleV2Receipt")
+            Dim printerReady As Func(Of Boolean) = Function()
+                                                      Dim settings As New PrinterSettings()
+                                                      Return settings.IsValid AndAlso String.Equals(settings.PrinterName, expectedPrinter, StringComparison.OrdinalIgnoreCase)
+                                                  End Function
+            If Not printerReady() Then Throw New InvalidOperationException()
+            Console.WriteLine("Uji browser staging: maksimal satu nota tunai v2 dan satu cetak ulang nota yang sama, selama 30 menit.")
+            Console.WriteLine("Tidak memasang agent/autostart, mengubah printer default, atau menyimpan isi nota.")
+            Console.WriteLine("Jangan ubah printer default selama uji. Jika cetak gagal/timeout, jangan mengulang pembayaran atau memulai sesi baru.")
+            Console.Write("Untuk membuka localhost:9111 pada PC uji, ketik UJI STAGING: ")
+            If Console.ReadLine() <> "UJI STAGING" Then Return 2
+            Dim policy As New V2StagingBridge(
+                Function(body As String) CType(parser.Invoke(Nothing, New Object() {body}), JObject),
+                Sub(body As String) renderer.Invoke(Nothing, New Object() {body}),
+                printerReady, agent.GetName().Version.ToString(3))
+            server = New V2StagingHttpServer(policy, "http://localhost:9111/")
+            server.Start()
+            Console.WriteLine("Jalur uji siap: buka https://staging.gamapos.id/pos/cashier di browser VM ini.")
+            Console.WriteLine("Buat satu transaksi TUNAI BERDISKON dengan barang uji, lalu cetak ulang dari Daftar Nota. Ctrl+C setelah cetak selesai.")
+            Using finished As New ManualResetEventSlim(False)
+                Dim cancel As ConsoleCancelEventHandler = Sub(sender As Object, e As ConsoleCancelEventArgs)
+                                                             e.Cancel = True
+                                                             If policy.IsPrinting Then
+                                                                 Console.WriteLine("Print command is still running; wait before stopping the test.")
+                                                             Else
+                                                                 finished.Set()
+                                                             End If
+                                                         End Sub
+                AddHandler Console.CancelKeyPress, cancel
+                Try
+                    finished.Wait(TimeSpan.FromMinutes(30))
+                    While policy.IsPrinting
+                        Thread.Sleep(50)
+                    End While
+                Finally
+                    RemoveHandler Console.CancelKeyPress, cancel
+                End Try
+            End Using
+            Return 0
+        Catch ex As Exception
+            Dim listenerError As System.Net.HttpListenerException = TryCast(ex, System.Net.HttpListenerException)
+            Dim code As String = If(listenerError Is Nothing, "", " (Windows code " & listenerError.NativeErrorCode & ")")
+            Console.Error.WriteLine("Jalur uji tidak aktif: " & ex.GetType().Name & code & ". Periksa printer default dan port 9111; jangan ubah driver/URL ACL atau hentikan agent lain otomatis.")
+            Return 1
+        Finally
+            If server IsNot Nothing Then server.Stop()
+        End Try
     End Function
 
     Private Function SafePreflightReason(failure As Exception) As String

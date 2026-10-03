@@ -81,6 +81,7 @@ Module Program
         CheckReceivableV2(IO.Path.Combine(args(0), "v2"))
         CheckReturnV2(IO.Path.Combine(args(0), "v2", "return_note.sample.json"))
         CheckPhysicalSamples(IO.Path.Combine(args(0), "v2"))
+        StagingBridgeTests.Run(IO.Path.Combine(args(0), "v2"))
         If args.Length >= 2 Then CheckGoReceivableV2(args(1))
         If args.Length >= 3 Then CheckGoSaleV2(args(2))
         If args.Length = 4 Then CheckGoReturnV2(args(3))
