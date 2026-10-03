@@ -215,6 +215,38 @@ Footer retur hanya menggunakan `TANDA TERIMA`, keterangan nota merah, dan
 ruang tanda tangan khusus. Bukti piutang biasa memiliki susunan lain: nama
 toko dan operator di bagian bawah. Jangan menyeragamkan footer semua jenis.
 
+### Catatan koreksi cetak ulang v2 — keputusan 3 Oktober 2026
+
+Snapshot penerbitan mempertahankan identitas/angka asal, **bukan izin
+mencetak seluruh audit**. Pemilik menyetujui draft ringkas setelah melihat
+foto cetak ulang yang terlalu padat. Nota tanpa koreksi tidak memiliki
+blok koreksi; nama asli tetap, kemudian “Dicetak ulang oleh: …” di footer.
+Baris nomor/waktu CETAK ULANG yang sudah ada pada v1 tetap dipertahankan.
+
+Untuk penjualan yang dikoreksi, blok sesudah jumlah hanya memuat:
+
+```text
+KOREKSI SETELAH NOTA DIBUAT:
+Pelanggan: Andi
+Diubah menjadi KASBON
+Metode DP: TRANSFER
+
+Angka di atas mengikuti nota asal.
+```
+
+Tampilkan hanya koreksi yang benar-benar ada. Koreksi metode yang bukan
+konversi kasbon memakai “Metode: TUNAI/TRANSFER/EDC”, bukan METODE DP.
+Nama pelanggan kosong memakai “Pelanggan: diperbarui”, tanpa mengarang nama
+atau mencetak ID internal. Nilai DP/saldo terkini tidak direka dari nota
+asal. ID pelanggan, waktu/pelaku setiap koreksi, dan “SALDO SEKARANG: LIHAT
+RIWAYAT” tidak dicetak; data audit/snapshot dan validator tetap dipertahankan.
+Nama panjang tetap dibungkus dengan helper pelanggan yang sama.
+
+Fixture Unicode ekstrem tetap untuk regresi teknis; contoh penilaian
+tampilan normal terpisah dari fixture tersebut. Jangan memperlakukan lolos
+tes Unicode di Linux sebagai bukti glyph/posisi benar pada printer fisik.
+Jangan menambahkan detail lain pada nota tanpa draft yang disetujui pemilik.
+
 ## 2. Epson LX-310 — Surat Jalan 82 Kolom
 
 ### Fungsi, kertas, dan font

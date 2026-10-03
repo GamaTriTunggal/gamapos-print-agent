@@ -99,7 +99,8 @@ Module Program
         Dim expected As String() = {
             "sale_cash.sample.json", "sale_edc_only.sample.json", "sale_split_edc.sample.json",
             "sale_split_wire.sample.json", "sale_kasbon_dp0.sample.json", "sale_kasbon_dp.sample.json",
-            "sale_long_item.sample.json", "sale_customer_metadata_long.sample.json", "sale_corrected_reprint.sample.json", "receivable_fifo_edc.sample.json",
+            "sale_long_item.sample.json", "sale_customer_metadata_long.sample.json", "sale_corrected_reprint.sample.json",
+            "sale_corrected_reprint_simple.sample.json", "receivable_fifo_edc.sample.json",
             "receivable_selected.sample.json", "receivable_selected_card.sample.json",
             "receivable_selected_reprint.sample.json", "receivable_proof.sample.json",
             "return_note.sample.json", "return_reprint.sample.json"}
@@ -155,6 +156,17 @@ Module Program
                         CheckWrappedCustomerSample("PEMBELI  : ", CStr(customer("name")), False, characters)
                         CheckWrappedCustomerSample("ALAMAT   : ", CStr(customer("address")), False, characters)
                         CheckWrappedCustomerSample("PO       : ", CStr(customer("poNo")), True, characters)
+                    End If
+                    If IO.Path.GetFileName(path) = "sale_corrected_reprint_simple.sample.json" Then
+                        Dim before As String = root.ToString(Formatting.None)
+                        Dim expectedLines As String() = {"KOREKSI SETELAH NOTA DIBUAT:", "Pelanggan: Andi",
+                            "Diubah menjadi KASBON", "Metode DP: TRANSFER", "", "Angka di atas mengikuti nota asal."}
+                        If Not LayoutSaleCorrections(reprint, 40.0F, characters).SequenceEqual(expectedLines) OrElse
+                           CStr(payload("originalProcessor")("name")) <> "Siti" OrElse
+                           CStr(reprint("processor")("name")) <> "Andi" OrElse
+                           root.ToString(Formatting.None) <> before Then
+                            Throw New InvalidOperationException("Contoh cetak ulang realistis tidak mengikuti draft pemilik.")
+                        End If
                     End If
                 Case "RECEIVABLE"
                     BuildReceivableV2Plan(ParseReceivableV2(body), 40.0F, 20.0F, characters, characters)
@@ -296,7 +308,7 @@ Module Program
            corrections.Count <> 2 OrElse CStr(corrections(0)("customerId")) <> "CS9002" OrElse
            CStr(corrections(1)("paymentMethod")) <> "WIRE" OrElse
            Not CBool(corrections(1)("convertedToCredit")) OrElse
-           Not lines.Any(Function(line) line.Contains("NOTA ASAL")) OrElse
+           Not lines.Any(Function(line) line.Contains("nota asal")) OrElse
            Not lines.Any(Function(line) line.Contains("KASBON")) OrElse
            lines.Any(Function(line) line.Length > 40) Then
             Throw New InvalidOperationException("Job Go salinan nota gagal diparse atau dicatat lengkap.")
@@ -706,16 +718,37 @@ Module Program
         Dim corrected As JObject = CType(reprint.DeepClone(), JObject)
         corrected("payload")("reprint")("corrections") = JArray.Parse("[{""kind"":""customer"",""eventId"":""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"",""date"":""2026-09-28"",""time"":""09:00:00"",""actorName"":""ADMIN SATU"",""customerId"":""CS9002"",""customerName"":""PELANGGAN BARU SANGAT PANJANG UNTUK DIBUNGKUS""},{""kind"":""payment"",""eventId"":""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"",""date"":""2026-09-28"",""time"":""10:00:00"",""actorName"":""ADMIN DUA"",""paymentMethod"":""WIRE"",""convertedToCredit"":true}]")
         Accept("salinan dengan dua koreksi", corrected)
+        Dim correctedBefore As String = corrected.ToString(Formatting.None)
         Dim correctedLines As List(Of String) = LayoutSaleCorrections(CType(corrected("payload")("reprint"), JObject),
             40.0F, Function(value As String) CSng(value.Length))
-        If correctedLines.Count < 8 OrElse
-           Not correctedLines.Any(Function(line) line.Contains("NOTA ASAL")) OrElse
-           Not correctedLines.Any(Function(line) line.Contains("CS9002")) OrElse
-           Not correctedLines.Any(Function(line) line.Contains("KASBON")) OrElse
-           Not correctedLines.Any(Function(line) line.Contains("TRANSFER")) OrElse
-           Not correctedLines.Any(Function(line) line.Contains("LIHAT RIWAYAT")) OrElse
-           correctedLines.Any(Function(line) line.Length > 40) Then
-            Throw New InvalidOperationException("Catatan koreksi hilang atau melewati area cetak.")
+        Dim expectedCorrections As New List(Of String) From {"KOREKSI SETELAH NOTA DIBUAT:"}
+        expectedCorrections.AddRange(LayoutSaleCustomer("Pelanggan: ", "PELANGGAN BARU SANGAT PANJANG UNTUK DIBUNGKUS",
+                                                      40.0F, Function(value As String) CSng(value.Length)))
+        expectedCorrections.AddRange({"Diubah menjadi KASBON", "Metode DP: TRANSFER", "", "Angka di atas mengikuti nota asal."})
+        If Not correctedLines.SequenceEqual(expectedCorrections) OrElse
+           correctedLines.Any(Function(line) line.Length > 40) OrElse
+           corrected.ToString(Formatting.None) <> correctedBefore Then
+            Throw New InvalidOperationException("Catatan koreksi tidak ringkas, melewati area, atau mengubah snapshot.")
+        End If
+        ' P-604: semua metode tetap dijelaskan; rincian audit tidak ikut tercetak.
+        For Each method In {"CASH", "WIRE", "EDC"}
+            Dim methodReprint As JObject = CType(corrected("payload")("reprint").DeepClone(), JObject)
+            Dim payment As JObject = CType(methodReprint("corrections")(1), JObject)
+            payment("paymentMethod") = method
+            payment("convertedToCredit") = False
+            Dim methodName As String = If(method = "CASH", "TUNAI", If(method = "WIRE", "TRANSFER", "EDC"))
+            Dim methodLines = LayoutSaleCorrections(methodReprint, 40.0F, Function(value As String) CSng(value.Length))
+            If Not methodLines.Contains("Metode: " & methodName) OrElse
+               methodLines.Any(Function(line) line.Contains("KASBON") OrElse line.Contains("Metode DP")) Then
+                Throw New InvalidOperationException("Koreksi metode diberi keterangan kasbon palsu.")
+            End If
+        Next
+        Dim unnamedReprint As JObject = CType(corrected("payload")("reprint").DeepClone(), JObject)
+        unnamedReprint("corrections")(0)("customerName") = ""
+        Dim unnamedLines = LayoutSaleCorrections(unnamedReprint, 40.0F, Function(value As String) CSng(value.Length))
+        If Not unnamedLines.Contains("Pelanggan: diperbarui") OrElse
+           unnamedLines.Any(Function(line) line.Contains("CS9002")) Then
+            Throw New InvalidOperationException("Nama kosong mencetak ID internal atau menghilangkan koreksi.")
         End If
         Try
             LayoutSaleCorrections(CType(corrected("payload")("reprint"), JObject), 8.0F,

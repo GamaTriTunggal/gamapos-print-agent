@@ -111,30 +111,28 @@ Module SaleV2MetadataLayout
         If reprint Is Nothing Then Return result
         Dim entries As JArray = CType(reprint("corrections"), JArray)
         If entries.Count = 0 Then Return result
-        result.AddRange(LayoutSaleCustomer("", "ANGKA DI ATAS = NOTA ASAL", printableWidth, measure))
+        ' P-604: cetak ringkas; waktu/pelaku/ID koreksi tetap di audit, bukan di kertas.
         result.AddRange(LayoutSaleCustomer("", "KOREKSI SETELAH NOTA DIBUAT:", printableWidth, measure))
         For Each token As JToken In entries
             Dim entry As JObject = CType(token, JObject)
             Dim kind As String = CStr(entry("kind"))
             If kind = "customer" Then
                 Dim customerName As String = NormalizeProcessorName(CStr(entry("customerName")))
-                Dim customerId As String = CStr(entry("customerId"))
-                Dim description As String = If(customerName = "", customerId, customerName & " (" & customerId & ")")
-                result.AddRange(LayoutSaleCustomer("PELANGGAN : ", description, printableWidth, measure))
+                Dim description As String = If(customerName = "", "diperbarui", customerName)
+                result.AddRange(LayoutSaleCustomer("Pelanggan: ", description, printableWidth, measure))
             Else
                 Dim method As String = CStr(entry("paymentMethod"))
                 Dim methodName As String = If(method = "CASH", "TUNAI", If(method = "WIRE", "TRANSFER", "EDC"))
                 If CBool(entry("convertedToCredit")) Then
-                    result.AddRange(LayoutSaleCustomer("", "DIUBAH MENJADI KASBON", printableWidth, measure))
-                    result.AddRange(LayoutSaleCustomer("METODE DP : ", methodName, printableWidth, measure))
+                    result.AddRange(LayoutSaleCustomer("", "Diubah menjadi KASBON", printableWidth, measure))
+                    result.AddRange(LayoutSaleCustomer("Metode DP: ", methodName, printableWidth, measure))
                 Else
-                    result.AddRange(LayoutSaleCustomer("METODE    : ", methodName, printableWidth, measure))
+                    result.AddRange(LayoutSaleCustomer("Metode: ", methodName, printableWidth, measure))
                 End If
-                result.AddRange(LayoutSaleCustomer("", "SALDO SEKARANG: LIHAT RIWAYAT", printableWidth, measure))
             End If
-            result.AddRange(LayoutSaleCustomer("WAKTU     : ", CStr(entry("date")) & " " & CStr(entry("time")), printableWidth, measure))
-            result.AddRange(LayoutSaleCustomer("OLEH      : ", CStr(entry("actorName")), printableWidth, measure))
         Next
+        result.Add("")
+        result.AddRange(LayoutSaleCustomer("", "Angka di atas mengikuti nota asal.", printableWidth, measure))
         Return result
     End Function
 

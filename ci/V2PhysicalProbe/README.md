@@ -61,11 +61,15 @@ di baris pertama; lanjutan sejajar dengan nilai setelah caption, bukan
 dengan tepi kiri nota. PO sengaja tanpa spasi agar pemenggalan token juga
 diuji. Pastikan alamat berakhir `12345` dan PO berakhir `000123456789`, tanpa
 huruf/angka hilang atau terulang. Nilai contoh tetap Rp19.752 − Rp252 =
-Rp19.500. Berikutnya gunakan `sale_corrected_reprint.sample.json` untuk
-penanda pencetak ulang. Nota piutang dan retur
+Rp19.500. Berikutnya gunakan `sale_corrected_reprint_simple.sample.json`
+untuk menilai catatan koreksi ringkas dan penanda pencetak ulang dengan
+nama realistis. Perubahan formatter ini memerlukan build ulang agent dan
+probe sebelum preflight/cetak. Contoh `sale_corrected_reprint.sample.json`
+tetap menguji Unicode/nama ekstrem, **bukan contoh desain normal**; hasil
+fisiknya belum lulus untuk glyph/posisi Unicode. Nota piutang dan retur
 belum memakai perbaikan posisi penjualan ini.
 
-Ulangi untuk lima belas contoh sintetis lainnya:
+Ulangi untuk enam belas contoh sintetis lainnya:
 
 - `sale_cash.sample.json` — penjualan tunai;
 - `sale_split_edc.sample.json` — tunai + EDC, termasuk dua biaya;
@@ -78,7 +82,9 @@ Ulangi untuk lima belas contoh sintetis lainnya:
 - `sale_customer_metadata_long.sample.json` — PEMBELI dan ALAMAT panjang,
   serta PO panjang tanpa spasi, untuk memeriksa lanjutan sejajar dan teks utuh;
 - `sale_corrected_reprint.sample.json` — cetak ulang penjualan dengan nama
-  pemroses panjang dan catatan koreksi pelanggan/metode;
+  pemroses Unicode ekstrem dan catatan koreksi pelanggan/metode;
+- `sale_corrected_reprint_simple.sample.json` — contoh realistis dengan Siti
+  dan Andi, dua catatan koreksi ringkas, serta angka asal Rp19.500;
 - `receivable_selected.sample.json` — pelunasan bon terpilih tunai;
 - `receivable_selected_card.sample.json` — pelunasan bon terpilih EDC;
 - `receivable_selected_reprint.sample.json` — cetak ulang pelunasan bon
@@ -89,9 +95,9 @@ Ulangi untuk lima belas contoh sintetis lainnya:
 - `return_reprint.sample.json` — cetak ulang retur, termasuk identitas
   pemroses awal dan pencetak ulang.
 
-Keenam belas fixture bawaan, termasuk `return_note.sample.json`, masih contoh
+Ketujuh belas fixture bawaan, termasuk `return_note.sample.json`, masih contoh
 awal. Retur tanpa nota serta kombinasi lain memerlukan fixture sintetis tambahan
-dari korpus Go→agent. Jangan menganggap enam belas contoh ini sebagai matriks
+dari korpus Go→agent. Jangan menganggap tujuh belas contoh ini sebagai matriks
 cetak akhir.
 
 Untuk tiap cetakan, catat commit agent, model/driver printer, lebar kertas,

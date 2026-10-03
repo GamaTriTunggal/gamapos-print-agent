@@ -306,3 +306,45 @@ Windows atau foto kertas. Contoh metadata baru **belum diuji fisik**;
 cetak ulang berkoreksi, piutang/retur, dan smoke HTTP Windows tetap belum
 dibuktikan oleh kedua foto tersebut. Tidak ada aktivasi schema2, rilis,
 pemasangan agent, atau penutupan papan pada checkpoint ini.
+
+### Catatan koreksi ringkas sesudah uji cetak ulang — 3 Oktober 2026 (P-604)
+
+Foto `IMG_3919.HEIC` cocok dengan contoh metadata panjang: PEMBELI,
+ALAMAT dan PO memiliki lanjutan sejajar, teks alamat sampai `12345` dan
+PO sampai `000123456789` tampak utuh. Belanja Rp19.752 − pembulatan Rp252
+= Rp19.500, header/footer terlihat utuh. Ini bukti visual satu contoh pada
+antrean uji, bukan jaminan semua keluarga/glyph. SHA-256 foto privat:
+`915bd52b7df3cced63b394f8ad6c434219ea0e995a2ed6062bb4ae2847f5dcfa`.
+
+Foto `IMG_3920.HEIC` cocok dengan fixture cetak ulang ekstrem: nama aktor
+`Kasir名` berulang pada dua koreksi dan footer, serta nilai berpecahan sen
+memang berasal dari fixture, bukan tambahan data oleh printer. Pemilik
+menolak kepadatan informasi pada struk. Unicode/glyph/posisi pada foto ini
+**tidak dinyatakan lulus**; bukan masalah yang ditutup hanya dengan nama
+contoh baru. SHA-256 foto privat:
+`94b35c1856f2eb1b347ef3ded5e060d45f9415c99cc1561c32198cdeda891df2`.
+
+Pemilik menyetujui draft ringkas sebelum implementasi: judul koreksi,
+pelanggan/metode/konversi yang berubah, lalu “Angka di atas mengikuti nota
+asal.” ID pelanggan, waktu/pelaku tiap koreksi dan arahan saldo tidak
+dicetak. Snapshot asal, audit/field/parser dan angka tidak diubah. Footer
+nama asli dan “Dicetak ulang oleh: …”, header, font, mekanisme kolom dan
+v1 tetap utuh. Nota tanpa koreksi tetap tanpa blok koreksi.
+
+Fixture `sale_corrected_reprint_simple.sample.json` terpisah memakai
+Siti/Andi/Budi dan Rp19.752 − Rp252 = Rp19.500 untuk penilaian tampilan
+normal. Fixture ekstrem dan golden tidak diubah/dihapus. Tes mengunci teks
+draft persis, konversi/nonkonversi, ketiga metode, nama kosong/panjang,
+tanpa koreksi, lebar 40 kolom dan tidak memutasi payload.
+
+Schema gate lulus 11 kasus + 7 rute + 17 fixture v1 + 17 fixture v2.
+Validator Go menerima seluruh 17 fixture yang sama. Build agent/probe
+net48 lulus 0 warning/error. CI aplikasi (`make ci TEST_PG_DSN=`) lulus
+pada salinan HEAD `ca784800` + dokumentasi checkpoint saja; integrasi
+ber-DSN dilewati. Perintah sama dengan
+checkpoint di atas; log privat di repo Go:
+`.local/discount-rounding/compact-reprint-20261003/`.
+Perubahan ekspektasi layout mengikuti draft eksplisit pemilik, bukan
+rekam ulang oracle agar tes hijau. Tidak ada perubahan endpoint/capability,
+rilis/pemasangan agent, atau aktivasi v2. Contoh ringkas **belum diuji
+fisik**; perlu build ulang Windows, preflight, cetak satu contoh, dan foto.

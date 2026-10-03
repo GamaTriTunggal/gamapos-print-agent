@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "jobId": "f0000000000000000000000000000002",
+  "jobType": "cashier_receipt",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {"name":"TOKO","address":"JL. SATU","contact":"0812"},
+  "payload": {
+    "eventId":"f0000000000000000000000000000002",
+    "transactionId":"IN/261003/000010",
+    "receiptNo":"26100310",
+    "date":"2026-10-03",
+    "time":"15:10",
+    "customer":{"name":"Budi","address":"JL. DUA","contact":"0813","poNo":""},
+    "items":[{"name":"Semen","quantity100":"100","unit":"sak","priceSen":"1975200","totalSen":"1975200"}],
+    "amounts":{"grossSen":"1975200","discountSen":"0","roundingSen":"25200","netSen":"1950000",
+      "principalAppliedSen":"1950000","remainingSen":"0","cashSen":"1950000","noncashSen":"0",
+      "customerFeeSen":"0","merchantFeeSen":"0","customerPaysSen":"1950000",
+      "merchantReceivesSen":"1950000"},
+    "paymentMethod":"CASH","noncashMethod":"",
+    "originalProcessor":{"userId":"2","name":"Siti"},
+    "reprint":{
+      "date":"2026-10-03","time":"15:30",
+      "processor":{"userId":"3","name":"Andi"},
+      "corrections":[
+        {"kind":"customer","eventId":"f0000000000000000000000000000003","date":"2026-10-03",
+          "time":"15:20:00","actorName":"Andi","customerId":"CS9002","customerName":"Andi"},
+        {"kind":"payment","eventId":"f0000000000000000000000000000004","date":"2026-10-03",
+          "time":"15:25:00","actorName":"Siti","paymentMethod":"WIRE","convertedToCredit":true}
+      ]
+    }
+  }
+}
