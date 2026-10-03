@@ -85,6 +85,7 @@ Module Program
         If args.Length >= 3 Then CheckGoSaleV2(args(2))
         If args.Length = 4 Then CheckGoReturnV2(args(3))
         CheckNameLayout()
+        CheckFooterNameColumns()
         CheckMoneyFormat()
         CheckItemLayout()
         CheckMetadataLayout()
@@ -92,7 +93,7 @@ Module Program
         CheckTenderChangeNotPrinted(IO.Path.Combine(args(0), "v2"))
         Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 + " &
                           IO.Directory.GetFiles(IO.Path.Combine(args(0), "v2"), "*.sample.json").Length &
-                          " fixtures v2 passed; sale/receivable/return v2 parser accepted/rejected; sale sample and return core/layout passed; sale column planning passed (not physical).")
+                          " fixtures v2 passed; sale/receivable/return v2 parser accepted/rejected; sale sample and return core/layout passed; sale and receivable/return footer column planning passed (not physical).")
     End Sub
 
     Private Sub CheckPhysicalSamples(folder As String)
@@ -169,9 +170,26 @@ Module Program
                         End If
                     End If
                 Case "RECEIVABLE"
-                    BuildReceivableV2Plan(ParseReceivableV2(body), 40.0F, 20.0F, characters, characters)
+                    Dim parsed As JObject = ParseReceivableV2(body)
+                    Dim before As String = parsed.ToString(Formatting.None)
+                    Dim plan = BuildReceivableV2Plan(parsed, 40.0F, 20.0F, characters, characters)
+                    CheckPhysicalFooterNames(parsed, plan.OriginalName, plan.ReprintName)
+                    Dim scaled = BuildReceivableV2Plan(parsed, 4000.0F, 2000.0F,
+                        Function(value As String) CSng(value.Length * 100), Function(value As String) CSng(value.Length * 100))
+                    If Not plan.OriginalName.SequenceEqual(scaled.OriginalName) OrElse
+                       Not plan.ReprintName.SequenceEqual(scaled.ReprintName) OrElse parsed.ToString(Formatting.None) <> before Then
+                        Throw New InvalidOperationException("Nama piutang bergantung metrik driver atau memutasi payload.")
+                    End If
                 Case "RETURN"
-                    BuildReturnV2CorePlan(ParseReturnV2(body), 40.0F, characters)
+                    Dim parsed As JObject = ParseReturnV2(body)
+                    Dim before As String = parsed.ToString(Formatting.None)
+                    Dim plan = BuildReturnV2CorePlan(parsed, 40.0F, characters)
+                    CheckPhysicalFooterNames(parsed, plan.OriginalName, plan.ReprintName)
+                    Dim scaled = BuildReturnV2CorePlan(parsed, 4000.0F, Function(value As String) CSng(value.Length * 100))
+                    If Not plan.OriginalName.SequenceEqual(scaled.OriginalName) OrElse
+                       Not plan.ReprintName.SequenceEqual(scaled.ReprintName) OrElse parsed.ToString(Formatting.None) <> before Then
+                        Throw New InvalidOperationException("Nama retur bergantung metrik driver atau memutasi payload.")
+                    End If
                 Case Else
                     Throw New InvalidOperationException("Keluarga fixture uji kertas tidak dikenal: " & kind)
             End Select
@@ -218,8 +236,8 @@ Module Program
            plan.ItemLines(0)(0) <> "1,5 BARANG A" OrElse
            Not plan.ItemLines(0).Last().EndsWith("1,52", StringComparison.Ordinal) OrElse
            Not plan.TotalLine.EndsWith("2,52", StringComparison.Ordinal) OrElse
-           plan.OriginalName.Count <> 1 OrElse plan.OriginalName(0).Text <> "KASIR ASAL" OrElse
-           plan.OriginalName(0).X <> 25.0F OrElse plan.ReprintName.Count <> 0 Then
+           plan.OriginalName.Count <> 1 OrElse plan.OriginalName(0) <> New String(" "c, 25) & "KASIR ASAL" OrElse
+           plan.ReprintName.Count <> 0 Then
             Throw New InvalidOperationException("Layout inti retur asli tidak cocok.")
         End If
         Dim reprint As JObject = CType(original.DeepClone(), JObject)
@@ -229,10 +247,9 @@ Module Program
         If reprintPlan.ReprintLine Is Nothing OrElse
            Not reprintPlan.ReprintLine.StartsWith("CETAK ULANG:", StringComparison.Ordinal) OrElse
            reprintPlan.TotalLine <> plan.TotalLine OrElse
-           reprintPlan.OriginalName(0).Text <> "KASIR ASAL" OrElse
+           reprintPlan.OriginalName(0) <> plan.OriginalName(0) OrElse
            reprintPlan.ReprintName.Count <> 1 OrElse
-           reprintPlan.ReprintName(0).Text <> "Dicetak ulang oleh: KASIR ULANG" OrElse
-           reprintPlan.ReprintName(0).X <> 40.0F - reprintPlan.ReprintName(0).Text.Length Then
+           reprintPlan.ReprintName(0) <> "Dicetak ulang oleh: KASIR ULANG".PadLeft(40) Then
             Throw New InvalidOperationException("Layout salinan retur mengubah nilai asal.")
         End If
         Dim longName As JObject = CType(reprint.DeepClone(), JObject)
@@ -240,8 +257,10 @@ Module Program
         longName("payload")("reprint")("processor")("name") = "NAMA PEMROSES CETAK ULANG YANG SANGAT PANJANG"
         Dim longPlan As ReturnV2CorePlan = BuildReturnV2CorePlan(longName, 40.0F, characters)
         If longPlan.OriginalName.Count < 2 OrElse longPlan.ReprintName.Count < 2 OrElse
-           longPlan.OriginalName.Any(Function(line) line.X < 0.0F OrElse line.X + line.Text.Length > 40.0F) OrElse
-           longPlan.ReprintName.Any(Function(line) line.X < 0.0F OrElse line.X + line.Text.Length > 40.0F) Then
+           longPlan.OriginalName.Any(Function(line) line.Length <> 40) OrElse
+           longPlan.ReprintName.Any(Function(line) line.Length <> 40) OrElse
+           String.Join(" ", longPlan.OriginalName.Select(Function(line) line.TrimStart())) <> CStr(longName("payload")("originalProcessor")("name")) OrElse
+           String.Join(" ", longPlan.ReprintName.Select(Function(line) line.TrimStart())) <> "Dicetak ulang oleh: " & CStr(longName("payload")("reprint")("processor")("name")) Then
             Throw New InvalidOperationException("Nama panjang retur melampaui area cetak.")
         End If
         For Each action As Action In {
@@ -548,7 +567,7 @@ Module Program
            Not original.Metadata.Any(Function(line) line.Contains("PELANGGAN")) OrElse
            original.AllocationLines.Count <> 2 OrElse
            Not original.AllocationLines(0).EndsWith("-1", StringComparison.Ordinal) OrElse
-           original.OriginalName.Count <> 1 OrElse original.OriginalName(0).Text <> "KASIR ASLI" OrElse
+           original.OriginalName.Count <> 1 OrElse original.OriginalName(0) <> "KASIR ASLI" OrElse
            original.ReprintName.Count <> 0 Then
             Throw New InvalidOperationException("Preflight bukti selected kehilangan identitas atau kredit bon.")
         End If
@@ -564,8 +583,8 @@ Module Program
         CType(reprint("payload"), JObject)("reprint") = JObject.Parse("{""date"":""2026-09-28"",""time"":""08:00"",""processor"":{""userId"":""9"",""name"":""KASIR ULANG""}}")
         Dim again As ReceivableV2PrintPlan = BuildReceivableV2Plan(
             ParseReceivableV2(reprint.ToString(Formatting.None)), 40.0F, 20.0F, characters, characters)
-        If again.OriginalName(0).Text <> "KASIR ASLI" OrElse again.ReprintName.Count = 0 OrElse
-           Not again.ReprintName.Any(Function(line) line.Text.Contains("KASIR ULANG")) OrElse
+        If again.OriginalName(0) <> "KASIR ASLI" OrElse again.ReprintName.Count = 0 OrElse
+           Not again.ReprintName.Any(Function(line) line.Contains("KASIR ULANG")) OrElse
            Not again.Metadata.Any(Function(line) line.Contains("CETAK ULANG")) Then
             Throw New InvalidOperationException("Cetak ulang menimpa pemroses asal.")
         End If
@@ -575,8 +594,10 @@ Module Program
         Dim wrappedNames As ReceivableV2PrintPlan = BuildReceivableV2Plan(
             ParseReceivableV2(longNames.ToString(Formatting.None)), 40.0F, 20.0F, characters, characters)
         If wrappedNames.OriginalName.Count < 2 OrElse wrappedNames.ReprintName.Count < 2 OrElse
-           wrappedNames.OriginalName.Any(Function(line) line.X < 0.0F OrElse line.X + line.Text.Length > 40.0F) OrElse
-           wrappedNames.ReprintName.Any(Function(line) line.X < 0.0F OrElse line.X + line.Text.Length > 40.0F) Then
+           wrappedNames.OriginalName.Any(Function(line) line.Length <> 40) OrElse
+           wrappedNames.ReprintName.Any(Function(line) line.Length <> 40) OrElse
+           String.Concat(wrappedNames.OriginalName.Select(Function(line) line.TrimStart())) <> New String("X"c, 60) OrElse
+           String.Concat(wrappedNames.ReprintName.Select(Function(line) line.TrimStart())) <> "Dicetak ulang oleh:" & New String("Y"c, 60) Then
             Throw New InvalidOperationException("Nama kasir panjang melewati area cetak.")
         End If
         Dim longCustomer As JObject = CType(selected.DeepClone(), JObject)
@@ -846,6 +867,57 @@ Module Program
             Return
         End Try
         Throw New InvalidOperationException(name & " diterima padahal tidak sah.")
+    End Sub
+
+    Private Sub CheckPhysicalFooterNames(root As JObject, original As List(Of String), reprint As List(Of String))
+        Dim payload = CType(root("payload"), JObject)
+        If original.Count <> 1 OrElse original(0).Length > 40 OrElse
+           original(0).TrimStart() <> CStr(payload("originalProcessor")("name")) Then
+            Throw New InvalidOperationException("Nama asal fixture kertas hilang/terpotong.")
+        End If
+        Dim copy As JObject = TryCast(payload("reprint"), JObject)
+        If copy Is Nothing Then
+            If reprint.Count <> 0 Then Throw New InvalidOperationException("Nama cetak ulang muncul pada nota asli.")
+        ElseIf reprint.Count <> 1 OrElse reprint(0).Length <> 40 OrElse
+               reprint(0).TrimStart() <> "Dicetak ulang oleh: " & CStr(copy("processor")("name")) Then
+            Throw New InvalidOperationException("Nama cetak ulang fixture kertas hilang/terpotong.")
+        End If
+    End Sub
+
+    Private Sub CheckFooterNameColumns()
+        If LayoutOriginalNameColumns("Siti", "HORMAT KAMI", 1, 40).Single() <> "   Siti" OrElse
+           LayoutOriginalNameColumns("SYNTHETIC OWNER", "HORMAT KAMI", 1, 40).Single() <> "SYNTHETIC OWNER".PadLeft(40) OrElse
+           LayoutOriginalNameColumns("KASIR ASAL", "TANDA TERIMA", 25, 40).Single() <> New String(" "c, 25) & "KASIR ASAL" OrElse
+           LayoutOriginalNameColumns("KASIR AWAL", "TANDA TERIMA", 25, 40).Single() <> New String(" "c, 25) & "KASIR AWAL" OrElse
+           LayoutReprintNameColumns("KASIR ULANG", 40).Single() <> "Dicetak ulang oleh: KASIR ULANG".PadLeft(40) Then
+            Throw New InvalidOperationException("Anchor kolom nama tidak mengikuti caption v1.")
+        End If
+        For Each size In {40, 41, 60}
+            Dim name = New String("X"c, size)
+            Dim lines = LayoutOriginalNameColumns(name, "TANDA TERIMA", 25, 40)
+            If lines.Any(Function(line) line.Length <> 40) OrElse
+               String.Concat(lines.Select(Function(line) line.TrimStart())) <> name Then
+                Throw New InvalidOperationException("Batas/wrapping nama kehilangan karakter.")
+            End If
+        Next
+        If LayoutOriginalNameColumns(vbTab, "HORMAT KAMI", 1, 40).Count <> 0 OrElse
+           LayoutReprintNameColumns("", 40).Count <> 0 OrElse
+           LayoutOriginalNameColumns(" KASIR" & vbCrLf & " ASAL ", "TANDA TERIMA", 25, 40).Single() <> New String(" "c, 25) & "KASIR ASAL" Then
+            Throw New InvalidOperationException("Normalisasi nama kolom salah.")
+        End If
+        For Each action As Action In {
+            Sub() LayoutOriginalNameColumns("Siti", "", 1, 40),
+            Sub() LayoutOriginalNameColumns("Siti", "HORMAT KAMI", 0, 40),
+            Sub() LayoutOriginalNameColumns("Siti", "HORMAT KAMI", 35, 40),
+            Sub() LayoutReprintNameColumns("Siti", 0),
+            Sub() LayoutReprintNameColumns("Siti", 41)}
+            Try
+                action()
+                Throw New InvalidOperationException("Area nama kolom tidak sah diterima.")
+            Catch ex As ArgumentException
+                ' Ditolak sebelum Printer.Print.
+            End Try
+        Next
     End Sub
 
     Private Sub CheckNameLayout()

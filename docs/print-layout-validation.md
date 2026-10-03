@@ -4,6 +4,61 @@ Dokumen ini mencatat bukti dan aturan kerja untuk renderer nota schema 2
 (`P-604`). Kontrak bisnis tetap diputuskan di repo utama GamaPOS; dokumen ini
 tidak mengizinkan aktivasi schema 2, rilis agent, atau perubahan nota schema 1.
 
+## Nama footer piutang/retur mengikuti kolom — 3 Oktober 2026 (P-604 / DR-08)
+
+Pemilik menyetujui perbaikan **posisi nama saja** setelah batch fisik:
+`IMG_3925.HEIC` memperlihatkan nama asli selected reprint terpotong menjadi
+`SYNTHETIC`; `IMG_3926.HEIC` memperlihatkan hal yang sama pada FIFO EDC dan
+retur asli hanya `KASIR`; retur cetak ulang pada `IMG_3924.HEIC` juga hanya
+`KASIR`. Payload menyimpan `SYNTHETIC OWNER`, `KASIR ASAL`, dan `KASIR AWAL`
+utuh. Ini kegagalan penempatan v2, **bukan masalah desain v1 atau data**.
+Foto batch lain `IMG_3923.HEIC` berisi campuran EDC/transfer; nama penjualan
+tidak termasuk perubahan ini. Angka yang terlihat cocok dengan fixture,
+tetapi foto bukan bukti seluruh integrasi HTTP/role mapping atau glyph.
+Identitas commit/binary Windows belum dicocokkan dari konsol batch ini.
+
+Rencana footer sekarang berupa string berindentasi kolom; renderer memakai
+`T(1)` seperti mekanisme v1, bukan `CurrentX` dari `TextWidth`. Caption
+piutang tetap kolom 1; caption retur tetap kolom 25. Nama yang tidak muat
+di-center rata kanan, nama panjang dibungkus, dan pencetak ulang tetap baris
+tersendiri. Font, header/body, angka, fixture, parser/schema, v1, branding,
+label EDC, snapshot dan aplikasi Go tidak berubah. Tidak ada migrasi.
+
+Validasi Linux: kedua build net48 agent/probe lulus 0 warning/error;
+schema gate lulus 11 kasus + 7 rute + 17 fixture v1 + 17 fixture v2.
+Tes mengunci nama kasus yang terpotong, anchor kolom, center/rata kanan,
+batas 40/41/60 karakter, wrapping tanpa kehilangan teks, input tidak sah,
+seluruh tujuh fixture piutang/retur, ketiadaan mutasi payload dan posisi
+nama yang tetap meski skala metrik driver berubah 100×. Perintah:
+
+```text
+dotnet run --project ci/SchemaGateTests/SchemaGateTests.vbproj -c Release --no-restore -- fixtures
+dotnet build src/SpikeTransport/SpikeTransport.vbproj -c Release --no-restore
+dotnet build ci/V2PhysicalProbe/V2PhysicalProbe.vbproj -c Release --no-restore
+git diff --check
+```
+
+Log privat repo Go: `.local/discount-rounding/footer-column-20261003/`.
+`make ci TEST_PG_DSN=` repo Go lulus pada salinan HEAD `c84f534e` +
+hanya dokumentasi checkpoint, dengan cache lint terisolasi. Termasuk 314
+tes browser piutang dan gerbang dokumentasi 75 dokumen/24 keputusan.
+Integrasi yang memerlukan DSN dilewati; CI memuat warning Vue readonly
+pada tes sintetis, bukan klaim seluruh CI tanpa warning. Tidak ada kode
+Go/frontend berubah; perubahan sesi lain tidak masuk kandidat.
+Foto tetap privat; SHA-256 masing-masing:
+
+- IMG_3923: `1978a2cbcf958cb0cacf953ccca799ab8ff7fcb39235d9acc129bb438d6f99de`.
+- IMG_3924: `874964cf587e8a819ed2f448037ed1c93c9c46861c53dec1fd91dfee1508592d`.
+- IMG_3925: `d9abc512a0f8e0ce66c064f8a5b1284cc591db43594d0f3e04f0d10bc47f1bd4`.
+- IMG_3926: `e20fb70f445a7891195f0464b2aae6e2f6e6fa2a681d8a889cf7848da7da57b5`.
+
+**Belum lulus fisik setelah perbaikan.** Windows build/HTTP smoke, uji
+kertas kandidat, lebar kertas, glyph Unicode ekstrem dan gerbang lain
+tetap belum lengkap. Tidak ada aktivasi schema2/rilis/pemasangan agent atau
+penutupan papan. Tujuh cetakan ulang disiapkan dalam satu batch pada
+README probe; tidak meminta ulang seluruh fixture penjualan.
+Catatan checkpoint di bawah tetap riwayat, bukan status terbaru batch ini.
+
 ## Pelajaran dari uji TM-U220 (2 Oktober 2026)
 
 - Perangkat uji: VM Windows 11, antrean `EPSON TM-U220 Receipt`, driver

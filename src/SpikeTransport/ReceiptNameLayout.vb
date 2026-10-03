@@ -1,5 +1,5 @@
 ' Tata letak nama pemroses nota v2, tanpa ketergantungan printer.
-' Pemanggil memberi TextWidth font/area cetak nyata; tes memberi metrik palsu.
+' Helper posisi menerima metrik; helper footer kolom tidak memakai TextWidth.
 Option Strict On
 Option Explicit On
 
@@ -19,6 +19,41 @@ Friend Class PositionedNameLine
 End Class
 
 Module ReceiptNameLayout
+    ' P-604: footer memakai kolom seperti TAB v1, bukan CurrentX dari TextWidth.
+    Friend Function LayoutOriginalNameColumns(raw As String, caption As String,
+                                             captionColumn As Integer, columns As Integer) As List(Of String)
+        CheckNameColumns(columns)
+        If String.IsNullOrEmpty(caption) OrElse caption <> NormalizeProcessorName(caption) OrElse
+           captionColumn < 1 OrElse captionColumn - 1 + caption.Length > columns Then
+            Throw New ArgumentException("Caption nama melampaui kolom.")
+        End If
+        Dim center As Single = CSng(captionColumn - 1) + CSng(caption.Length) / 2.0F
+        Return ToNameColumnLines(LayoutOriginalName(raw, center, CSng(columns),
+            Function(value As String) CSng(value.Length)), columns)
+    End Function
+
+    Friend Function LayoutReprintNameColumns(raw As String, columns As Integer) As List(Of String)
+        CheckNameColumns(columns)
+        Return ToNameColumnLines(LayoutReprintName(raw, CSng(columns),
+            Function(value As String) CSng(value.Length)), columns)
+    End Function
+
+    Private Sub CheckNameColumns(columns As Integer)
+        If columns < 1 OrElse columns > 40 Then Throw New ArgumentException("Area nama tidak sah.")
+    End Sub
+
+    Private Function ToNameColumnLines(lines As List(Of PositionedNameLine), columns As Integer) As List(Of String)
+        Dim result As New List(Of String)()
+        For Each line As PositionedNameLine In lines
+            Dim spaces As Integer = CInt(Math.Floor(line.X))
+            If spaces < 0 OrElse spaces + line.Text.Length > columns Then
+                Throw New ArgumentException("Nama melampaui kolom.")
+            End If
+            result.Add(New String(" "c, spaces) & line.Text)
+        Next
+        Return result
+    End Function
+
     Friend Function NormalizeProcessorName(raw As String) As String
         Dim result As New StringBuilder()
         Dim pendingSpace As Boolean = False

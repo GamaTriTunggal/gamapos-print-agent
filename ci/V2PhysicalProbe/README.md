@@ -7,6 +7,60 @@ menulis autostart, mengganti printer default, memasang driver, atau
 mengiklankan kemampuan v2. Jangan jalankan pada PC toko yang sedang
 melayani transaksi. Gunakan hanya fixture sintetis, bukan data pelanggan.
 
+## Batch uji ulang nama piutang/retur — 3 Oktober 2026
+
+Sesudah mengambil commit perbaikan dan build ulang **kedua** proyek, cetak
+tujuh contoh berikut sekaligus. Penjualan tidak berubah dan tidak perlu
+diulang pada checkpoint ini. Jalankan dari root repo di PowerShell; setiap
+contoh tetap meminta `CETAK`. Tunggu batch selesai, baru ambil semua kertas
+sekali. Tidak ada retry otomatis; laporkan nama fixture yang gagal dan
+apakah kertas keluar. `--preflight` hanya untuk penjualan, jangan dipakai
+untuk ketujuh contoh ini.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$probe = (Resolve-Path '.\ci\V2PhysicalProbe\bin\Release\net48\V2PhysicalProbe.exe').Path
+$agent = (Resolve-Path '.\src\SpikeTransport\bin\Release\net48\GamaPrintAgent.SpikeTransport.exe').Path
+$printerName = 'EPSON TM-U220 Receipt'
+$samples = @(
+  'receivable_selected.sample.json',
+  'receivable_selected_card.sample.json',
+  'receivable_selected_reprint.sample.json',
+  'receivable_proof.sample.json',
+  'receivable_fifo_edc.sample.json',
+  'return_note.sample.json',
+  'return_reprint.sample.json'
+)
+$failedSamples = @()
+$completedCount = 0
+foreach ($sample in $samples) {
+  Write-Host "`n=== $sample ==="
+  $fixture = (Resolve-Path (Join-Path '.\fixtures\v2' $sample)).Path
+  & $probe --verify $agent $fixture $printerName
+  if ($LASTEXITCODE -ne 0) {
+    $failedSamples += "$sample (verify)"
+    continue
+  }
+  & $probe --print $agent $fixture $printerName
+  if ($LASTEXITCODE -ne 0) {
+    $failedSamples += "$sample (print)"
+  } else {
+    $completedCount++
+  }
+}
+Write-Host "`nPerintah cetak sukses: $completedCount / $($samples.Count)"
+if ($failedSamples.Count -gt 0) { $failedSamples | ForEach-Object { Write-Host "Gagal: $_" } }
+```
+
+Sukses konsol bukan bukti kertas. Periksa nama `SYNTHETIC OWNER` utuh pada
+selected reprint/FIFO EDC, `KASIR ASAL` dan `KASIR AWAL` utuh pada retur,
+serta pencetak ulang pada baris tersendiri. Nama pendek sejajar dengan
+caption masing-masing; nama yang tidak muat center rata kanan sampai
+kolom 40. Nama panjang pada fixture piutang tersebut memang rata kanan,
+bukan dipindah ke bawah caption penjualan. Angka dan label harus tetap
+sama dengan cetakan sebelumnya. Foto seluruh struk dan kirim hasil
+konsol batch beserta hash `git rev-parse --short HEAD`.
+
 ## Persiapan operator
 
 1. Pastikan printer nota uji terpasang, kertas cukup, dan nama persisnya
@@ -66,8 +120,9 @@ untuk menilai catatan koreksi ringkas dan penanda pencetak ulang dengan
 nama realistis. Perubahan formatter ini memerlukan build ulang agent dan
 probe sebelum preflight/cetak. Contoh `sale_corrected_reprint.sample.json`
 tetap menguji Unicode/nama ekstrem, **bukan contoh desain normal**; hasil
-fisiknya belum lulus untuk glyph/posisi Unicode. Nota piutang dan retur
-belum memakai perbaikan posisi penjualan ini.
+fisiknya belum lulus untuk glyph/posisi Unicode. Pada checkpoint penjualan
+tersebut piutang/retur belum diperbaiki; tindak lanjut nama footer berada
+pada bagian batch tujuh contoh di atas.
 
 Ulangi untuk enam belas contoh sintetis lainnya:
 

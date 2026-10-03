@@ -46,20 +46,19 @@ Module ReturnV2Receipt
         printer.Print(plan.TotalLine)
         printer.Print(Line1())
         printer.Print("Nota merah untuk customer.")
-        printer.Print(T(25), ReturnSignCaption)
+        printer.Print(T(ReturnSignColumn), ReturnSignCaption)
         For index As Integer = 1 To 3
             printer.Print(T(1), ".", T(40), ".")
         Next
-        PrintPositionedReturn(printer, plan.OriginalName)
-        PrintPositionedReturn(printer, plan.ReprintName)
+        PrintReturnColumnNames(printer, plan.OriginalName)
+        PrintReturnColumnNames(printer, plan.ReprintName)
         printer.Print(T(1), ReturnBrandingCaption)
         printer.EndDoc()
     End Sub
 
-    Private Sub PrintPositionedReturn(printer As Printer, lines As List(Of PositionedNameLine))
-        For Each line As PositionedNameLine In lines
-            printer.CurrentX = line.X
-            printer.Print(line.Text)
+    Private Sub PrintReturnColumnNames(printer As Printer, lines As List(Of String))
+        For Each line As String In lines
+            printer.Print(T(1), line)
         Next
     End Sub
 End Module

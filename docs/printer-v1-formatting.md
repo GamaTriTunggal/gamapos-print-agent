@@ -215,6 +215,23 @@ Footer retur hanya menggunakan `TANDA TERIMA`, keterangan nota merah, dan
 ruang tanda tangan khusus. Bukti piutang biasa memiliki susunan lain: nama
 toko dan operator di bagian bawah. Jangan menyeragamkan footer semua jenis.
 
+Kandidat piutang/retur v2, checkpoint 3 Oktober 2026 setelah foto batch:
+
+- Piutang mempertahankan `HORMAT KAMI` di kolom **1**, bukan 25 seperti
+  penjualan. Retur mempertahankan `TANDA TERIMA` di kolom **25**.
+- `LayoutOriginalNameColumns` memakai pusat caption masing-masing. Jika
+  center tidak muat, nama rata kanan; lebih dari 40 kolom dibungkus tanpa
+  membuang teks. `LayoutReprintNameColumns` merencanakan baris pencetak ulang
+  terpisah dan rata kanan. Normalisasi whitespace tetap berlaku.
+- Renderer mencetak baris nama melalui `printer.Print(T(1), line)` dengan
+  spasi kolom. **Jangan memakai `CurrentX` hasil `TextWidth` untuk footer**:
+  foto batch memperlihatkan `SYNTHETIC OWNER` menjadi `SYNTHETIC` dan
+  `KASIR ASAL/AWAL` menjadi `KASIR`, walaupun tes metrik murni dahulu lulus.
+- Font 9 pt piutang/10 pt retur, header, angka dan caption lainnya tetap.
+  Branding retur tetap terakhir; piutang tidak mendapat branding tambahan.
+  Hasil fisik setelah perbaikan belum dibuktikan; batch uji ulang hanya
+  lima bukti piutang dan dua retur, bukan mengulang penjualan.
+
 ### Catatan koreksi cetak ulang v2 — keputusan 3 Oktober 2026
 
 Snapshot penerbitan mempertahankan identitas/angka asal, **bukan izin

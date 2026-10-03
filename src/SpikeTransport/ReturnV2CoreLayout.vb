@@ -16,12 +16,12 @@ Friend Class ReturnV2CorePlan
     Friend ReadOnly ReprintLine As String
     Friend ReadOnly ItemLines As List(Of List(Of String))
     Friend ReadOnly TotalLine As String
-    Friend ReadOnly OriginalName As List(Of PositionedNameLine)
-    Friend ReadOnly ReprintName As List(Of PositionedNameLine)
+    Friend ReadOnly OriginalName As List(Of String)
+    Friend ReadOnly ReprintName As List(Of String)
 
     Friend Sub New(title As String, customerLines As List(Of String), receiptLine As String,
                    reprintLine As String, itemLines As List(Of List(Of String)), totalLine As String,
-                   originalName As List(Of PositionedNameLine), reprintName As List(Of PositionedNameLine))
+                   originalName As List(Of String), reprintName As List(Of String))
         Me.Title = title
         Me.CustomerLines = customerLines
         Me.ReceiptLine = receiptLine
@@ -36,6 +36,7 @@ End Class
 Module ReturnV2CoreLayout
     Private Const ReturnColumns As Integer = 40
     Friend Const ReturnSignCaption As String = "TANDA TERIMA"
+    Friend Const ReturnSignColumn As Integer = 25
     Friend Const ReturnBrandingCaption As String = "           powered by GamaPOS           "
     Private Const CustomerNameCaption As String = "PEMBELI  : "
     Private Const CustomerAddressCaption As String = "ALAMAT   : "
@@ -55,21 +56,15 @@ Module ReturnV2CoreLayout
         CheckWidth(New String("-"c, ReturnColumns), printableWidth, measure)
         CheckWidth(New String("="c, ReturnColumns), printableWidth, measure)
         CheckWidth("Nota merah untuk customer.", printableWidth, measure)
-        CheckWidth(New String(" "c, 24) & ReturnSignCaption, printableWidth, measure)
+        CheckWidth(New String(" "c, ReturnSignColumn - 1) & ReturnSignCaption, printableWidth, measure)
         CheckWidth(New String(" "c, ReturnColumns - 1) & ".", printableWidth, measure)
         CheckWidth(ReturnBrandingCaption, printableWidth, measure)
-        Dim signCenter As Single = measure(New String(" "c, 24) & ReturnSignCaption) -
-                                   measure(ReturnSignCaption) / 2.0F
-        If Single.IsNaN(signCenter) OrElse Single.IsInfinity(signCenter) OrElse
-           signCenter < 0.0F OrElse signCenter > printableWidth Then
-            Throw New ArgumentException("Posisi tanda terima tidak sah.")
-        End If
-        Dim originalName As List(Of PositionedNameLine) = LayoutOriginalName(
-            CStr(payload("originalProcessor")("name")), signCenter, printableWidth, measure)
-        Dim reprintName As New List(Of PositionedNameLine)()
+        Dim originalName As List(Of String) = LayoutOriginalNameColumns(
+            CStr(payload("originalProcessor")("name")), ReturnSignCaption, ReturnSignColumn, ReturnColumns)
+        Dim reprintName As New List(Of String)()
         Dim reprint As JObject = TryCast(payload("reprint"), JObject)
         If reprint IsNot Nothing Then
-            reprintName = LayoutReprintName(CStr(reprint("processor")("name")), printableWidth, measure)
+            reprintName = LayoutReprintNameColumns(CStr(reprint("processor")("name")), ReturnColumns)
         End If
 
         Dim customerLines As New List(Of String)()

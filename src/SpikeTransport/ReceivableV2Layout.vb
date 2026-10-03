@@ -14,15 +14,15 @@ Friend Class ReceivableV2PrintPlan
     Friend ReadOnly Metadata As List(Of String)
     Friend ReadOnly AllocationLines As List(Of String)
     Friend ReadOnly AmountLines As List(Of String)
-    Friend ReadOnly OriginalName As List(Of PositionedNameLine)
-    Friend ReadOnly ReprintName As List(Of PositionedNameLine)
+    Friend ReadOnly OriginalName As List(Of String)
+    Friend ReadOnly ReprintName As List(Of String)
     Friend ReadOnly Separator As String
     Friend ReadOnly StrongSeparator As String
 
     Friend Sub New(storeNameValue As List(Of PositionedNameLine), storeDetailsValue As List(Of PositionedNameLine),
                    titleValue As List(Of PositionedNameLine), metadataValue As List(Of String),
                    allocationValue As List(Of String), amountValue As List(Of String),
-                   originalValue As List(Of PositionedNameLine), reprintValue As List(Of PositionedNameLine),
+                   originalValue As List(Of String), reprintValue As List(Of String),
                    separatorValue As String, strongSeparatorValue As String)
         StoreName = storeNameValue
         StoreDetails = storeDetailsValue
@@ -39,6 +39,8 @@ End Class
 
 Module ReceivableV2Layout
     Private Const Columns As Integer = 40
+    Friend Const ReceivableSignCaption As String = "HORMAT KAMI"
+    Friend Const ReceivableSignColumn As Integer = 1
 
     Friend Function BuildReceivableV2Plan(root As JObject, printableWidth As Single, nameWidth As Single,
                                          measure As Func(Of String, Single),
@@ -79,15 +81,15 @@ Module ReceivableV2Layout
         Next
         Dim separator As String = CheckedRule("-"c, printableWidth, measure)
         Dim strong As String = CheckedRule("="c, printableWidth, measure)
-        If Width("HORMAT KAMI", measure) > printableWidth OrElse
+        If Width(ReceivableSignCaption, measure) > printableWidth OrElse
            Width("ALOKASI BON", measure) > printableWidth Then
             Throw New ArgumentException("Judul alokasi/tanda tangan melewati area cetak.")
         End If
-        Dim footCenter As Single = Width("HORMAT KAMI", measure) / 2.0F
-        Dim original As List(Of PositionedNameLine) = LayoutOriginalName(CStr(payload("originalProcessor")("name")), footCenter, printableWidth, measure)
-        Dim reprintName As New List(Of PositionedNameLine)()
+        Dim original As List(Of String) = LayoutOriginalNameColumns(
+            CStr(payload("originalProcessor")("name")), ReceivableSignCaption, ReceivableSignColumn, Columns)
+        Dim reprintName As New List(Of String)()
         If reprint IsNot Nothing Then
-            reprintName = LayoutReprintName(CStr(reprint("processor")("name")), printableWidth, measure)
+            reprintName = LayoutReprintNameColumns(CStr(reprint("processor")("name")), Columns)
         End If
         Return New ReceivableV2PrintPlan(storeName, details, title, metadata, allocations, amounts,
                                           original, reprintName, separator, strong)

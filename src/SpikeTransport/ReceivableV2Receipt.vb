@@ -57,13 +57,19 @@ Module ReceivableV2Receipt
             printer.Print(line)
         Next
         printer.Print(plan.Separator)
-        printer.Print("HORMAT KAMI")
+        printer.Print(T(ReceivableSignColumn), ReceivableSignCaption)
         printer.Print()
         printer.Print()
         printer.Print()
-        PrintProofPositioned(printer, plan.OriginalName)
-        PrintProofPositioned(printer, plan.ReprintName)
+        PrintProofColumnNames(printer, plan.OriginalName)
+        PrintProofColumnNames(printer, plan.ReprintName)
         printer.EndDoc()
+    End Sub
+
+    Private Sub PrintProofColumnNames(printer As Printer, lines As List(Of String))
+        For Each line As String In lines
+            printer.Print(T(1), line)
+        Next
     End Sub
 
     Private Sub PrintProofPositioned(printer As Printer, lines As List(Of PositionedNameLine))
