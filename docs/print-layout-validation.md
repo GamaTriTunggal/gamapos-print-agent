@@ -4,6 +4,51 @@ Dokumen ini mencatat bukti dan aturan kerja untuk renderer nota schema 2
 (`P-604`). Kontrak bisnis tetap diputuskan di repo utama GamaPOS; dokumen ini
 tidak mengizinkan aktivasi schema 2, rilis agent, atau perubahan nota schema 1.
 
+## EDC/Campuran asli dan salinan terbukti — 6 Oktober 2026 (P-604 / DR-08)
+
+Pemilik melanjutkan uji dengan probe `--serve-edc-split` setelah push khusus
+`141eee0` ke branch uji. Aplikasi staging `fde96f98`, repo aplikasi lokal
+awal checkpoint bukti `5fc035a4`; catatan kanonik pada rancangan §180.
+Keluaran Windows: repo bersih pada `141eee0`, SDK9.0.304, kedua build
+Release/net48 berhasil. SHA-256 dari operator:
+
+- Agent: `DB6B70FE0B31DE6C0850B57CC50A267BF2CA5E8BA9E4604B1195ED4B1705B764`.
+- Probe: `0850E15938715A1EC0BBE8F17A8E2669EE00BD7948253BBADC37B90EEBD6B988`.
+
+EPSON TM-U220 Receipt default, WorkOffline=False, antrean0 dan port9111
+kosong sebelum start. Health staging-test/edc-split/schema2 dilaporkan dari
+browser VM. Build/hash/health berdasarkan keluaran operator, bukan inspeksi
+proses independen; tidak mengisi kekosongan hash pada uji tunai4 Oktober.
+
+Dua transaksi masing-masing belanja180.000/D9.000/neto171.000. Foto IMG_3946
+dan IMG_3948 membuktikan EDC asli/salinan nota26100011: biaya4.275 dan total
+dibayar175.275. Foto IMG_3949 membuktikan Campuran asli/salinan nota26100012:
+tunai100.000, pokok EDC71.000, biaya1.775, total172.775. Angka asli/salinan
+sama, nama utuh, atribusi ulang hanya pada salinan. Tidak ada uang diterima/
+kembalian dan teks terlihat utuh. Pemilik mengonfirmasi biaya/Grand Total
+di detail kedua nota serta penahanan tunai171.000/EDC0 dengan arahan Bayar
+tunai. Tidak ada pembulatan nonnol pada kedua kasus ini.
+
+Sesudah empat cetakan, pemilik melaporkan prompt kembali tanpa Ctrl+C,
+sesuai batas otomatis30menit. Akhir sesi dicatat dari operator; tidak
+mengklaim inspeksi port/proses. Foto sumber hanya dibaca, PNG inspeksi dan
+bukti lengkap privat di repo aplikasi `checkpoint-20261006-edc-split-probe`.
+Jangan mengulang empat cetakan ini tanpa alasan. Status persiapan di bawah
+menggambarkan keadaan sebelum uji ini, bukan gerbang yang masih kosong.
+
+Bukti ini hanya dua kasus pada printer tersebut melalui probe sementara.
+Dispatcher/role mapping agent terpasang, Windows smoke penuh, varian
+printer/glyph, pembulatan nonnol, seluruh UAT/PG dan rollback belum tertutup.
+Formatter, runtime agent/aplikasi dan fixture tidak diubah pada checkpoint
+bukti ini. P-604/DR-08/papan tetap terbuka; tidak ada rilis atau pemasangan.
+`make ci` aplikasi lulus pada kandidat dokumentasi terisolasi: 15 tes
+capability, 41 aksi nota dan 5 browser→Go→PG18.3 nyata (0 skip/0 flaky).
+Integrasi PG umum lokal memakai DSN port1 dan skip, bukan lulus matriks
+penuh. Build/parser/renderer tidak berubah, sehingga bukti tes agent §179
+masih berlaku. Diff ditelaah, foto/payload tetap di luar Git dan perubahan
+17 berkas sesi lain di repo aplikasi dipertahankan. Bukti CI privat di
+`checkpoint-20261006-edc-split-physical`; ini commit dokumentasi lokal.
+
 ## Persiapan batch EDC/Campuran — 6 Oktober 2026 (P-604 / DR-08)
 
 Pemilik mengizinkan perluasan terbatas alat uji sebelum sesi VM. Repo aplikasi

@@ -12,9 +12,15 @@ barang/pelanggan uji staging yang disepakati, bukan transaksi toko.
 
 ## Batch EDC/Campuran — persiapan 6 Oktober 2026 (P-604 / DR-08)
 
-Pemilik menyetujui persiapan alat **sebelum sesi VM**. Batch ini belum diuji
-fisik dan bukan izin rilis/pemasangan agent. Aplikasi staging sudah
-`fde96f98`; checkpoint ini tidak mengubah alur aplikasi atau formatter.
+Pemilik menyetujui persiapan alat **sebelum sesi VM**, kemudian push khusus
+`141eee0` dan uji melalui panduan chat. Pada6 Oktober empat kertas EDC/
+Campuran asli+salinan terbukti, detail kedua nota serta batas EDC0 diterima
+pemilik. Prompt probe kembali tanpa Ctrl+C sesuai batas30menit. Build/hash
+Windows dan batas bukti ada di [catatan validasi](../../docs/print-layout-validation.md).
+**Jangan mengulang empat cetakan yang sudah terbukti tanpa alasan.** Panduan
+di bawah dipertahankan sebagai prosedur jika kelak ada uji baru yang disepakati.
+Ini bukan izin rilis/pemasangan agent. Aplikasi staging `fde96f98`; alur
+aplikasi dan formatter tidak berubah.
 Mode `--serve` lama tetap untuk tunai/dua job; jangan memakainya untuk batch ini.
 Tunai asli/ulang telah terbukti 4 Oktober (§164 rancangan aplikasi), sehingga
 batch ini tidak mengulangnya atau tujuh fixture footer yang diterima.
@@ -104,9 +110,10 @@ menegakkannya. Karena itu transaksi di luar batch bisa tersimpan di aplikasi
 meski probe menolak cetaknya.
 
 Tes lokal mencakup policy + HTTP loopback dengan renderer spy, build net48,
-dan capability browser sintetis repo aplikasi. Belum bukti Windows, hash
-binary yang benar-benar dijalankan, CORS browser VM, driver/kertas, dispatcher/
-role mapping agent terpasang, atau seluruh UAT/matriks printer/rollback.
+dan capability browser sintetis repo aplikasi. Uji Windows6 Oktober kemudian
+membuktikan batch dua kasus melalui browser/probe/printer tersebut, disertai
+hash build dari operator. Ini belum bukti dispatcher/role mapping agent
+terpasang, Windows smoke penuh, seluruh UAT/matriks printer/rollback.
 
 ## Uji kasir staging → kertas, tanpa memasang agent — 3 Oktober 2026
 
