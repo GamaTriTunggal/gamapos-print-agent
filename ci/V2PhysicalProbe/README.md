@@ -3,10 +3,110 @@
 Alat ini khusus PC Windows uji dengan printer nota fisik. Ia memanggil
 parser/renderer schema 2 dari assembly hasil build secara langsung;
 `Program.Main` agent **tidak dijalankan**. Mode fixture tidak membuka port 9111;
-mode `--serve` membuka loopback sementara setelah konfirmasi operator. Alat tidak
+mode `--serve` / `--serve-edc-split` membuka loopback sementara setelah
+konfirmasi operator. Alat tidak
 menulis autostart, mengganti printer default, memasang driver, atau
-mengiklankan kemampuan v2. Jangan jalankan pada PC toko yang sedang
-melayani transaksi. Gunakan hanya fixture sintetis, bukan data pelanggan.
+mengiklankan kemampuan v2 pada agent normal. Jangan jalankan pada PC toko yang sedang
+melayani transaksi. Mode fixture memakai data sintetis; mode browser memakai
+barang/pelanggan uji staging yang disepakati, bukan transaksi toko.
+
+## Batch EDC/Campuran — persiapan 6 Oktober 2026 (P-604 / DR-08)
+
+Pemilik menyetujui persiapan alat **sebelum sesi VM**. Batch ini belum diuji
+fisik dan bukan izin rilis/pemasangan agent. Aplikasi staging sudah
+`fde96f98`; checkpoint ini tidak mengubah alur aplikasi atau formatter.
+Mode `--serve` lama tetap untuk tunai/dua job; jangan memakainya untuk batch ini.
+Tunai asli/ulang telah terbukti 4 Oktober (§164 rancangan aplikasi), sehingga
+batch ini tidak mengulangnya atau tujuh fixture footer yang diterima.
+
+### Persiapan file dan VM
+
+1. Gunakan satu folder kandidat terpisah dari agent terpasang, beserta semua
+   DLL/config hasil build. Catat commit repo agent, SHA-256 kedua EXE dan
+   tanggal uji. Versi assembly `1.2.0` saja tidak membedakan kandidat ini.
+   Jika memakai arsip kandidat, cocokkan **semua** hash pada `SHA256SUMS.txt`
+   dengan berkas hasil ekstraksi sebelum menjalankan; jangan mencampur DLL
+   dari build lain. Bila membangun ulang di Windows, catat hash hasil build
+   baru (tidak diasumsikan sama dengan build Linux).
+2. Sambungkan EPSON TM-U220 Receipt (TM-U220IIB) ke **VM Windows**, pastikan
+   terlihat/default, kertas cukup dan antrean kosong. Pada uji tunai dahulu,
+   dua job tertunda langsung keluar setelah printer disambungkan. Pemeriksaan
+   nama default oleh probe tidak membuktikan USB/driver siap atau kertas keluar.
+3. Pastikan port9111 tersedia dan probe lama telah berhenti. Pemilik sudah
+   mengonfirmasi Ctrl+C sesi tunai; periksa kembali kondisi saat sesi baru.
+   Jangan jalankan `ci/smoke.ps1`, installer, EXE agent normal, atau ubah
+   autostart/pemetaan/default/driver secara otomatis.
+
+Build lokal dari root repo (hentikan bila build gagal):
+
+```powershell
+dotnet build .\src\SpikeTransport\SpikeTransport.vbproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Build agent gagal' }
+dotnet build .\ci\V2PhysicalProbe\V2PhysicalProbe.vbproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Build probe gagal' }
+$probe = (Resolve-Path '.\ci\V2PhysicalProbe\bin\Release\net48\V2PhysicalProbe.exe').Path
+$agent = (Resolve-Path '.\src\SpikeTransport\bin\Release\net48\GamaPrintAgent.SpikeTransport.exe').Path
+git rev-parse HEAD
+Get-FileHash -Algorithm SHA256 -Path $probe,$agent
+& $probe --serve-edc-split $agent 'EPSON TM-U220 Receipt'
+```
+
+Untuk arsip kandidat, `$probe` menunjuk `probe\V2PhysicalProbe.exe` dan
+`$agent` menunjuk `agent\GamaPrintAgent.SpikeTransport.exe` di folder
+hasil ekstraksi; build tidak diperlukan. Ketik **UJI EDC CAMPURAN**.
+Cek `http://localhost:9111/health`: `mode=staging-test`, `testBatch=edc-split`,
+schema2 dan job `cashier_receipt` + `split_receipt`. Bila berbeda, berhenti
+sebelum transaksi. Port terpakai/galat hak listener perlu dilaporkan; jangan
+mematikan proses lain atau mengubah URL ACL/driver untuk memaksakan uji.
+
+### Satu batch: dua transaksi, empat kertas
+
+Browser VM yang sama, staging, FHD1920×1080. Gunakan barang stok dan pelanggan
+uji yang sudah tersedia; jangan membuat master/tarif baru. Pilih diskon5%
+seperti UAT sebelumnya dan konfigurasi EDC yang tersedia (misalnya BCA/Kartu
+Kredit/AMERICAN EXPRESS). Catat tarif/angka aktual, jangan memakai ingatan
+"biaya sekitar4.000" sebagai acuan. Tidak ada charge ke jaringan bank dari
+probe ini. Selama sesi jangan jalankan checkout/jenis cetak lain.
+
+| Urutan | Tindakan sekali | Yang diperiksa |
+| --- | --- | --- |
+| 1 | Transaksi EDC berdiskon melalui alur existing | Bruto, D/R, pokok EDC, fee dan Grand Total pada kasir cocok dengan daftar/detail sesudah reload. Catat nomor nota A. |
+| 2 | Cetak ulang nota A sekali dari Daftar Nota | Angka/identitas asal sama; atribusi pencetak ulang hanya pada salinan. Jangan koreksi nota di antara asli dan salinan. |
+| 3 | Siapkan Campuran berdiskon. Coba tunai tepat tagihan sehingga EDC0; pastikan Proses/F8 tertahan. Lalu ubah tunai agar kedua bagian positif, proses sekali. | Kas dan pokok EDC sesuai preview; R bila aktif hanya bagian tunai, fee memakai tarif aktual. Jumlah/detail sesuai Grand Total; nomor nota B berbeda dari A. |
+| 4 | Cetak ulang nota B sekali | Angka asli/ulang sama, nama utuh dan atribusi salinan tepat. |
+
+Catat angka layar tiap nota sebelum checkout dan sesudah reload, serta empat
+struk **dalam satu pengambilan**. Label/susunan kertas mengikuti v1 yang
+disepakati, tidak harus memakai label layar "Grand Total". `TOTAL NOTA` adalah neto
+setelah D/R; bila fee positif, `BIAYA EDC` dan `TOTAL DIBAYAR` ditampilkan.
+Pada Campuran, `TUNAI` dan `EDC` menunjukkan pokok masing-masing bagian
+(EDC belum termasuk fee). Periksa diskon, pembulatan bila ada dan fee/total;
+tidak ada "UANG DITERIMA"/"KEMBALIAN", teks tidak terpotong. Jangan menambah
+baris cetak agar menyerupai layar. Bukti/foto tetap privat, bukan Git.
+
+**Jika kertas tidak keluar, timeout, konflik atau hasil ambigu:** hentikan
+batch, jangan bayar lagi, klik cetak ulang tambahan, atau restart probe.
+Periksa status nota/antrean/koneksi terlebih dahulu; job mungkin sudah masuk
+spooler. Respons sukses hanya berarti perintah renderer selesai. Setelah
+batch selesai dan antrean diperiksa, Ctrl+C lalu konfirmasikan penghentian.
+
+### Batas pengaman dan bukti
+
+Mode baru hanya menerima `cashier_receipt/EDC`, lalu `split_receipt/SPLIT`
+dengan `noncashMethod=EDC`, semuanya berdiskon dan `copies=1`. Urutan asli/
+ulang wajib; salinan harus snapshot identik, nota kedua berbeda nomor,
+transaksi dan event, toko sama. Maksimal empat job; retry jobId/body identik
+mengembalikan hasil lama tanpa mencetak, termasuk setelah batas tercapai.
+Konflik/galat ambigu menahan cetak baru. Ledger hanya RAM, hilang saat restart.
+Origin staging, loopback, JSON1MiB, parser riil, sesi30menit dan serialisasi
+cetakan tetap. Health tidak mengiklankan pembatas metode: policy POST yang
+menegakkannya. Karena itu transaksi di luar batch bisa tersimpan di aplikasi
+meski probe menolak cetaknya.
+
+Tes lokal mencakup policy + HTTP loopback dengan renderer spy, build net48,
+dan capability browser sintetis repo aplikasi. Belum bukti Windows, hash
+binary yang benar-benar dijalankan, CORS browser VM, driver/kertas, dispatcher/
+role mapping agent terpasang, atau seluruh UAT/matriks printer/rollback.
 
 ## Uji kasir staging → kertas, tanpa memasang agent — 3 Oktober 2026
 
@@ -78,10 +178,11 @@ Batas alat:
   ditutup tidak ada port/autostart baru yang bertahan. Agent terpasang
   tidak di-upgrade/diubah dan tetap hanya mendukung schema1.
 
-Mode ini belum dibuktikan pada Windows/browser staging/printer fisik.
-Tes HTTP Linux menggunakan renderer spy; jangan menulisnya sebagai UAT
-atau aktivasi agent. Foto tujuh fixture sebelumnya adalah bukti renderer
-footer saja, bukan bukti handoff browser ini.
+Pembaruan4 Oktober: pemilik membuktikan tunai diskon dan salinan nota yang
+sama pada Windows/staging/TM-U220IIB; angka/teks utuh, tanpa uang diterima/
+kembalian. Probe telah dihentikan menurut konfirmasi pemilik. Hash binary
+Windows belum dicocokkan; bukti terbatas ini tidak menutup matriks atau
+membuktikan batch EDC/Campuran. Rincian pada §164 rancangan aplikasi.
 
 ## Batch uji ulang nama piutang/retur — 3 Oktober 2026
 

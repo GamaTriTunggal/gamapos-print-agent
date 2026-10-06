@@ -101,11 +101,143 @@ Module StagingBridgeTests
             Task.Run(Sub() Expect(Send(concurrent, body), 200, ""))}
         If Not Task.WaitAll(tasks, 5000) OrElse calls <> 1 Then Throw New InvalidOperationException("Retry paralel menggandakan cetak.")
         CheckHttp(body, copyBody)
+        CheckEDCSplitBatch(directory)
         Console.WriteLine("Staging bridge policy + loopback HTTP passed; printer spy only, not Windows/physical/browser UAT.")
     End Sub
 
-    Private Function NewPolicy(render As Action(Of String), ready As Func(Of Boolean)) As V2StagingBridge
-        Return New V2StagingBridge(AddressOf ParseSaleV2, render, ready, "1.2.0")
+    Private Sub CheckEDCSplitBatch(directory As String)
+        ' Salinan RAM: sumber fixture tidak diubah, fee tetap seperti snapshot parser.
+        Dim edc = DiscountedCardSample(directory, "sale_edc_only.sample.json")
+        Dim split = DiscountedCardSample(directory, "sale_split_edc.sample.json")
+        Dim edcCopy = Reprint(edc, "batch-edc-copy")
+        Dim splitCopy = Reprint(split, "batch-split-copy")
+        Dim calls As Integer = 0
+        Dim ready As Boolean = True
+        Dim policy = NewPolicy(Sub(value As String) calls += 1, Function() ready, True)
+        Dim health = JObject.Parse(policy.Handle("GET", "/health", Nothing, Nothing, Nothing, True).Body)
+        If CStr(health("mode")) <> "staging-test" OrElse CStr(health("testBatch")) <> "edc-split" OrElse
+           Not JToken.DeepEquals(health("supportedPrintSchemas"), New JArray(2)) OrElse
+           Not JToken.DeepEquals(health("supportedPrintJobTypesV2"), New JArray("cashier_receipt", "split_receipt")) Then
+            Throw New InvalidOperationException("Batch health tidak sesuai batas EDC/Campuran.")
+        End If
+        For Each name In {"sale_cash.sample.json", "sale_split_wire.sample.json", "sale_kasbon_dp.sample.json"}
+            Expect(Send(policy, File.ReadAllText(Path.Combine(directory, name))), 422, "TEST_EDC_SPLIT_ONLY")
+        Next
+        For Each name In {"sale_edc_only.sample.json", "sale_split_edc.sample.json"}
+            Expect(Send(policy, File.ReadAllText(Path.Combine(directory, name))), 422, "TEST_DISCOUNT_REQUIRED")
+        Next
+        Expect(Send(policy, split), 409, "TEST_BATCH_ORDER")
+        Expect(Send(policy, edcCopy), 409, "ORIGINAL_REQUIRED")
+        ready = False
+        Expect(Send(policy, edc), 409, "PRINTER_NOT_CONFIRMED")
+        If calls <> 0 Then Throw New InvalidOperationException("Batch ditolak tetapi mencapai printer.")
+        ready = True
+        Expect(Send(policy, edc), 200, "")
+        Expect(Send(policy, split), 409, "TEST_BATCH_ORDER")
+        Dim changed = JObject.Parse(edc)
+        changed("payload")("customer")("name") = "OTHER"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "JOB_ID_CONFLICT")
+        changed("jobId") = "second-original"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "SAME_RECEIPT_REPRINT_REQUIRED")
+        For Each source In {edcCopy, splitCopy}
+            ' Snapshot ulang pertama dan kedua harus identik, termasuk fee dan identitas.
+            For Each field In {"name", "fee"}
+                changed = JObject.Parse(source)
+                If field = "name" Then
+                    changed("payload")("customer")("name") = "OTHER"
+                Else
+                    Dim amounts = changed("payload")("amounts")
+                    amounts("customerFeeSen") = "600"
+                    amounts("customerPaysSen") = "1900600"
+                    amounts("merchantReceivesSen") = "1900350"
+                End If
+                Expect(Send(policy, changed.ToString(Formatting.None)), 409, "SAME_RECEIPT_REPRINT_REQUIRED")
+            Next
+            Expect(Send(policy, source), 200, "")
+            If source = edcCopy Then
+                Expect(Send(policy, splitCopy), 409, "ORIGINAL_REQUIRED")
+                changed = JObject.Parse(edc)
+                changed("jobId") = "extra-edc"
+                Expect(Send(policy, changed.ToString(Formatting.None)), 409, "TEST_BATCH_ORDER")
+                For Each field In {"receiptNo", "transactionId", "eventId"}
+                    changed = JObject.Parse(split)
+                    changed("payload")(field) = JObject.Parse(edc)("payload")(field).DeepClone()
+                    Expect(Send(policy, changed.ToString(Formatting.None)), 409, "DIFFERENT_RECEIPT_REQUIRED")
+                Next
+                changed = JObject.Parse(split)
+                changed("store")("name") = "OTHER STORE"
+                Expect(Send(policy, changed.ToString(Formatting.None)), 409, "SAME_STORE_REQUIRED")
+                If calls <> 2 Then Throw New InvalidOperationException("Batch melampaui pasangan EDC.")
+                Expect(Send(policy, split), 200, "")
+            End If
+        Next
+        For Each body In {edc, edcCopy, split, splitCopy}
+            Dim duplicate = Send(policy, body)
+            Expect(duplicate, 200, "")
+            If Not CBool(JObject.Parse(duplicate.Body)("duplicate")) Then Throw New InvalidOperationException("Batch retry bukan replay.")
+        Next
+        changed = JObject.Parse(splitCopy)
+        changed("jobId") = "fifth-job"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "TEST_PRINT_LIMIT")
+        If calls <> 4 Then Throw New InvalidOperationException("Batch harus tepat empat cetakan.")
+
+        calls = 0
+        Dim uncertain = NewPolicy(Sub(value As String)
+                                      calls += 1
+                                      Throw New InvalidOperationException("SECRET")
+                                  End Sub, Function() True, True)
+        Dim failed = Send(uncertain, edc)
+        Expect(failed, 409, "PRINT_OUTCOME_UNKNOWN")
+        If failed.Body.Contains("SECRET") Then Throw New InvalidOperationException("Batch membocorkan galat renderer.")
+        For Each body In {edc, edcCopy, split}
+            Expect(Send(uncertain, body), 409, "PRINT_OUTCOME_UNKNOWN")
+        Next
+        If calls <> 1 Then Throw New InvalidOperationException("Batch ambigu diulang.")
+        calls = 0
+        Dim concurrent = NewPolicy(Sub(value As String) Interlocked.Increment(calls), Function() True, True)
+        Dim tasks As Task() = {
+            Task.Run(Sub() Expect(Send(concurrent, edc), 200, "")),
+            Task.Run(Sub() Expect(Send(concurrent, edc), 200, "")),
+            Task.Run(Sub() Expect(Send(concurrent, edc), 200, "")),
+            Task.Run(Sub() Expect(Send(concurrent, edc), 200, ""))}
+        If Not Task.WaitAll(tasks, 5000) OrElse calls <> 1 Then Throw New InvalidOperationException("Batch retry paralel menggandakan cetak.")
+        Dim clock As New DateTime(2026, 10, 6, 0, 0, 0, DateTimeKind.Utc)
+        Dim expired = New V2StagingBridge(AddressOf ParseSaleV2, Sub(value As String) calls += 1, Function() True,
+                                         "1.2.0", Function() clock, True)
+        clock = clock.AddMinutes(30)
+        Expect(Send(expired, edc), 410, "TEST_SESSION_EXPIRED")
+        expired.CloseSession()
+        Expect(Send(expired, edc), 410, "TEST_SESSION_ENDED")
+        If calls <> 1 Then Throw New InvalidOperationException("Batch kedaluwarsa mencapai printer.")
+        CheckHttp(edc, edcCopy, split, splitCopy)
+        Console.WriteLine("EDC/split four-job batch policy + loopback HTTP passed; renderer spy only.")
+    End Sub
+
+    Private Function DiscountedCardSample(directory As String, filename As String) As String
+        Dim root = ParseSaleV2(File.ReadAllText(Path.Combine(directory, filename)))
+        Dim amounts = root("payload")("amounts")
+        amounts("discountSen") = "50000"
+        amounts("netSen") = "1900000"
+        amounts("principalAppliedSen") = "1900000"
+        amounts("customerPaysSen") = "1900500"
+        amounts("merchantReceivesSen") = "1900250"
+        If CStr(root("payload")("paymentMethod")) = "EDC" Then
+            amounts("noncashSen") = "1900000"
+        Else
+            amounts("cashSen") = "950000"
+        End If
+        Return ParseSaleV2(root.ToString(Formatting.None)).ToString(Formatting.None)
+    End Function
+
+    Private Function Reprint(body As String, jobId As String) As String
+        Dim root = JObject.Parse(body)
+        root("jobId") = jobId
+        root("payload")("reprint") = JObject.Parse("{""date"":""2026-10-06"",""time"":""13:30:00"",""processor"":{""userId"":""43"",""name"":""KASIR ULANG""},""corrections"":[]}")
+        Return ParseSaleV2(root.ToString(Formatting.None)).ToString(Formatting.None)
+    End Function
+
+    Private Function NewPolicy(render As Action(Of String), ready As Func(Of Boolean), Optional edcSplitBatch As Boolean = False) As V2StagingBridge
+        Return New V2StagingBridge(AddressOf ParseSaleV2, render, ready, "1.2.0", edcSplitBatch:=edcSplitBatch)
     End Function
 
     Private Function Send(policy As V2StagingBridge, body As String, Optional origin As String = V2StagingBridge.StagingOrigin) As BridgeReply
@@ -119,14 +251,14 @@ Module StagingBridgeTests
         If status = 200 AndAlso Not CBool(JObject.Parse(reply.Body)("ok")) Then Throw New InvalidOperationException("Bridge ok=false.")
     End Sub
 
-    Private Sub CheckHttp(body As String, copy As String)
+    Private Sub CheckHttp(body As String, copy As String, Optional split As String = Nothing, Optional splitCopy As String = Nothing)
         Dim reservation As New TcpListener(IPAddress.Loopback, 0)
         reservation.Start()
         Dim port = CType(reservation.LocalEndpoint, IPEndPoint).Port
         reservation.Stop()
         Dim prefix = "http://127.0.0.1:" & port & "/"
         Dim calls As Integer = 0
-        Dim server As New V2StagingHttpServer(NewPolicy(Sub(value As String) calls += 1, Function() True), prefix)
+        Dim server As New V2StagingHttpServer(NewPolicy(Sub(value As String) calls += 1, Function() True, split IsNot Nothing), prefix)
         server.Start()
         Try
             Using client As New HttpClient() With {.Timeout = TimeSpan.FromSeconds(5)}
@@ -150,7 +282,12 @@ Module StagingBridgeTests
                 CheckHttpReply(client, prefix & "print", HttpMethod.Post, V2StagingBridge.StagingOrigin, body, 200, "")
                 CheckHttpReply(client, prefix & "print", HttpMethod.Post, V2StagingBridge.StagingOrigin, body, 200, "")
                 CheckHttpReply(client, prefix & "print", HttpMethod.Post, V2StagingBridge.StagingOrigin, copy, 200, "")
-                If calls <> 2 Then Throw New InvalidOperationException("Jumlah HTTP print berbeda.")
+                If split IsNot Nothing Then
+                    CheckHttpReply(client, prefix & "print", HttpMethod.Post, V2StagingBridge.StagingOrigin, split, 200, "")
+                    CheckHttpReply(client, prefix & "print", HttpMethod.Post, V2StagingBridge.StagingOrigin, splitCopy, 200, "")
+                    CheckHttpReply(client, prefix & "print", HttpMethod.Post, V2StagingBridge.StagingOrigin, body, 200, "")
+                End If
+                If calls <> If(split Is Nothing, 2, 4) Then Throw New InvalidOperationException("Jumlah HTTP print berbeda.")
             End Using
         Finally
             server.Stop()

@@ -1,4 +1,4 @@
-' P-604 / DR-08: jalur HTTP sementara untuk dua cetakan staging di PC uji.
+' P-604 / DR-08: jalur HTTP sementara untuk batch cetakan staging terbatas di PC uji.
 ' Tidak menjalankan Program.Main agent, mengubah pemetaan, atau menyimpan payload.
 Option Strict On
 Option Explicit On
@@ -28,6 +28,7 @@ Friend Class V2StagingBridge
     Private ReadOnly _parser As Func(Of String, JObject)
     Private ReadOnly _render As Action(Of String)
     Private ReadOnly _printerReady As Func(Of Boolean)
+    Private ReadOnly _edcSplitBatch As Boolean
     Private ReadOnly _version As String
     Private ReadOnly _now As Func(Of DateTime)
     Private ReadOnly _expires As DateTime
@@ -50,11 +51,12 @@ Friend Class V2StagingBridge
     End Property
 
     Friend Sub New(parser As Func(Of String, JObject), render As Action(Of String), printerReady As Func(Of Boolean),
-                   version As String, Optional now As Func(Of DateTime) = Nothing)
+                   version As String, Optional now As Func(Of DateTime) = Nothing, Optional edcSplitBatch As Boolean = False)
         _parser = parser
         _render = render
         _printerReady = printerReady
         _version = version
+        _edcSplitBatch = edcSplitBatch
         _now = If(now, Function() DateTime.UtcNow)
         _expires = _now().AddMinutes(30)
     End Sub
@@ -74,6 +76,12 @@ Friend Class V2StagingBridge
             Return New BridgeReply(204, "")
         End If
         If method = "GET" AndAlso path = "/health" Then
+            If _edcSplitBatch Then
+                Return New BridgeReply(200, JsonConvert.SerializeObject(New With {
+                    .ok = True, .agentVersion = _version, .schemaVersion = 1, .mode = "staging-test",
+                    .testBatch = "edc-split", .supportedPrintSchemas = New Integer() {2},
+                    .supportedPrintJobTypesV2 = New String() {"cashier_receipt", "split_receipt"}}))
+            End If
             Return New BridgeReply(200, JsonConvert.SerializeObject(New With {
                 .ok = True, .agentVersion = _version, .schemaVersion = 1, .mode = "staging-test",
                 .supportedPrintSchemas = New Integer() {2},
@@ -91,7 +99,15 @@ Friend Class V2StagingBridge
         Catch
             Return Failure(400, "BAD_PAYLOAD")
         End Try
-        If CStr(root("jobType")) <> "cashier_receipt" OrElse CStr(root("payload")("paymentMethod")) <> "CASH" Then
+        If _edcSplitBatch Then
+            Dim kind = CStr(root("jobType"))
+            Dim payment = CStr(root("payload")("paymentMethod"))
+            If CStr(root("payload")("noncashMethod")) <> "EDC" OrElse
+               Not ((kind = "cashier_receipt" AndAlso payment = "EDC") OrElse
+                    (kind = "split_receipt" AndAlso payment = "SPLIT")) Then
+                Return Failure(422, "TEST_EDC_SPLIT_ONLY")
+            End If
+        ElseIf CStr(root("jobType")) <> "cashier_receipt" OrElse CStr(root("payload")("paymentMethod")) <> "CASH" Then
             Return Failure(422, "TEST_CASHIER_CASH_ONLY")
         End If
         If CStr(root("payload")("amounts")("discountSen")) = "0" Then Return Failure(422, "TEST_DISCOUNT_REQUIRED")
@@ -110,17 +126,30 @@ Friend Class V2StagingBridge
                 Return New BridgeReply(200, "{""ok"":true,""duplicate"":true}")
             End If
             If _uncertain Then Return Failure(409, "PRINT_OUTCOME_UNKNOWN")
-            If _jobs.Count >= 2 Then Return Failure(409, "TEST_PRINT_LIMIT")
+            If _jobs.Count >= If(_edcSplitBatch, 4, 2) Then Return Failure(409, "TEST_PRINT_LIMIT")
             Dim copy As JObject = TryCast(root("payload")("reprint"), JObject)
             Dim snapshot As JObject = SnapshotFor(root)
-            If _jobs.Count = 0 AndAlso copy IsNot Nothing Then Return Failure(409, "ORIGINAL_REQUIRED")
-            If _jobs.Count = 1 AndAlso (copy Is Nothing OrElse Not JToken.DeepEquals(snapshot, _snapshot)) Then
+            Dim originalRequired = _jobs.Count = 0 OrElse (_edcSplitBatch AndAlso _jobs.Count = 2)
+            If _edcSplitBatch Then
+                Dim expectedKind = If(_jobs.Count < 2, "cashier_receipt", "split_receipt")
+                If CStr(root("jobType")) <> expectedKind Then Return Failure(409, "TEST_BATCH_ORDER")
+                If _jobs.Count = 2 Then
+                    If CStr(snapshot("payload")("receiptNo")) = CStr(_snapshot("payload")("receiptNo")) OrElse
+                       CStr(snapshot("payload")("transactionId")) = CStr(_snapshot("payload")("transactionId")) OrElse
+                       CStr(snapshot("payload")("eventId")) = CStr(_snapshot("payload")("eventId")) Then
+                        Return Failure(409, "DIFFERENT_RECEIPT_REQUIRED")
+                    End If
+                    If Not JToken.DeepEquals(snapshot("store"), _snapshot("store")) Then Return Failure(409, "SAME_STORE_REQUIRED")
+                End If
+            End If
+            If originalRequired AndAlso copy IsNot Nothing Then Return Failure(409, "ORIGINAL_REQUIRED")
+            If Not originalRequired AndAlso (copy Is Nothing OrElse Not JToken.DeepEquals(snapshot, _snapshot)) Then
                 Return Failure(409, "SAME_RECEIPT_REPRINT_REQUIRED")
             End If
             If Not _printerReady() Then Return Failure(409, "PRINTER_NOT_CONFIRMED")
             ' Reservasi sebelum renderer: timeout/galat tidak boleh mencetak ulang otomatis.
             _jobs.Add(jobId, New KeyValuePair(Of String, Boolean)(fingerprint, False))
-            If _snapshot Is Nothing Then _snapshot = snapshot
+            If originalRequired Then _snapshot = snapshot
             Volatile.Write(_printing, 1)
             Try
                 _render(body)

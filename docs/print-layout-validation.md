@@ -4,6 +4,45 @@ Dokumen ini mencatat bukti dan aturan kerja untuk renderer nota schema 2
 (`P-604`). Kontrak bisnis tetap diputuskan di repo utama GamaPOS; dokumen ini
 tidak mengizinkan aktivasi schema 2, rilis agent, atau perubahan nota schema 1.
 
+## Persiapan batch EDC/Campuran — 6 Oktober 2026 (P-604 / DR-08)
+
+Pemilik mengizinkan perluasan terbatas alat uji sebelum sesi VM. Repo aplikasi
+awal `7b08fca3`, staging `fde96f98`; keputusan/bukti pada rancangan §179.
+Mode `--serve-edc-split` baru membatasi empat job berurutan: EDC asli/ulang,
+lalu Campuran tunai+EDC asli/ulang. Semuanya berdiskon, copies1, salinan
+snapshot identik; nota kedua berbeda nomor/transaksi/event, toko sama.
+Mode tunai `--serve` dua job tetap. Health mode baru bertanda
+`mode:staging-test`, `testBatch:edc-split`, capability kasir+split saja.
+Parser/renderer riil dari assembly agent tetap; formatter/payload/angka,
+normal agent/dispatcher/autostart/pemetaan/driver/versi1.2.0 tidak berubah.
+Retry identik sukses tidak mengulang cetak; konflik/galat ambigu/batas sesi
+menahan job baru. Ledger hanya RAM, tidak menjamin sesudah restart.
+
+Build net48 agent/probe lulus0warning/0error. Schema gate lulus11kasus,
+7rute,17fixture v1+17fixture v2 serta policy/HTTP mode tunai dan batch baru.
+Tes batch mengunci urutan/identitas/toko, snapshot/fee salinan, metode/diskon,
+printer belum siap, batas empat, retry/konflik/konkurensi, kedaluwarsa,
+penutupan dan galat ambigu. HTTP loopback/CORS/PNA memakai renderer spy;
+belum bukti Windows/browser VM/driver/kertas. Fixture sumber tidak diubah.
+`make ci` aplikasi pada kandidat terisolasi lulus: 15 tes capability,
+41 aksi nota dan 5 browser→Go→PG18.3 nyata (0 skip/0 flaky). Integrasi PG
+umum lokal memakai DSN port1 dan skip, bukan lulus matriks penuh. Warning
+Vue readonly sintetis pada CI tetap ada; build agent/probe tanpa warning.
+Bukti privat repo Go `checkpoint-20261006-edc-split-probe`; panduan operator
+pada README probe mencakup hash kedua EXE, USB/antrean, FHD, angka layar,
+EDC0 tertahan, empat struk dan konfirmasi Ctrl+C. Persiapan ini lokal,
+bukan push/rilis/install atau penutupan P-604/DR-08.
+
+Rekonsiliasi4 Oktober: uji browser staging pada VM Windows/TM-U220IIB
+menghasilkan dua struk nota26100004, belanja10.000/D200/total9.800 sama pada
+asli/ulang, atribusi ulang MARTIN HALIM, teks utuh tanpa uang diterima atau
+kembalian (foto privat IMG_3929). Dua job sebelumnya tertahan karena printer
+belum tersambung ke VM, lalu tercetak tanpa bayar ulang setelah tersambung.
+Pemilik telah mengonfirmasi probe dihentikan; bukan inspeksi proses VM.
+Bukti ini menggantikan status belum terbukti3 Oktober di bawah **hanya untuk
+kasus tunai asli/ulang tersebut**. Hash binary Windows masih belum terbukti;
+EDC/Campuran, role mapping/dispatcher dan matriks lain tetap terbuka.
+
 ## Batch footer diterima dan jalur HTTP staging disiapkan — 3 Oktober 2026
 
 Pemilik mengirim `IMG_3927.HEIC` lalu menyetujui hasil pemeriksaan. Setelah
