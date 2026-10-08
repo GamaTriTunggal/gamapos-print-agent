@@ -3,12 +3,25 @@
 Alat ini khusus PC Windows uji dengan printer nota fisik. Ia memanggil
 parser/renderer schema 2 dari assembly hasil build secara langsung;
 `Program.Main` agent **tidak dijalankan**. Mode fixture tidak membuka port 9111;
-mode `--serve` / `--serve-edc-split` membuka loopback sementara setelah
+mode `--serve` / `--serve-edc-split` / `--serve-receivable` membuka loopback sementara setelah
 konfirmasi operator. Alat tidak
 menulis autostart, mengganti printer default, memasang driver, atau
 mengiklankan kemampuan v2 pada agent normal. Jangan jalankan pada PC toko yang sedang
 melayani transaksi. Mode fixture memakai data sintetis; mode browser memakai
 barang/pelanggan uji staging yang disepakati, bukan transaksi toko.
+
+## Batch bukti piutang — 8 Oktober 2026 (D-024 DR-08)
+
+Pemilik menyetujui push cabang uji ini untuk UAT pembayaran piutang di
+staging. Mode `--serve-receivable` hanya menerima `receivable_selected`,
+`receivable_selected_card` dan `receivable_proof` dari origin staging:
+maksimal tiga pembayaran berbeda pada toko yang sama, masing-masing satu
+cetak asli lalu satu cetak ulang dengan snapshot identik (enam job, 30 menit).
+Cetak ulang tanpa asli, asli kedua untuk transaksi yang sama, atau salinan
+yang isinya berbeda ditolak tanpa mencapai printer. Langkah build/hash sama
+dengan batch di bawah; jalankan `& $probe --serve-receivable $agent 'EPSON TM-U220 Receipt'`,
+ketik **UJI PIUTANG**, lalu periksa `/health`: `testBatch=receivable` dan
+ketiga jenis bukti piutang. Bukan rilis/pemasangan agent.
 
 ## Batch EDC/Campuran — persiapan 6 Oktober 2026 (P-604 / DR-08)
 

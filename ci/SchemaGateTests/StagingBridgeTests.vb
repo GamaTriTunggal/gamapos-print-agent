@@ -102,6 +102,7 @@ Module StagingBridgeTests
         If Not Task.WaitAll(tasks, 5000) OrElse calls <> 1 Then Throw New InvalidOperationException("Retry paralel menggandakan cetak.")
         CheckHttp(body, copyBody)
         CheckEDCSplitBatch(directory)
+        CheckReceivableBatch(directory)
         Console.WriteLine("Staging bridge policy + loopback HTTP passed; printer spy only, not Windows/physical/browser UAT.")
     End Sub
 
@@ -211,6 +212,137 @@ Module StagingBridgeTests
         If calls <> 1 Then Throw New InvalidOperationException("Batch kedaluwarsa mencapai printer.")
         CheckHttp(edc, edcCopy, split, splitCopy)
         Console.WriteLine("EDC/split four-job batch policy + loopback HTTP passed; renderer spy only.")
+    End Sub
+
+    Private Sub CheckReceivableBatch(directory As String)
+        ' D-024 DR-08: tiga bukti piutang berbeda transaksi, masing-masing satu cetak ulang identik.
+        Dim selected = ReceivableSample(directory, "receivable_selected.sample.json")
+        Dim fifo = ReceivableSample(directory, "receivable_proof.sample.json")
+        Dim card = ReceivableSample(directory, "receivable_selected_card.sample.json")
+        Dim selectedCopy = ReceivableReprint(selected, "receivable-selected-copy")
+        Dim fifoCopy = ReceivableReprint(fifo, "receivable-fifo-copy")
+        Dim cardCopy = ReceivableReprint(card, "receivable-card-copy")
+        Dim calls As Integer = 0
+        Dim ready As Boolean = True
+        Dim policy = ReceivablePolicy(Sub(value As String) calls += 1, Function() ready)
+        Dim health = JObject.Parse(policy.Handle("GET", "/health", Nothing, Nothing, Nothing, True).Body)
+        If CStr(health("mode")) <> "staging-test" OrElse CStr(health("testBatch")) <> "receivable" OrElse
+           Not JToken.DeepEquals(health("supportedPrintSchemas"), New JArray(2)) OrElse
+           Not JToken.DeepEquals(health("supportedPrintJobTypesV2"), New JArray("receivable_selected", "receivable_selected_card", "receivable_proof")) Then
+            Throw New InvalidOperationException("Batch piutang membuka keluarga lain.")
+        End If
+        For Each name In {"sale_cash.sample.json", "sale_edc_only.sample.json", "return_note.sample.json"}
+            Expect(Send(policy, File.ReadAllText(Path.Combine(directory, name))), 400, "BAD_PAYLOAD")
+        Next
+        Expect(Send(policy, selectedCopy), 409, "ORIGINAL_REQUIRED")
+        ready = False
+        Expect(Send(policy, selected), 409, "PRINTER_NOT_CONFIRMED")
+        If calls <> 0 Then Throw New InvalidOperationException("Batch piutang ditolak tetapi mencapai printer.")
+        ready = True
+        Expect(Send(policy, selected), 200, "")
+        Dim changed = JObject.Parse(selected)
+        changed("jobId") = "selected-again"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "ORIGINAL_ALREADY_PRINTED")
+        changed = JObject.Parse(fifo)
+        changed("store")("name") = "OTHER STORE"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "SAME_STORE_REQUIRED")
+        Expect(Send(policy, fifoCopy), 409, "ORIGINAL_REQUIRED")
+        For Each field In {"customer", "amount"}
+            changed = JObject.Parse(selectedCopy)
+            If field = "customer" Then
+                changed("payload")("customer")("name") = "OTHER"
+            Else
+                changed("payload")("originalProcessor")("name") = "OTHER PROCESSOR"
+            End If
+            Expect(Send(policy, changed.ToString(Formatting.None)), 409, "SAME_RECEIPT_REPRINT_REQUIRED")
+        Next
+        Expect(Send(policy, selectedCopy), 200, "")
+        changed = JObject.Parse(selectedCopy)
+        changed("jobId") = "selected-second-copy"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "TEST_PRINT_LIMIT")
+        Expect(Send(policy, fifo), 200, "")
+        Expect(Send(policy, card), 200, "")
+        changed = JObject.Parse(fifo)
+        changed("jobId") = "fourth-original"
+        changed("payload")("transactionId") = "IN/260927/000009"
+        changed("payload")("eventId") = New String("f"c, 32)
+        Expect(Send(policy, ReceivableParsed(changed)), 409, "TEST_PRINT_LIMIT")
+        Expect(Send(policy, cardCopy), 200, "")
+        Expect(Send(policy, fifoCopy), 200, "")
+        For Each body In {selected, selectedCopy, fifo, fifoCopy, card, cardCopy}
+            Dim duplicate = Send(policy, body)
+            Expect(duplicate, 200, "")
+            If Not CBool(JObject.Parse(duplicate.Body)("duplicate")) Then Throw New InvalidOperationException("Batch piutang retry bukan replay.")
+        Next
+        changed = JObject.Parse(cardCopy)
+        changed("jobId") = "seventh-job"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "TEST_PRINT_LIMIT")
+        If calls <> 6 Then Throw New InvalidOperationException("Batch piutang harus tepat enam cetakan.")
+
+        calls = 0
+        Dim uncertain = ReceivablePolicy(Sub(value As String)
+                                             calls += 1
+                                             Throw New InvalidOperationException("SECRET")
+                                         End Sub, Function() True)
+        Dim failed = Send(uncertain, selected)
+        Expect(failed, 409, "PRINT_OUTCOME_UNKNOWN")
+        If failed.Body.Contains("SECRET") Then Throw New InvalidOperationException("Batch piutang membocorkan galat renderer.")
+        For Each body In {selected, selectedCopy, fifo}
+            Expect(Send(uncertain, body), 409, "PRINT_OUTCOME_UNKNOWN")
+        Next
+        If calls <> 1 Then Throw New InvalidOperationException("Batch piutang ambigu diulang.")
+        Dim mixed As Boolean = False
+        Try
+            Dim invalid = New V2StagingBridge(AddressOf ParseReceivableV2, Sub(value As String) calls += 1, Function() True,
+                                              "1.2.0", edcSplitBatch:=True, receivableBatch:=True)
+        Catch ex As ArgumentException
+            mixed = True
+        End Try
+        If Not mixed Then Throw New InvalidOperationException("Dua batch dalam satu sesi diterima.")
+        CheckReceivableHttp(selected, selectedCopy)
+        Console.WriteLine("Receivable six-job batch policy + loopback HTTP passed; renderer spy only.")
+    End Sub
+
+    Private Function ReceivableSample(directory As String, filename As String) As String
+        Return ParseReceivableV2(File.ReadAllText(Path.Combine(directory, filename))).ToString(Formatting.None)
+    End Function
+
+    Private Function ReceivableParsed(root As JObject) As String
+        Return ParseReceivableV2(root.ToString(Formatting.None)).ToString(Formatting.None)
+    End Function
+
+    Private Function ReceivableReprint(body As String, jobId As String) As String
+        Dim root = JObject.Parse(body)
+        root("jobId") = jobId
+        root("payload")("reprint") = JObject.Parse("{""date"":""2026-10-08"",""time"":""10:00:00"",""processor"":{""userId"":""43"",""name"":""KASIR ULANG""}}")
+        Return ReceivableParsed(root)
+    End Function
+
+    Private Function ReceivablePolicy(render As Action(Of String), ready As Func(Of Boolean)) As V2StagingBridge
+        Return New V2StagingBridge(AddressOf ParseReceivableV2, render, ready, "1.2.0", receivableBatch:=True)
+    End Function
+
+    Private Sub CheckReceivableHttp(body As String, copy As String)
+        Dim reservation As New TcpListener(IPAddress.Loopback, 0)
+        reservation.Start()
+        Dim port = CType(reservation.LocalEndpoint, IPEndPoint).Port
+        reservation.Stop()
+        Dim prefix = "http://127.0.0.1:" & port & "/"
+        Dim calls As Integer = 0
+        Dim server As New V2StagingHttpServer(ReceivablePolicy(Sub(value As String) calls += 1, Function() True), prefix)
+        server.Start()
+        Try
+            Using client As New HttpClient() With {.Timeout = TimeSpan.FromSeconds(5)}
+                CheckHttpReply(client, prefix & "health", HttpMethod.Get, V2StagingBridge.StagingOrigin, Nothing, 200, "")
+                CheckHttpReply(client, prefix & "print", HttpMethod.Post, "https://app.gamapos.id", body, 403, "FORBIDDEN_ORIGIN")
+                CheckHttpReply(client, prefix & "print", HttpMethod.Post, V2StagingBridge.StagingOrigin, copy, 409, "ORIGINAL_REQUIRED")
+                CheckHttpReply(client, prefix & "print", HttpMethod.Post, V2StagingBridge.StagingOrigin, body, 200, "")
+                CheckHttpReply(client, prefix & "print", HttpMethod.Post, V2StagingBridge.StagingOrigin, copy, 200, "")
+                If calls <> 2 Then Throw New InvalidOperationException("Jumlah HTTP print piutang berbeda.")
+            End Using
+        Finally
+            server.Stop()
+        End Try
     End Sub
 
     Private Function DiscountedCardSample(directory As String, filename As String) As String
