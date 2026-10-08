@@ -1,6 +1,6 @@
 ' Probe manual nota v2, terpisah dari startup agent. Tidak memasang agent,
 ' menulis autostart, mengganti default printer, atau merilisnya.
-' --serve / --serve-edc-split / --serve-receivable membuka loopback sementara setelah konfirmasi.
+' --serve / --serve-edc-split / --serve-receivable / --serve-kasbon membuka loopback sementara setelah konfirmasi.
 Option Strict On
 Option Explicit On
 
@@ -15,12 +15,12 @@ Module Program
     Private Const AgentNamespace As String = "GamaPrintAgent.SpikeTransport."
 
     Function Main(args As String()) As Integer
-        If args.Length = 3 AndAlso (args(0) = "--serve" OrElse args(0) = "--serve-edc-split" OrElse args(0) = "--serve-receivable") Then
-            Return ServeStaging(args(1), args(2), args(0) = "--serve-edc-split", args(0) = "--serve-receivable")
+        If args.Length = 3 AndAlso (args(0) = "--serve" OrElse args(0) = "--serve-edc-split" OrElse args(0) = "--serve-receivable" OrElse args(0) = "--serve-kasbon") Then
+            Return ServeStaging(args(1), args(2), args(0) = "--serve-edc-split", args(0) = "--serve-receivable", args(0) = "--serve-kasbon")
         End If
         If args.Length <> 4 OrElse
            (args(0) <> "--verify" AndAlso args(0) <> "--preflight" AndAlso args(0) <> "--print") Then
-            Console.Error.WriteLine("Pakai: V2PhysicalProbe.exe --verify|--preflight|--print AGENT_EXE FIXTURE_JSON NAMA_PRINTER_DEFAULT; atau --serve|--serve-edc-split|--serve-receivable AGENT_EXE NAMA_PRINTER_DEFAULT")
+            Console.Error.WriteLine("Pakai: V2PhysicalProbe.exe --verify|--preflight|--print AGENT_EXE FIXTURE_JSON NAMA_PRINTER_DEFAULT; atau --serve|--serve-edc-split|--serve-receivable|--serve-kasbon AGENT_EXE NAMA_PRINTER_DEFAULT")
             Return 2
         End If
         Try
@@ -87,7 +87,7 @@ Module Program
         Return 1
     End Function
 
-    Private Function ServeStaging(agentPath As String, expectedPrinter As String, edcSplitBatch As Boolean, receivableBatch As Boolean) As Integer
+    Private Function ServeStaging(agentPath As String, expectedPrinter As String, edcSplitBatch As Boolean, receivableBatch As Boolean, kasbonBatch As Boolean) As Integer
         Dim server As V2StagingHttpServer = Nothing
         Try
             If Not File.Exists(agentPath) OrElse String.IsNullOrWhiteSpace(expectedPrinter) Then Throw New ArgumentException()
@@ -103,6 +103,8 @@ Module Program
             If Not printerReady() Then Throw New InvalidOperationException()
             If receivableBatch Then
                 Console.WriteLine("Uji browser staging piutang: maksimal tiga bukti pembayaran asli, masing-masing satu cetak ulang (enam job) selama 30 menit.")
+            ElseIf kasbonBatch Then
+                Console.WriteLine("Uji browser staging kasbon: maksimal tiga nota kasbon asli, masing-masing satu cetak ulang (enam job) selama 30 menit.")
             ElseIf edcSplitBatch Then
                 Console.WriteLine("Uji browser staging: EDC asli, ulang EDC, Campuran asli, ulang Campuran; maksimal empat job selama 30 menit.")
             Else
@@ -110,18 +112,20 @@ Module Program
             End If
             Console.WriteLine("Tidak memasang agent/autostart, mengubah printer default, atau menyimpan isi nota.")
             Console.WriteLine("Jangan ubah printer default selama uji. Jika cetak gagal/timeout, jangan mengulang pembayaran atau memulai sesi baru.")
-            Dim confirmation = If(receivableBatch, "UJI PIUTANG", If(edcSplitBatch, "UJI EDC CAMPURAN", "UJI STAGING"))
+            Dim confirmation = If(receivableBatch, "UJI PIUTANG", If(kasbonBatch, "UJI KASBON", If(edcSplitBatch, "UJI EDC CAMPURAN", "UJI STAGING")))
             Console.Write("Untuk membuka localhost:9111 pada PC uji, ketik " & confirmation & ": ")
             If Console.ReadLine() <> confirmation Then Return 2
             Dim policy As New V2StagingBridge(
                 Function(body As String) CType(parser.Invoke(Nothing, New Object() {body}), JObject),
                 Sub(body As String) renderer.Invoke(Nothing, New Object() {body}),
-                printerReady, agent.GetName().Version.ToString(3), edcSplitBatch:=edcSplitBatch, receivableBatch:=receivableBatch)
+                printerReady, agent.GetName().Version.ToString(3), edcSplitBatch:=edcSplitBatch, receivableBatch:=receivableBatch, kasbonBatch:=kasbonBatch)
             server = New V2StagingHttpServer(policy, "http://localhost:9111/")
             server.Start()
             Console.WriteLine("Jalur uji siap: buka https://staging.gamapos.id/" & If(receivableBatch, "pos/receivables", "pos/cashier") & " di browser VM ini.")
             If receivableBatch Then
                 Console.WriteLine("Bayar bon pelanggan uji sesuai panduan, lalu cetak ulang tiap bukti dari Histori pembayaran (F6). Ctrl+C setelah selesai.")
+            ElseIf kasbonBatch Then
+                Console.WriteLine("Buat kasbon pelanggan uji sesuai panduan (dengan DP dan tanpa DP), lalu cetak ulang tiap nota dari Daftar Nota. Ctrl+C setelah selesai.")
             ElseIf edcSplitBatch Then
                 Console.WriteLine("Buat EDC BERDISKON lalu cetak ulang. Setelah itu buat CAMPURAN TUNAI+EDC BERDISKON lalu cetak ulang. Ctrl+C setelah selesai.")
             Else

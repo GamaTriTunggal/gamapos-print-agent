@@ -103,6 +103,7 @@ Module StagingBridgeTests
         CheckHttp(body, copyBody)
         CheckEDCSplitBatch(directory)
         CheckReceivableBatch(directory)
+        CheckKasbonBatch(directory)
         Console.WriteLine("Staging bridge policy + loopback HTTP passed; printer spy only, not Windows/physical/browser UAT.")
     End Sub
 
@@ -301,6 +302,64 @@ Module StagingBridgeTests
         If Not mixed Then Throw New InvalidOperationException("Dua batch dalam satu sesi diterima.")
         CheckReceivableHttp(selected, selectedCopy)
         Console.WriteLine("Receivable six-job batch policy + loopback HTTP passed; renderer spy only.")
+    End Sub
+
+    Private Sub CheckKasbonBatch(directory As String)
+        ' D-024 adendum 8 Okt 2026: nota kasbon v2 (DP dan DP0), tiap nota satu asli + satu cetak ulang identik.
+        Dim dp = ParseSaleV2(File.ReadAllText(Path.Combine(directory, "sale_kasbon_dp.sample.json"))).ToString(Formatting.None)
+        Dim dp0 = ParseSaleV2(File.ReadAllText(Path.Combine(directory, "sale_kasbon_dp0.sample.json"))).ToString(Formatting.None)
+        Dim dpCopy = Reprint(dp, "kasbon-dp-copy")
+        Dim dp0Copy = Reprint(dp0, "kasbon-dp0-copy")
+        Dim calls As Integer = 0
+        Dim ready As Boolean = True
+        Dim policy = New V2StagingBridge(AddressOf ParseSaleV2, Sub(value As String) calls += 1, Function() ready, "1.2.0", kasbonBatch:=True)
+        Dim health = JObject.Parse(policy.Handle("GET", "/health", Nothing, Nothing, Nothing, True).Body)
+        If CStr(health("testBatch")) <> "kasbon" OrElse
+           Not JToken.DeepEquals(health("supportedPrintJobTypesV2"), New JArray("kasbon_receipt")) Then
+            Throw New InvalidOperationException("Batch kasbon membuka keluarga lain.")
+        End If
+        Expect(Send(policy, File.ReadAllText(Path.Combine(directory, "sale_cash.sample.json"))), 422, "TEST_KASBON_ONLY")
+        Expect(Send(policy, dpCopy), 409, "ORIGINAL_REQUIRED")
+        ready = False
+        Expect(Send(policy, dp), 409, "PRINTER_NOT_CONFIRMED")
+        If calls <> 0 Then Throw New InvalidOperationException("Batch kasbon ditolak tetapi mencapai printer.")
+        ready = True
+        Expect(Send(policy, dp), 200, "")
+        Dim changed = JObject.Parse(dp)
+        changed("jobId") = "kasbon-dp-again"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "ORIGINAL_ALREADY_PRINTED")
+        changed = JObject.Parse(dpCopy)
+        changed("payload")("customer")("name") = "OTHER"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "SAME_RECEIPT_REPRINT_REQUIRED")
+        ' DP0 tidak punya nomor transaksi kas: kunci batch = nomor nota.
+        Expect(Send(policy, dp0), 200, "")
+        Expect(Send(policy, dp0Copy), 200, "")
+        Expect(Send(policy, dpCopy), 200, "")
+        changed = JObject.Parse(dp0Copy)
+        changed("jobId") = "kasbon-dp0-second-copy"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "TEST_PRINT_LIMIT")
+        For Each body In {dp, dpCopy, dp0, dp0Copy}
+            Dim duplicate = Send(policy, body)
+            Expect(duplicate, 200, "")
+            If Not CBool(JObject.Parse(duplicate.Body)("duplicate")) Then Throw New InvalidOperationException("Batch kasbon retry bukan replay.")
+        Next
+        changed = JObject.Parse(dp0)
+        changed("jobId") = "kasbon-third"
+        changed("payload")("receiptNo") = "26092799"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 200, "")
+        changed("jobId") = "kasbon-fourth"
+        changed("payload")("receiptNo") = "26092798"
+        Expect(Send(policy, changed.ToString(Formatting.None)), 409, "TEST_PRINT_LIMIT")
+        If calls <> 5 Then Throw New InvalidOperationException("Batch kasbon harus tepat lima cetakan pada uji ini.")
+        Dim mixed As Boolean = False
+        Try
+            Dim invalid = New V2StagingBridge(AddressOf ParseSaleV2, Sub(value As String) calls += 1, Function() True,
+                                              "1.2.0", receivableBatch:=True, kasbonBatch:=True)
+        Catch ex As ArgumentException
+            mixed = True
+        End Try
+        If Not mixed Then Throw New InvalidOperationException("Dua batch dalam satu sesi diterima.")
+        Console.WriteLine("Kasbon batch policy passed; renderer spy only.")
     End Sub
 
     Private Function ReceivableSample(directory As String, filename As String) As String

@@ -1,4 +1,5 @@
 ' P-604 / DR-08: jalur HTTP sementara untuk batch cetakan staging terbatas di PC uji.
+' D-024 adendum 8 Okt 2026: batch kasbon (nota kasbon v2, tiap nota satu asli + satu cetak ulang).
 ' Tidak menjalankan Program.Main agent, mengubah pemetaan, atau menyimpan payload.
 Option Strict On
 Option Explicit On
@@ -30,13 +31,15 @@ Friend Class V2StagingBridge
     Private ReadOnly _printerReady As Func(Of Boolean)
     Private ReadOnly _edcSplitBatch As Boolean
     Private ReadOnly _receivableBatch As Boolean
+    Private ReadOnly _kasbonBatch As Boolean
     Private ReadOnly _version As String
     Private ReadOnly _now As Func(Of DateTime)
     Private ReadOnly _expires As DateTime
     Private ReadOnly _jobs As New Dictionary(Of String, KeyValuePair(Of String, Boolean))(StringComparer.Ordinal)
-    ' Batch piutang: snapshot asli per transaksi pembayaran dan transaksi yang sudah dicetak ulang.
-    Private ReadOnly _receivableOriginals As New Dictionary(Of String, JObject)(StringComparer.Ordinal)
-    Private ReadOnly _receivableCopies As New HashSet(Of String)(StringComparer.Ordinal)
+    ' Batch piutang/kasbon: snapshot asli per transaksi (piutang) atau per nota (kasbon;
+    ' kasbon DP0 tidak punya nomor transaksi kas) dan yang sudah dicetak ulang.
+    Private ReadOnly _batchOriginals As New Dictionary(Of String, JObject)(StringComparer.Ordinal)
+    Private ReadOnly _batchCopies As New HashSet(Of String)(StringComparer.Ordinal)
     Private _snapshot As JObject
     Private _uncertain As Boolean
     Private _printing As Integer
@@ -56,14 +59,15 @@ Friend Class V2StagingBridge
 
     Friend Sub New(parser As Func(Of String, JObject), render As Action(Of String), printerReady As Func(Of Boolean),
                    version As String, Optional now As Func(Of DateTime) = Nothing, Optional edcSplitBatch As Boolean = False,
-                   Optional receivableBatch As Boolean = False)
-        If edcSplitBatch AndAlso receivableBatch Then Throw New ArgumentException("Satu sesi uji hanya satu batch.")
+                   Optional receivableBatch As Boolean = False, Optional kasbonBatch As Boolean = False)
+        If (If(edcSplitBatch, 1, 0) + If(receivableBatch, 1, 0) + If(kasbonBatch, 1, 0)) > 1 Then Throw New ArgumentException("Satu sesi uji hanya satu batch.")
         _parser = parser
         _render = render
         _printerReady = printerReady
         _version = version
         _edcSplitBatch = edcSplitBatch
         _receivableBatch = receivableBatch
+        _kasbonBatch = kasbonBatch
         _now = If(now, Function() DateTime.UtcNow)
         _expires = _now().AddMinutes(30)
     End Sub
@@ -88,6 +92,12 @@ Friend Class V2StagingBridge
                     .ok = True, .agentVersion = _version, .schemaVersion = 1, .mode = "staging-test",
                     .testBatch = "receivable", .supportedPrintSchemas = New Integer() {2},
                     .supportedPrintJobTypesV2 = ReceivableJobTypes}))
+            End If
+            If _kasbonBatch Then
+                Return New BridgeReply(200, JsonConvert.SerializeObject(New With {
+                    .ok = True, .agentVersion = _version, .schemaVersion = 1, .mode = "staging-test",
+                    .testBatch = "kasbon", .supportedPrintSchemas = New Integer() {2},
+                    .supportedPrintJobTypesV2 = New String() {"kasbon_receipt"}}))
             End If
             If _edcSplitBatch Then
                 Return New BridgeReply(200, JsonConvert.SerializeObject(New With {
@@ -114,6 +124,10 @@ Friend Class V2StagingBridge
         End Try
         If _receivableBatch Then
             If Array.IndexOf(ReceivableJobTypes, CStr(root("jobType"))) < 0 Then Return Failure(422, "TEST_RECEIVABLE_ONLY")
+        ElseIf _kasbonBatch Then
+            If CStr(root("jobType")) <> "kasbon_receipt" OrElse CStr(root("payload")("paymentMethod")) <> "CREDIT" Then
+                Return Failure(422, "TEST_KASBON_ONLY")
+            End If
         ElseIf _edcSplitBatch Then
             Dim kind = CStr(root("jobType"))
             Dim payment = CStr(root("payload")("paymentMethod"))
@@ -125,7 +139,9 @@ Friend Class V2StagingBridge
         ElseIf CStr(root("jobType")) <> "cashier_receipt" OrElse CStr(root("payload")("paymentMethod")) <> "CASH" Then
             Return Failure(422, "TEST_CASHIER_CASH_ONLY")
         End If
-        If Not _receivableBatch AndAlso CStr(root("payload")("amounts")("discountSen")) = "0" Then Return Failure(422, "TEST_DISCOUNT_REQUIRED")
+        ' Kasbon tidak boleh berdiskon (D-024); batch kasbon menguji pembulatan/DP, bukan diskon.
+        Dim perReceipt As Boolean = _receivableBatch OrElse _kasbonBatch
+        If Not perReceipt AndAlso CStr(root("payload")("amounts")("discountSen")) = "0" Then Return Failure(422, "TEST_DISCOUNT_REQUIRED")
         Dim jobId As String = CStr(root("jobId"))
         Dim fingerprint As String
         Using hash As SHA256 = SHA256.Create()
@@ -141,24 +157,24 @@ Friend Class V2StagingBridge
                 Return New BridgeReply(200, "{""ok"":true,""duplicate"":true}")
             End If
             If _uncertain Then Return Failure(409, "PRINT_OUTCOME_UNKNOWN")
-            If _jobs.Count >= If(_receivableBatch, 6, If(_edcSplitBatch, 4, 2)) Then Return Failure(409, "TEST_PRINT_LIMIT")
+            If _jobs.Count >= If(perReceipt, 6, If(_edcSplitBatch, 4, 2)) Then Return Failure(409, "TEST_PRINT_LIMIT")
             Dim copy As JObject = TryCast(root("payload")("reprint"), JObject)
             Dim snapshot As JObject = SnapshotFor(root)
             Dim originalRequired = _jobs.Count = 0 OrElse (_edcSplitBatch AndAlso _jobs.Count = 2)
-            Dim transactionId As String = CStr(snapshot("payload")("transactionId"))
-            If _receivableBatch Then
-                ' Maksimal tiga pembayaran: masing-masing satu asli lalu satu cetak ulang identik.
+            Dim batchKey As String = If(_kasbonBatch, CStr(snapshot("payload")("receiptNo")), CStr(snapshot("payload")("transactionId")))
+            If perReceipt Then
+                ' Maksimal tiga pembayaran/nota: masing-masing satu asli lalu satu cetak ulang identik.
                 originalRequired = copy Is Nothing
                 Dim original As JObject = Nothing
                 If originalRequired Then
-                    If _receivableOriginals.ContainsKey(transactionId) Then Return Failure(409, "ORIGINAL_ALREADY_PRINTED")
-                    If _receivableOriginals.Count >= 3 Then Return Failure(409, "TEST_PRINT_LIMIT")
+                    If _batchOriginals.ContainsKey(batchKey) Then Return Failure(409, "ORIGINAL_ALREADY_PRINTED")
+                    If _batchOriginals.Count >= 3 Then Return Failure(409, "TEST_PRINT_LIMIT")
                     If _snapshot IsNot Nothing AndAlso Not JToken.DeepEquals(snapshot("store"), _snapshot("store")) Then
                         Return Failure(409, "SAME_STORE_REQUIRED")
                     End If
-                ElseIf Not _receivableOriginals.TryGetValue(transactionId, original) Then
+                ElseIf Not _batchOriginals.TryGetValue(batchKey, original) Then
                     Return Failure(409, "ORIGINAL_REQUIRED")
-                ElseIf _receivableCopies.Contains(transactionId) Then
+                ElseIf _batchCopies.Contains(batchKey) Then
                     Return Failure(409, "TEST_PRINT_LIMIT")
                 ElseIf Not JToken.DeepEquals(snapshot, original) Then
                     Return Failure(409, "SAME_RECEIPT_REPRINT_REQUIRED")
@@ -175,16 +191,16 @@ Friend Class V2StagingBridge
                     If Not JToken.DeepEquals(snapshot("store"), _snapshot("store")) Then Return Failure(409, "SAME_STORE_REQUIRED")
                 End If
             End If
-            If Not _receivableBatch AndAlso originalRequired AndAlso copy IsNot Nothing Then Return Failure(409, "ORIGINAL_REQUIRED")
-            If Not _receivableBatch AndAlso Not originalRequired AndAlso (copy Is Nothing OrElse Not JToken.DeepEquals(snapshot, _snapshot)) Then
+            If Not perReceipt AndAlso originalRequired AndAlso copy IsNot Nothing Then Return Failure(409, "ORIGINAL_REQUIRED")
+            If Not perReceipt AndAlso Not originalRequired AndAlso (copy Is Nothing OrElse Not JToken.DeepEquals(snapshot, _snapshot)) Then
                 Return Failure(409, "SAME_RECEIPT_REPRINT_REQUIRED")
             End If
             If Not _printerReady() Then Return Failure(409, "PRINTER_NOT_CONFIRMED")
             ' Reservasi sebelum renderer: timeout/galat tidak boleh mencetak ulang otomatis.
             _jobs.Add(jobId, New KeyValuePair(Of String, Boolean)(fingerprint, False))
-            If originalRequired AndAlso (Not _receivableBatch OrElse _snapshot Is Nothing) Then _snapshot = snapshot
-            If _receivableBatch Then
-                If originalRequired Then _receivableOriginals.Add(transactionId, snapshot) Else _receivableCopies.Add(transactionId)
+            If originalRequired AndAlso (Not perReceipt OrElse _snapshot Is Nothing) Then _snapshot = snapshot
+            If perReceipt Then
+                If originalRequired Then _batchOriginals.Add(batchKey, snapshot) Else _batchCopies.Add(batchKey)
             End If
             Volatile.Write(_printing, 1)
             Try
