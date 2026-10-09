@@ -178,7 +178,11 @@ Release → `ci/smoke.ps1`: jalankan exe sebagai proses latar, tunggu `:9111`, p
 menambah: `waiting_printer`/`WAITING_CABLE` + `/setup/cancel` (resep uji `TEST-LABEL`), auto-map dua tahap conflict/applied
 (`TEST-EXISTING` = antrean printer virtual), label QR tanpa QRLABEL → `warning`. **Merah = tidak boleh dirilis.**
 
-## Rilis (hanya pemilik; VM Windows 64-bit)
+## Rilis (pemilik memutuskan; sejak 1.3.0 dibangun otomatis)
+
+Sejak 1.3.0 (9 Okt 2026): Actions → **release** → Run workflow `version=X.Y.Z` menjalankan `pack.ps1` di runner Windows x64
+dan membuat GitHub **pre-release** berisi seluruh `Releases\`. Paket penuh saja (tanpa delta). Langkah manual di bawah tetap
+berlaku sebagai cadangan.
 
 1. Naikkan `<Version>` di `src/SpikeTransport/SpikeTransport.vbproj`; CI hijau; ceklis `docs/RELEASE.md`.
 2. `dotnet tool install -g vpk --version 1.2.0` (sekali), lalu dari root repo: `.\pack.ps1 -Version X.Y.Z` → folder `Releases\`

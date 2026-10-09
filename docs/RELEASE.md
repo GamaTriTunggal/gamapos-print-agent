@@ -20,8 +20,8 @@ Setiap butir wajib dicentang; hasilnya dicatat di `release-journal.md`.
 
 ## `pack.ps1` + unggah
 
-- [ ] `pack.ps1 -Version X` di VM Windows 64-bit (bit-spesifik).
-- [ ] GitHub Release `vX` dibuat sebagai **PRE-RELEASE** (pilot) — 6 aset dari `Releases\`.
+- [ ] `pack.ps1 -Version X` di Windows 64-bit: workflow **release** (Actions, runner windows-latest x64; sejak 1.3.0) atau VM pemilik.
+- [ ] GitHub Release `vX` dibuat sebagai **PRE-RELEASE** (pilot) — seluruh aset `Releases\` (workflow release membuatnya otomatis).
 - [ ] PC uji pemilik memasang `Setup.exe` pre-release; `/health` melaporkan versi baru.
 
 ## Pilot (papan printer PR-13)
