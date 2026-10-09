@@ -135,10 +135,22 @@ try {
         # Amplop rusak -> BAD_PAYLOAD, bukan 500.
         $bad = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":1}' -TimeoutSec 10
         if ($bad.ok -ne $false -or $bad.error -ne "BAD_PAYLOAD") { Fail "amplop rusak tidak BAD_PAYLOAD: $($bad | ConvertTo-Json -Compress)" } else { Ok "amplop rusak -> BAD_PAYLOAD" }
-        # Schema 2 belum diiklankan/dirender. Walau jobType sama, jangan
-        # menafsirkan payload v2 sebagai v1 dan mencetak total kosong/salah.
+        # 1.3.0 (P-604): schema 2 dirutekan ke parser v2. Payload v2 cacat ditolak
+        # parser v2 (BAD_PAYLOAD), tidak pernah jatuh ke formatter v1; schema 3 belum ada.
         $v2 = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":2,"jobType":"cashier_receipt","payload":{}}' -TimeoutSec 10
-        if ($v2.ok -ne $false -or $v2.error -ne "UNSUPPORTED_SCHEMA") { Fail "schema 2 tidak ditahan: $($v2 | ConvertTo-Json -Compress)" } else { Ok "schema 2 -> UNSUPPORTED_SCHEMA" }
+        if ($v2.ok -ne $false -or $v2.error -ne "BAD_PAYLOAD") { Fail "schema 2 cacat tidak ditolak parser v2: $($v2 | ConvertTo-Json -Compress)" } else { Ok "schema 2 cacat -> BAD_PAYLOAD" }
+        $v3 = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":3,"jobType":"cashier_receipt","payload":{}}' -TimeoutSec 10
+        if ($v3.ok -ne $false -or $v3.error -ne "UNSUPPORTED_SCHEMA") { Fail "schema 3 tidak ditahan: $($v3 | ConvertTo-Json -Compress)" } else { Ok "schema 3 -> UNSUPPORTED_SCHEMA" }
+        # 1.3.0: 17 fixture v2 (penjualan/kasbon/campuran, piutang, retur, salinan) ke printer virtual.
+        $v2fixtures = Get-ChildItem (Join-Path $PSScriptRoot "..\fixtures\v2\*.sample.json")
+        if ($v2fixtures.Count -lt 17) { Fail "fixtures v2 < 17 (ada $($v2fixtures.Count))" }
+        foreach ($f in $v2fixtures) {
+            $body = Get-Content $f.FullName -Raw
+            try {
+                $r = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body $body -TimeoutSec 90
+                if ($r.ok -ne $true) { Fail "v2 $($f.Name): $($r | ConvertTo-Json -Compress)" } else { Ok "v2 $($f.Name)" }
+            } catch { Fail "v2 $($f.Name): $($_.Exception.Message)" }
+        }
         $duplicate = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":2,"schemaVersion":1,"jobType":"cashier_receipt","payload":{}}' -TimeoutSec 10
         if ($duplicate.ok -ne $false -or $duplicate.error -ne "BAD_PAYLOAD") { Fail "schema duplikat tidak ditahan: $($duplicate | ConvertTo-Json -Compress)" } else { Ok "schema duplikat -> BAD_PAYLOAD" }
     } else {
@@ -148,6 +160,8 @@ try {
     # 10) PR-12 — /health field aditif (deviceId GUID, osArch, katalog); versi dari assembly.
     if (-not ($h.deviceId -match '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')) { Fail "/health deviceId bukan GUID: $($h.deviceId)" } else { Ok "/health deviceId GUID" }
     if ($h.osArch -notin @("x64", "x86", "arm64")) { Fail "/health osArch aneh: $($h.osArch)" } else { Ok "/health osArch=$($h.osArch)" }
+    # 1.3.0 (P-604): kemampuan v2 diiklankan (web hanya mengirim v2 bila ini ada).
+    if (-not (@($h.supportedPrintSchemas) -contains 2) -or @($h.supportedPrintJobTypesV2).Count -ne 7 -or -not (@($h.supportedPrintJobTypesV2) -contains "return_note")) { Fail "/health kemampuan v2 tidak sesuai: $($h | ConvertTo-Json -Compress)" } else { Ok "/health schema [1,2] + 7 job v2" }
     if ($h.catalogVersion -ne 0 -or $h.catalogSource -notin @("seed", "server")) { Fail "/health katalog awal bukan v0 benih/server: $($h.catalogSource)/$($h.catalogVersion)" } else { Ok "/health katalog v0 ($($h.catalogSource))" }
     $h2 = Invoke-RestMethod "$base/health" -TimeoutSec 5
     if ($h2.deviceId -ne $h.deviceId) { Fail "deviceId berubah antar panggilan" } else { Ok "deviceId stabil" }
