@@ -17,7 +17,7 @@ PowerPacks) — "Opsi B". Tanpa dialog cetak browser.
 
 | Versi | Saluran | Keadaan |
 |---|---|---|
-| **1.3.0** (kandidat 9 Okt 2026; belum pre-release) | belum dirilis | D-024 putusan pemilik C: `/health` mengiklankan `supportedPrintSchemas:[1,2]` + tujuh jenis job v2 (nota tunai/kasbon/campuran, tiga bukti piutang, nota retur); `/print` merutekan schema 2 ke parser/renderer v2; amplop v1 tidak berubah. Perilaku cetak armada baru berubah saat server menyalakan `D024_NATIVE_CHECKOUT`. P-604 |
+| **1.3.0** (pre-release 9 Okt 2026; pilot PC Vin Jaya 9 Okt) | pre-release — armada belum menerima | D-024 putusan pemilik C: `/health` mengiklankan `supportedPrintSchemas:[1,2]` + tujuh jenis job v2 (nota tunai/kasbon/campuran, tiga bukti piutang, nota retur); `/print` merutekan schema 2 ke parser/renderer v2; amplop v1 tidak berubah. Perilaku cetak armada baru berubah saat server menyalakan `D024_NATIVE_CHECKOUT`. P-604 |
 | **1.2.0** (pre-release 20 Sep 2026; **rilis penuh 20 Sep 2026 16:14 WIB**) | rilis penuh — `releases/latest` | residu PR-12: state `waiting_printer` (menunggu printer tercolok/online, WMI), auto-map peran dua tahap (`mapping: conflict` + `previousPrinter`, tidak menimpa), `POST /setup/cancel`, label QR tanpa peran QRLABEL → `warning: ROLE_UNMAPPED`; katalog `usbIds` |
 | **1.1.0** (13 Sep 2026; promosi 15 Sep 2026 14:59 WIB) | rilis penuh sebelumnya | agent pembaca katalog resep dari server; PC uji pemilik lulus 13 Sep; pilot selesai 18 Sep (kedua toko 1.1.0, nota normal) |
 | **1.0.2** (12 Jul 2026) | rilis lama | tetap tersedia di GitHub Releases |
