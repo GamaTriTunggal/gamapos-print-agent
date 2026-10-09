@@ -241,7 +241,8 @@ Module Program
         If plan.Title <> "NOTA KEMBALI BARANG" OrElse plan.CustomerLines.Count <> 3 OrElse
            plan.ReceiptLine.IndexOf("26090001", StringComparison.Ordinal) < 0 OrElse
            plan.ReprintLine IsNot Nothing OrElse plan.ItemLines.Count <> 2 OrElse
-           plan.ItemLines(0)(0) <> "1,5 BARANG A" OrElse
+           plan.ItemLines(0).Count <> 1 OrElse
+           Not plan.ItemLines(0)(0).StartsWith("1,5 BARANG A" & StrDup(11, " ") & "X ", StringComparison.Ordinal) OrElse
            Not plan.ItemLines(0).Last().EndsWith("1,52", StringComparison.Ordinal) OrElse
            Not plan.TotalLine.EndsWith("2,52", StringComparison.Ordinal) OrElse
            plan.OriginalName.Count <> 1 OrElse plan.OriginalName(0) <> New String(" "c, 25) & "KASIR ASAL" OrElse
@@ -979,9 +980,24 @@ Module Program
         Dim characters As Func(Of String, Single) = Function(value As String) CSng(value.Length)
         Dim ordinary = BuildSaleItemLines(100L, " SAK" & vbTab, "Semen  Putih" & vbCrLf & "Kualitas Tinggi",
                                           1975200L, 1975200L, 40.0F, 40, characters)
-        If ordinary(0) <> "1 SAK Semen Putih Kualitas Tinggi" OrElse
-           ordinary(ordinary.Count - 1).Length <> 40 Then
+        If ordinary.Count <> 1 OrElse ordinary(0) <> "1 SAK Semen Putih Kualitas Tinggi 19.752" Then
             Throw New InvalidOperationException("Item biasa tidak dinormalisasi/diratakan.")
+        End If
+        ' P-604 9 Okt 2026: satu baris diutamakan seperti v1 (kolom tetap X/harga/total).
+        For Each scenario In New (Qty As Long, Name As String, Price As Long, Total As Long, Expected As String)() {
+            (100L, "SEMEN DYNAMIX 40KG", 6000000L, 6000000L, "1 SEMEN DYNAMIX 40KG              60.000"),
+            (600L, "SEMEN MERDEKA 40KG", 5000000L, 30000000L, "6 SEMEN MERDEKA 40KG   X  50.000 300.000"),
+            (200L, "CAT TEMBOK AVIAN 5KG", 8500000L, 17000000L, "2 CAT TEMBOK AVIAN 5KG X 85.000  170.000"),
+            (250L, "PASIR", 1012650L, 2531625L, "2,5 PASIR X 10.126,50          25.316,25")}
+            Dim one = BuildSaleItemLines(scenario.Qty, "", scenario.Name, scenario.Price, scenario.Total, 40.0F, 40, characters)
+            If one.Count <> 1 OrElse one(0) <> scenario.Expected OrElse one(0).Length <> 40 Then
+                Throw New InvalidOperationException("Item muat satu baris tidak dicetak satu baris: " & String.Join("|", one))
+            End If
+        Next
+        Dim twoLines = BuildSaleItemLines(200L, "", "KERAMIK LANTAI ROMAN 40X40 PUTIH", 8500000L, 17000000L, 40.0F, 40, characters)
+        If twoLines.Count <> 2 OrElse twoLines(0) <> "2 KERAMIK LANTAI ROMAN 40X40 PUTIH" OrElse
+           twoLines(1) <> "  X 85.000" & StrDup(23, " ") & "170.000" Then
+            Throw New InvalidOperationException("Item tidak muat satu baris salah dipecah: " & String.Join("|", twoLines))
         End If
         Dim wrapped = BuildSaleItemLines(100L, "SAK", "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
                                          1000L, 1000L, 12.0F, 12, characters)
@@ -1004,7 +1020,7 @@ Module Program
             unicodeRestored &= line.Substring(2)
         Next
         If unicodeRestored <> unicodeName Then Throw New InvalidOperationException("Grapheme item terpotong.")
-        Dim highAmount = BuildSaleItemLines(100L, "SAK", "A", 99999999999999L, 99999999999999L,
+        Dim highAmount = BuildSaleItemLines(200L, "SAK", "A", 49999999999999L, 99999999999998L,
                                             40.0F, 40, characters)
         If highAmount.Count <> 3 OrElse highAmount(1).Length > 40 OrElse highAmount(2).Length > 40 Then
             Throw New InvalidOperationException("Harga dan total besar tidak dipisah aman.")

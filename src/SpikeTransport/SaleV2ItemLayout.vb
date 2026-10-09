@@ -19,6 +19,12 @@ Module SaleV2ItemLayout
         Dim continuation As String = StrDup(prefix.Length, " ")
         Dim name As String = NormalizeProcessorName(rawName)
         If name = "" Then Throw New ArgumentException("Nama item kosong setelah normalisasi.")
+        ' P-604 (putusan pemilik 9 Okt 2026): nota ringkas — satu baris diutamakan
+        ' bila muat, sama dengan semangat formatter v1; dua baris hanya cadangan.
+        Dim singleLine As String = BuildSingleItemLine(prefix & name, quantity100, priceSen, totalSen, columns)
+        If singleLine IsNot Nothing AndAlso Fits(singleLine, printableWidth, measure) Then
+            Return New List(Of String) From {singleLine}
+        End If
         Dim lines As New List(Of String)()
         Dim current As String = ""
         Dim initial As Boolean = True
@@ -54,6 +60,33 @@ Module SaleV2ItemLayout
         Next
         Return lines
     End Function
+
+    ' Urutan sama dengan v1 (ReceiptCommon.PrintItems): jumlah 1 dengan harga =
+    ' total cukup "1 NAMA ... TOTAL"; selain itu kolom tetap v1 (" X " di kolom 23,
+    ' harga rata kanan di 32, total di 40) bila nama pendek dan angka <= 7 karakter;
+    ' bila tidak, satu baris rapat "NAMA X HARGA ... TOTAL" selama muat. Nothing =
+    ' tidak muat satu baris.
+    Friend Function BuildSingleItemLine(head As String, quantity100 As Long, priceSen As Long,
+                                        totalSen As Long, columns As Integer) As String
+        Dim price As String = FormatSaleSen(priceSen)
+        Dim total As String = FormatSaleSen(totalSen)
+        If quantity100 = 100L AndAlso priceSen = totalSen Then
+            If head.Length + 1 + total.Length > columns Then Return Nothing
+            Return head & StrDup(columns - head.Length - total.Length, " ") & total
+        End If
+        If columns = V1Columns AndAlso head.Length + 1 <= V1NameColumns AndAlso
+           price.Length <= V1AmountWidth AndAlso total.Length <= V1AmountWidth Then
+            Return head.PadRight(V1NameColumns + 1) & "X " & price.PadLeft(V1AmountWidth) & " " &
+                   total.PadLeft(V1AmountWidth)
+        End If
+        Dim left As String = head & " X " & price
+        If left.Length + 1 + total.Length > columns Then Return Nothing
+        Return left & StrDup(columns - left.Length - total.Length, " ") & total
+    End Function
+
+    Private Const V1Columns As Integer = 40
+    Private Const V1NameColumns As Integer = 22
+    Private Const V1AmountWidth As Integer = 7
 
     Private Function Fits(value As String, width As Single, measure As Func(Of String, Single)) As Boolean
         Dim actual As Single = measure(value)
