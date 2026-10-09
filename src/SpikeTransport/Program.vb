@@ -333,7 +333,7 @@ Module Program
         ' Schema 2 harus memilih parser/formatter tersendiri. Jangan biarkan
         ' payload v2 bernama cashier_receipt jatuh ke formatter v1 (yang akan
         ' membaca field berbeda dan dapat mencetak total nol/salah).
-        Dim schemaResult As String = RoutePrintSchema(body, SchemaVersion)
+        Dim schemaResult As String = RoutePrintSchema(body, MaxPrintSchema)
         If schemaResult = "V2" Then Return DispatchV2(body)
         If schemaResult <> "V1" Then
             If schemaResult = "BAD_PAYLOAD" Then
