@@ -656,6 +656,28 @@ Module Program
         CheckAmountRows("cash rounding", baseline,
             "TOTAL BELANJA=1975200|PEMBULATAN (-)=25200|-TOTAL NOTA=1950000")
 
+        ' P-604 9 Okt 2026: tanpa diskon dan pembulatan TOTAL NOTA = TOTAL BELANJA → disembunyikan.
+        Dim plain As JObject = CType(baseline.DeepClone(), JObject)
+        Dim plainAmounts As JObject = CType(plain("payload")("amounts"), JObject)
+        plainAmounts("roundingSen") = "0"
+        For Each name As String In {"netSen", "principalAppliedSen", "cashSen", "customerPaysSen", "merchantReceivesSen"}
+            plainAmounts(name) = "1975200"
+        Next
+        Accept("cash plain", plain)
+        CheckAmountRows("cash plain", plain, "TOTAL BELANJA=1975200")
+        Dim plainCredit As JObject = CType(plain.DeepClone(), JObject)
+        plainCredit("jobType") = "kasbon_receipt"
+        CType(plainCredit("payload"), JObject)("paymentMethod") = "CREDIT"
+        CType(plainCredit("payload"), JObject)("transactionId") = ""
+        plainAmounts = CType(plainCredit("payload")("amounts"), JObject)
+        plainAmounts("principalAppliedSen") = "0"
+        plainAmounts("remainingSen") = "1975200"
+        For Each name As String In {"cashSen", "customerPaysSen", "merchantReceivesSen"}
+            plainAmounts(name) = "0"
+        Next
+        Accept("DP0 plain", plainCredit)
+        CheckAmountRows("DP0 plain", plainCredit, "TOTAL BELANJA=1975200|BAYAR=0|SISA UTANG=1975200")
+
         Dim discounted As JObject = CType(baseline.DeepClone(), JObject)
         Dim discountedAmounts As JObject = CType(discounted("payload")("amounts"), JObject)
         discountedAmounts("discountSen") = "10000"

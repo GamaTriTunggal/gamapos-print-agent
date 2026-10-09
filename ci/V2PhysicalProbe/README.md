@@ -97,7 +97,7 @@ probe ini. Selama sesi jangan jalankan checkout/jenis cetak lain.
 Catat angka layar tiap nota sebelum checkout dan sesudah reload, serta empat
 struk **dalam satu pengambilan**. Label/susunan kertas mengikuti v1 yang
 disepakati, tidak harus memakai label layar "Grand Total". `TOTAL NOTA` adalah neto
-setelah D/R; bila fee positif, `BIAYA EDC` dan `TOTAL DIBAYAR` ditampilkan.
+setelah D/R (sejak 1.3.1 hanya tercetak bila ada diskon/pembulatan); bila fee positif, `BIAYA EDC` dan `TOTAL DIBAYAR` ditampilkan.
 Pada Campuran, `TUNAI` dan `EDC` menunjukkan pokok masing-masing bagian
 (EDC belum termasuk fee). Periksa diskon, pembulatan bila ada dan fee/total;
 tidak ada "UANG DITERIMA"/"KEMBALIAN", teks tidak terpotong. Jangan menambah

@@ -26,7 +26,11 @@ Module SaleV2Rows
             New SaleAmountRow("TOTAL BELANJA", Sen(amounts, "grossSen"))}
         If Sen(amounts, "discountSen") > 0 Then rows.Add(New SaleAmountRow("DISKON (-)", Sen(amounts, "discountSen")))
         If Sen(amounts, "roundingSen") > 0 Then rows.Add(New SaleAmountRow("PEMBULATAN (-)", Sen(amounts, "roundingSen")))
-        rows.Add(New SaleAmountRow("TOTAL NOTA", Sen(amounts, "netSen"), True))
+        ' P-604 (putusan pemilik 9 Okt 2026, nota ringkas): TOTAL NOTA hanya bila
+        ' berbeda dari TOTAL BELANJA, yaitu ada diskon atau pembulatan.
+        If Sen(amounts, "netSen") <> Sen(amounts, "grossSen") Then
+            rows.Add(New SaleAmountRow("TOTAL NOTA", Sen(amounts, "netSen"), True))
+        End If
         If Sen(amounts, "customerFeeSen") > 0 Then
             rows.Add(New SaleAmountRow("BIAYA EDC", Sen(amounts, "customerFeeSen")))
             rows.Add(New SaleAmountRow("TOTAL DIBAYAR", Sen(amounts, "customerPaysSen"), True))
