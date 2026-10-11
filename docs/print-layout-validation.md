@@ -553,9 +553,10 @@ Cetak fisik nota staging 26100041 (pemilik, 11 Okt 19:01) dengan PO 50
 karakter `PO/VJ2/2026-10/PABRIK-WANAHERANG/PURCHASING/A00012`: seluruh
 karakter tercetak, tetapi PO tanpa spasi dipotong per karakter di tengah
 kata (`...PABRIK-WANAHER` / `ANG/...`). Tata letak agen lama memang dua
-baris (dibuktikan uji balik schema gate); caption "PO" tampak lebih tinggi
-dari nilainya pada foto, gejala yang sama dengan caption PEMBELI/ALAMAT
-pada foto sesi cetak 10 Okt — bukan baris ketiga dari tata letak.
+baris (dibuktikan uji balik schema gate); caption "PO" yang tampak lebih
+tinggi dari nilainya pada foto hanya efek kertas melengkung saat dipegang —
+pemilik memastikan di kertas caption dan nilai sejajar. Cetak fisik 1.4.1
+(19:59 WIB, VM pemilik): PO 50 karakter dua baris patah sesudah `-`.
 
 Perubahan: `WrapSaleText` memotong token tanpa spasi sesudah `/` atau `-`
 terakhir yang muat, asal baris itu terisi minimal separuh; selain itu tetap
@@ -564,4 +565,4 @@ karakter menjadi `PO       : PO/VJ2/2026-10/PABRIK-` +
 `           WANAHERANG/PURCHASING/A00012`; PO pendek tetap satu baris.
 Font, kolom, caption, v1, parser, dan kontrak tidak berubah. Schema gate
 mengunci tiga kasus (PO 50, PO pendek, pemisah terlalu awal); uji balik
-dengan kode lama merah. **Belum diuji fisik**; belum dirilis.
+dengan kode lama merah. Dirilis 1.4.1 (11 Okt 19:40 WIB) dan terbukti di kertas.
