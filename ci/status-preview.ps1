@@ -15,7 +15,7 @@ $windowType = $asm.GetType("GamaPrintAgent.SpikeTransport.StatusWindow", $true)
 $captureType = $asm.GetType("GamaPrintAgent.SpikeTransport.StatusCapture", $true)
 
 function Save-Window([string]$name) {
-    $ctor = $windowType.GetConstructor($flags, $null, [Type[]]@(), $null)
+    $ctor = $windowType.GetConstructor([Reflection.BindingFlags]"NonPublic,Instance", $null, [Type[]]@(), $null)   # tanpa Static: .cctor ikut cocok
     $form = $ctor.Invoke(@())
     $form.StartPosition = [Windows.Forms.FormStartPosition]::Manual
     $form.Location = New-Object Drawing.Point(-3000, -3000)
