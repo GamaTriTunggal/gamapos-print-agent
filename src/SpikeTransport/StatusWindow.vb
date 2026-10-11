@@ -63,7 +63,7 @@ Friend NotInheritable Class StatusWindow
         AutoSize = True
         AutoSizeMode = AutoSizeMode.GrowAndShrink
         Try
-            Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath)
+            Icon = AgentIcon()
         Catch
         End Try
 
@@ -102,13 +102,18 @@ Friend NotInheritable Class StatusWindow
         _refreshTimer.Start()
     End Sub
 
+    ' Ikon dari berkas agent sendiri (bukan proses induk), sama dengan ikon tray.
+    Private Shared Function AgentIcon() As Icon
+        Return System.Drawing.Icon.ExtractAssociatedIcon(Reflection.Assembly.GetExecutingAssembly().Location)
+    End Function
+
     Private Function BuildHeader() As Control
         Dim header As New FlowLayoutPanel With {
             .AutoSize = True, .WrapContents = False, .Margin = New Padding(0, 0, 0, 14)}
         Dim logo As New PictureBox With {
             .Size = New Size(40, 40), .SizeMode = PictureBoxSizeMode.Zoom, .Margin = New Padding(0, 0, 12, 0)}
         Try
-            logo.Image = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath).ToBitmap()
+            logo.Image = AgentIcon().ToBitmap()
         Catch
         End Try
         Dim titles As New FlowLayoutPanel With {
