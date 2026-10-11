@@ -27,6 +27,17 @@ jobs:
       - name: Smoke (listener :9111, bentuk endpoint, 17 fixtures ke printer virtual)
         shell: pwsh
         run: ./ci/smoke.ps1 -Exe (Resolve-Path src/SpikeTransport/bin/Release/net48/GamaPrintAgent.SpikeTransport.exe)
+      - name: Pratinjau jendela Status (P-626; bukan gerbang)
+        continue-on-error: true
+        shell: powershell
+        run: ./ci/status-preview.ps1 -Exe src/SpikeTransport/bin/Release/net48/GamaPrintAgent.SpikeTransport.exe -OutDir status-preview
+      - name: Unggah pratinjau jendela Status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: status-window-preview
+          path: status-preview/
+          if-no-files-found: ignore
       - name: Unggah log agent bila gagal
         if: failure()
         uses: actions/upload-artifact@v4

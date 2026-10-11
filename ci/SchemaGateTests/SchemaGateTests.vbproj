@@ -22,5 +22,6 @@
     <Compile Include="../../src/SpikeTransport/SaleV2Rows.vb" Link="SaleV2Rows.vb" />
     <Compile Include="../../src/SpikeTransport/SaleV2ItemLayout.vb" Link="SaleV2ItemLayout.vb" />
     <Compile Include="../../src/SpikeTransport/SaleV2MetadataLayout.vb" Link="SaleV2MetadataLayout.vb" />
+    <Compile Include="../../src/SpikeTransport/StatusModel.vb" Link="StatusModel.vb" />
   </ItemGroup>
 </Project>

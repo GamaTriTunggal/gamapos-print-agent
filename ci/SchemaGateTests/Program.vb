@@ -58,6 +58,10 @@ Module Program
            RoutePrintSchema("{""schemaVersion"":1,""jobType"":""cashier_receipt""}", MaxPrintSchema) <> "V1" Then
             Throw New InvalidOperationException("Kemampuan v2 1.3.0 tidak sesuai.")
         End If
+        ' 1.4.0 (P-625): fitur di dalam job v2 diiklankan terpisah dari jenis job.
+        If Not JToken.DeepEquals(capabilities("supportedPrintFeaturesV2"), New JArray("sale_correction_deposit")) Then
+            Throw New InvalidOperationException("Fitur v2 1.4.0 tidak sesuai.")
+        End If
         For Each jobType In V2JobTypes
             If SelectV2Family(jobType) = "UNSUPPORTED_JOBTYPE" Then Throw New InvalidOperationException("Health mengiklankan job tanpa keluarga: " & jobType)
         Next
@@ -88,6 +92,7 @@ Module Program
         CheckReceivableV2(IO.Path.Combine(args(0), "v2"))
         CheckReturnV2(IO.Path.Combine(args(0), "v2", "return_note.sample.json"))
         CheckPhysicalSamples(IO.Path.Combine(args(0), "v2"))
+        StatusModelTests.Run()
         StagingBridgeTests.Run(IO.Path.Combine(args(0), "v2"))
         If args.Length >= 2 Then CheckGoReceivableV2(args(1))
         If args.Length >= 3 Then CheckGoSaleV2(args(2))
@@ -338,6 +343,7 @@ Module Program
            Not CBool(corrections(1)("convertedToCredit")) OrElse
            Not lines.Any(Function(line) line.Contains("nota asal")) OrElse
            Not lines.Any(Function(line) line.Contains("KASBON")) OrElse
+           CStr(corrections(1)("depositSen")) <> "1" OrElse Not lines.Contains("DP TRANSFER: 0,01") OrElse
            lines.Any(Function(line) line.Length > 40) Then
             Throw New InvalidOperationException("Job Go salinan nota gagal diparse atau dicatat lengkap.")
         End If
@@ -794,6 +800,44 @@ Module Program
                methodLines.Any(Function(line) line.Contains("KASBON") OrElse line.Contains("Metode DP")) Then
                 Throw New InvalidOperationException("Koreksi metode diberi keterangan kasbon palsu.")
             End If
+        Next
+        ' P-625: nominal DP. DP 0 tanpa baris DP, DP positif bernominal per metode;
+        ' tanpa depositSen (server lama) tetap "Metode DP".
+        For Each scenario In {
+            (Method:="CASH", Deposit:="0", Line:=""),
+            (Method:="CASH", Deposit:="500000", Line:="DP TUNAI: 5.000"),
+            (Method:="WIRE", Deposit:="1250050", Line:="DP TRANSFER: 12.500,50"),
+            (Method:="EDC", Deposit:="500000", Line:="DP EDC: 5.000")}
+            Dim depositJob As JObject = CType(corrected.DeepClone(), JObject)
+            Dim payment As JObject = CType(depositJob("payload")("reprint")("corrections")(1), JObject)
+            payment("paymentMethod") = scenario.Method
+            payment("depositSen") = scenario.Deposit
+            Accept("koreksi kasbon DP " & scenario.Method & " " & scenario.Deposit, depositJob)
+            Dim depositLines = LayoutSaleCorrections(CType(depositJob("payload")("reprint"), JObject), 40.0F,
+                Function(value As String) CSng(value.Length))
+            Dim expectedDeposit As New List(Of String) From {"KOREKSI SETELAH NOTA DIBUAT:"}
+            expectedDeposit.AddRange(LayoutSaleCustomer("Pelanggan: ", "PELANGGAN BARU SANGAT PANJANG UNTUK DIBUNGKUS",
+                                                        40.0F, Function(value As String) CSng(value.Length)))
+            expectedDeposit.Add("Diubah menjadi KASBON")
+            If scenario.Line <> "" Then expectedDeposit.Add(scenario.Line)
+            expectedDeposit.AddRange({"", "Angka di atas mengikuti nota asal."})
+            If Not depositLines.SequenceEqual(expectedDeposit) Then
+                Throw New InvalidOperationException("Baris DP salah: " & String.Join(" | ", depositLines))
+            End If
+        Next
+        For Each scenario In {
+            (Name:="DP pada koreksi metode biasa", Method:="CASH", Converted:=False, Deposit:=CType(New JValue("500000"), JToken)),
+            (Name:="DP EDC nol", Method:="EDC", Converted:=True, Deposit:=CType(New JValue("0"), JToken)),
+            (Name:="DP transfer nol", Method:="WIRE", Converted:=True, Deposit:=CType(New JValue("0"), JToken)),
+            (Name:="DP angka JSON", Method:="CASH", Converted:=True, Deposit:=CType(New JValue(500000), JToken)),
+            (Name:="DP nol depan", Method:="CASH", Converted:=True, Deposit:=CType(New JValue("0500000"), JToken)),
+            (Name:="DP negatif", Method:="CASH", Converted:=True, Deposit:=CType(New JValue("-500000"), JToken))}
+            Dim badDeposit As JObject = CType(corrected.DeepClone(), JObject)
+            Dim payment As JObject = CType(badDeposit("payload")("reprint")("corrections")(1), JObject)
+            payment("paymentMethod") = scenario.Method
+            payment("convertedToCredit") = scenario.Converted
+            payment("depositSen") = scenario.Deposit
+            Reject(scenario.Name, badDeposit.ToString(Formatting.None))
         Next
         Dim unnamedReprint As JObject = CType(corrected("payload")("reprint").DeepClone(), JObject)
         unnamedReprint("corrections")(0)("customerName") = ""

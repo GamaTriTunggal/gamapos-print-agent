@@ -167,13 +167,22 @@ Module SaleV2Parser
                 Case "payment"
                     If seenPayment Then Throw New ArgumentException("Koreksi pembayaran duplikat.")
                     seenPayment = True
-                    correction = Exact(entry, "correction.payment", "kind,eventId,date,time,actorName,paymentMethod,convertedToCredit")
+                    correction = Exact(entry, "correction.payment", "kind,eventId,date,time,actorName,paymentMethod,convertedToCredit", "depositSen")
                     Dim method As String = Text(correction, "paymentMethod", True)
                     If method <> "CASH" AndAlso method <> "WIRE" AndAlso method <> "EDC" Then
                         Throw New ArgumentException("Metode koreksi pembayaran tidak sah.")
                     End If
                     If correction("convertedToCredit").Type <> JTokenType.Boolean Then
                         Throw New ArgumentException("Status konversi harus boolean.")
+                    End If
+                    ' P-625: nominal DP hanya ada pada konversi kasbon (server
+                    ' mengirimnya bila /health mengiklankan sale_correction_deposit).
+                    ' DP nontunai selalu positif; DP 0 hanya tunai.
+                    If correction.Property("depositSen") IsNot Nothing Then
+                        Dim deposit As Long = Cent(correction, "depositSen")
+                        If Not CBool(correction("convertedToCredit")) OrElse (method <> "CASH" AndAlso deposit = 0) Then
+                            Throw New ArgumentException("Nominal DP koreksi tidak sah.")
+                        End If
                     End If
                 Case Else
                     Throw New ArgumentException("Jenis koreksi salinan tidak dikenal.")

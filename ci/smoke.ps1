@@ -93,6 +93,14 @@ try {
     }
     if ($fail.Count -eq 0) { Ok "/printers bentuk" }
 
+    # 4b) 1.4.0 (P-621): body JSON dibaca UTF-8 walau Content-Type tanpa charset (web lama).
+    #     Nama printer tak terpasang dipantulkan di pesan galat; printers.json tidak berubah.
+    $accented = "PRINTER " + [char]0x00C9 + " " + [char]0x00D1 + " TIDAK ADA"
+    $raw = [Text.Encoding]::UTF8.GetBytes('{"CASHIER":"' + $accented + '"}')
+    $cr = Invoke-WebRequest "$base/printers/config" -Method Post -ContentType "application/json" -Body $raw -TimeoutSec 5 -UseBasicParsing
+    $ctext = [Text.Encoding]::UTF8.GetString($cr.RawContentStream.ToArray())
+    if (-not $ctext.Contains($accented)) { Fail "body UTF-8 tanpa charset terbaca salah: $ctext" } else { Ok "body UTF-8 tanpa charset terbaca utuh" }
+
     # 5) /setup/status — state idle + field lama.
     $s = Invoke-RestMethod "$base/setup/status" -TimeoutSec 5
     if ($s.state -ne "idle") { Fail "/setup/status state awal != idle ($($s.state))" } else { Ok "/setup/status idle" }
@@ -162,6 +170,8 @@ try {
     if ($h.osArch -notin @("x64", "x86", "arm64")) { Fail "/health osArch aneh: $($h.osArch)" } else { Ok "/health osArch=$($h.osArch)" }
     # 1.3.0 (P-604): kemampuan v2 diiklankan (web hanya mengirim v2 bila ini ada).
     if (-not (@($h.supportedPrintSchemas) -contains 2) -or @($h.supportedPrintJobTypesV2).Count -ne 7 -or -not (@($h.supportedPrintJobTypesV2) -contains "return_note")) { Fail "/health kemampuan v2 tidak sesuai: $($h | ConvertTo-Json -Compress)" } else { Ok "/health schema [1,2] + 7 job v2" }
+    # 1.4.0 (P-625): fitur v2 aditif — server mengirim depositSen hanya bila ini terbaca.
+    if (-not (@($h.supportedPrintFeaturesV2) -contains "sale_correction_deposit")) { Fail "/health tanpa fitur sale_correction_deposit: $($h | ConvertTo-Json -Compress)" } else { Ok "/health fitur v2 sale_correction_deposit" }
     if ($h.catalogVersion -ne 0 -or $h.catalogSource -notin @("seed", "server")) { Fail "/health katalog awal bukan v0 benih/server: $($h.catalogSource)/$($h.catalogVersion)" } else { Ok "/health katalog v0 ($($h.catalogSource))" }
     $h2 = Invoke-RestMethod "$base/health" -TimeoutSec 5
     if ($h2.deviceId -ne $h.deviceId) { Fail "deviceId berubah antar panggilan" } else { Ok "deviceId stabil" }

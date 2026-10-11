@@ -125,7 +125,18 @@ Module SaleV2MetadataLayout
                 Dim methodName As String = If(method = "CASH", "TUNAI", If(method = "WIRE", "TRANSFER", "EDC"))
                 If CBool(entry("convertedToCredit")) Then
                     result.AddRange(LayoutSaleCustomer("", "Diubah menjadi KASBON", printableWidth, measure))
-                    result.AddRange(LayoutSaleCustomer("Metode DP: ", methodName, printableWidth, measure))
+                    ' P-625 (putusan pemilik 11 Okt 2026): DP 0 tanpa baris DP;
+                    ' DP positif dicetak dengan nominalnya. Tanpa depositSen
+                    ' (server lama) tetap baris lama karena nominal tidak diketahui.
+                    Dim deposit As JToken = entry("depositSen")
+                    If deposit Is Nothing Then
+                        result.AddRange(LayoutSaleCustomer("Metode DP: ", methodName, printableWidth, measure))
+                    Else
+                        Dim depositSen As Long = Long.Parse(CStr(deposit), NumberStyles.None, CultureInfo.InvariantCulture)
+                        If depositSen > 0 Then
+                            result.AddRange(LayoutSaleCustomer("DP " & methodName & ": ", FormatSaleSen(depositSen), printableWidth, measure))
+                        End If
+                    End If
                 Else
                     result.AddRange(LayoutSaleCustomer("Metode: ", methodName, printableWidth, measure))
                 End If
