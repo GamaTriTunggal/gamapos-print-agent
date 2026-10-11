@@ -1238,6 +1238,19 @@ Module Program
            customer.Any(Function(line) line.Length > 20) Then
             Throw New InvalidOperationException("Alamat pelanggan tidak dibungkus aman.")
         End If
+        ' P-637: PO 50 karakter dari cetak fisik 11 Okt 2026 dipotong sesudah "-", bukan di tengah kata.
+        Dim poLines = LayoutSaleCustomer("PO       : ", "PO/VJ2/2026-10/PABRIK-WANAHERANG/PURCHASING/A00012", 40.0F, characters)
+        If Not poLines.SequenceEqual({"PO       : PO/VJ2/2026-10/PABRIK-", "           WANAHERANG/PURCHASING/A00012"}) Then
+            Throw New InvalidOperationException("PO panjang tidak dipotong pada garis miring/tanda hubung: " & String.Join("|", poLines))
+        End If
+        If Not LayoutSaleCustomer("PO       : ", "UAT-PO/1011-B", 40.0F, characters).SequenceEqual({"PO       : UAT-PO/1011-B"}) Then
+            Throw New InvalidOperationException("PO pendek tidak lagi satu baris.")
+        End If
+        ' Pemisah terlalu awal (baris kurang dari separuh) tetap dipotong per karakter.
+        Dim earlyLines = LayoutSaleCustomer("PO       : ", "PO/" & New String("A"c, 40), 40.0F, characters)
+        If Not earlyLines.SequenceEqual({"PO       : PO/" & New String("A"c, 26), "           " & New String("A"c, 14)}) Then
+            Throw New InvalidOperationException("Pemisah awal memotong baris terlalu pendek: " & String.Join("|", earlyLines))
+        End If
         Dim graphemes As Func(Of String, Single) = Function(value As String) CSng(StringInfo.ParseCombiningCharacters(value).Length)
         Dim unicodeName As String = String.Concat(Enumerable.Repeat("😊", 12))
         Dim unicodeLines = LayoutCenteredSaleText(unicodeName, "", 5.0F, graphemes)

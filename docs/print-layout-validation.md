@@ -546,3 +546,22 @@ Perubahan ekspektasi layout mengikuti draft eksplisit pemilik, bukan
 rekam ulang oracle agar tes hijau. Tidak ada perubahan endpoint/capability,
 rilis/pemasangan agent, atau aktivasi v2. Contoh ringkas **belum diuji
 fisik**; perlu build ulang Windows, preflight, cetak satu contoh, dan foto.
+
+### Lipatan token di garis miring/tanda hubung — 11 Oktober 2026 (P-637)
+
+Cetak fisik nota staging 26100041 (pemilik, 11 Okt 19:01) dengan PO 50
+karakter `PO/VJ2/2026-10/PABRIK-WANAHERANG/PURCHASING/A00012`: seluruh
+karakter tercetak, tetapi PO tanpa spasi dipotong per karakter di tengah
+kata (`...PABRIK-WANAHER` / `ANG/...`). Tata letak agen lama memang dua
+baris (dibuktikan uji balik schema gate); caption "PO" tampak lebih tinggi
+dari nilainya pada foto, gejala yang sama dengan caption PEMBELI/ALAMAT
+pada foto sesi cetak 10 Okt — bukan baris ketiga dari tata letak.
+
+Perubahan: `WrapSaleText` memotong token tanpa spasi sesudah `/` atau `-`
+terakhir yang muat, asal baris itu terisi minimal separuh; selain itu tetap
+per karakter (fixture `sale_customer_metadata_long` tidak berubah). PO 50
+karakter menjadi `PO       : PO/VJ2/2026-10/PABRIK-` +
+`           WANAHERANG/PURCHASING/A00012`; PO pendek tetap satu baris.
+Font, kolom, caption, v1, parser, dan kontrak tidak berubah. Schema gate
+mengunci tiga kasus (PO 50, PO pendek, pemisah terlalu awal); uji balik
+dengan kode lama merah. **Belum diuji fisik**; belum dirilis.

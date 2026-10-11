@@ -171,20 +171,32 @@ Module SaleV2MetadataLayout
                 current = word
                 Continue For
             End If
+            ' P-637: token tanpa spasi (mis. No. PO "PO/VJ2/2026-10/PABRIK-WANAHERANG/...")
+            ' dipotong sesudah "/" atau "-" terakhir yang muat, bukan di tengah kata, asal
+            ' baris itu tetap terisi minimal separuh; selain itu tetap per karakter.
+            Dim separatorCut As Integer = 0
             Dim elements As TextElementEnumerator = StringInfo.GetTextElementEnumerator(word)
             While elements.MoveNext()
                 Dim element As String = elements.GetTextElement()
                 prefix = If(result.Count = 0, firstPrefix, nextPrefix)
                 If Not Fits(prefix & current & element, printableWidth, measure) Then
                     If current = "" Then Throw New ArgumentException("Karakter header/pelanggan melampaui area cetak.")
+                    Dim carried As String = ""
+                    If separatorCut * 2 >= current.Length AndAlso separatorCut < current.Length AndAlso
+                       Fits(nextPrefix & current.Substring(separatorCut) & element, printableWidth, measure) Then
+                        carried = current.Substring(separatorCut)
+                        current = current.Substring(0, separatorCut)
+                    End If
                     result.Add(prefix & current)
-                    current = ""
+                    current = carried
+                    separatorCut = 0
                     prefix = nextPrefix
-                    If Not Fits(prefix & element, printableWidth, measure) Then
+                    If Not Fits(prefix & current & element, printableWidth, measure) Then
                         Throw New ArgumentException("Karakter header/pelanggan melampaui area cetak.")
                     End If
                 End If
                 current &= element
+                If element = "/" OrElse element = "-" Then separatorCut = current.Length
             End While
         Next
         If current <> "" Then result.Add(If(result.Count = 0, firstPrefix, nextPrefix) & current)
