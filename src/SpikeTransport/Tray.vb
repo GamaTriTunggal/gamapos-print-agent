@@ -37,6 +37,8 @@ Friend Class TrayContext
             .Visible = True,
             .ContextMenuStrip = menu
         }
+        ' P-626: klik ganda ikon = jendela Status (pola tray Windows umum).
+        AddHandler _tray.DoubleClick, AddressOf OnStatus
         Try
             _tray.ShowBalloonTip(3000, "Gama Print Agent", "Aktif — siap menerima cetak.", ToolTipIcon.Info)
         Catch
@@ -58,9 +60,9 @@ Friend Class TrayContext
         End Try
     End Function
 
+    ' P-626: jendela Status berbahasa toko; rincian teknis lewat tombol salin.
     Private Sub OnStatus(sender As Object, e As EventArgs)
-        MessageBox.Show(Program.StatusSummary(), "Status — Gama Print Agent",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information)
+        StatusWindow.ShowSingle()
     End Sub
 
     Private Sub OnOpenData(sender As Object, e As EventArgs)

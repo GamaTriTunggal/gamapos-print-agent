@@ -181,12 +181,17 @@ Module Program
         End Try
     End Sub
 
-    ' Ringkasan status untuk menu tray (Status).
-    Friend Function StatusSummary() As String
-        Return "Gama Print Agent v" & AgentVersion & Environment.NewLine &
-               "Listening: " & Prefix & Environment.NewLine &
-               "Data: " & AppPaths.DataDir() & Environment.NewLine & Environment.NewLine &
-               Printers.ConfigSummary()
+    ' Rincian teknis untuk "Salin info untuk bantuan" di jendela Status (P-626).
+    Friend Function ListenPrefix() As String
+        Return Prefix
+    End Function
+
+    Friend Function DeviceIdString() As String
+        Return DeviceId()
+    End Function
+
+    Friend Function OsArchString() As String
+        Return OsArch()
     End Function
 
     ' Bungkus HandleRequest + penangan error (dipakai inline & di thread pool).
@@ -269,7 +274,9 @@ Module Program
                     Catch
                     End Try
                 End If
-                WriteJson(ctx, 200, Dispatch(body))
+                Dim reply As String = Dispatch(body)
+                RecordPrintReply(body, reply)   ' P-626: waktu + peran + hasil saja, untuk jendela Status
+                WriteJson(ctx, 200, reply)
 
             Case "POST /print/test"
                 MarkActivity()
@@ -298,9 +305,11 @@ Module Program
                         Try
                             Printers.Serialize(Sub() PrintTestPageTo(target))
                             Console.WriteLine("   test page -> " & target & " (" & role & ")")
+                            RecordPrint(role, True, "")
                             WriteJson(ctx, 200, "{""ok"":true,""printer"":" & JsonString(target) & ",""role"":" & JsonString(role.Trim().ToUpperInvariant()) & "}")
                         Catch ex As Exception
                             Console.WriteLine("   PRINT_FAILED (test): " & ex.Message)
+                            RecordPrint(role, False, "PRINT_FAILED")
                             WriteJson(ctx, 200, "{""ok"":false,""error"":""PRINT_FAILED"",""message"":" & JsonString(ex.Message) & "}")
                         End Try
                     End If
@@ -654,7 +663,9 @@ Module Program
                 If total > MaxBodyBytes Then Throw New Exception("PAYLOAD_TOO_LARGE")
                 ms.Write(buf, 0, n)
             Loop
-            Return req.ContentEncoding.GetString(ms.ToArray())
+            ' P-621: JSON selalu UTF-8 (RFC 8259). ContentEncoding tanpa charset
+            ' jatuh ke ANSI Windows dan merusak É/Ñ; web lama tidak mengirim charset.
+            Return New UTF8Encoding(False).GetString(ms.ToArray())
         End Using
     End Function
 

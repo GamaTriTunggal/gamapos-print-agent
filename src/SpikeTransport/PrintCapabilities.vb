@@ -16,9 +16,15 @@ Module PrintCapabilities
         "receivable_selected", "receivable_selected_card", "receivable_proof",
         "return_note"}
 
+    ' Kemampuan di dalam job v2 yang sudah ada (aditif). Server hanya mengirim
+    ' field opsional bila nama di sini terbaca dari /health.
+    ' 1.4.0 (P-625): depositSen pada koreksi konversi kasbon.
+    Friend ReadOnly V2Features As String() = {"sale_correction_deposit"}
+
     Friend Function HealthPrintCapabilities() As Dictionary(Of String, Object)
         Return New Dictionary(Of String, Object) From {
             {"supportedPrintSchemas", New Integer() {1, MaxPrintSchema}},
-            {"supportedPrintJobTypesV2", V2JobTypes.Clone()}}
+            {"supportedPrintJobTypesV2", V2JobTypes.Clone()},
+            {"supportedPrintFeaturesV2", V2Features.Clone()}}
     End Function
 End Module

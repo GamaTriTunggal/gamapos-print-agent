@@ -22,6 +22,24 @@ Module Updater
     Private _staged As UpdateInfo = Nothing
     Private _stagedMgr As UpdateManager = Nothing
 
+    ' Keadaan pemeriksaan terakhir untuk jendela Status (P-626). Ditulis/dibaca di thread UI.
+    Private _state As UpdateState = UpdateState.NotChecked
+    Private _checkedAt As DateTime? = Nothing
+
+    Friend Function CurrentState() As UpdateState
+        If _staged IsNot Nothing Then Return UpdateState.Staged
+        Return _state
+    End Function
+
+    Friend Function StagedVersion() As String
+        If _staged Is Nothing Then Return ""
+        Return _staged.TargetFullRelease.Version.ToString()
+    End Function
+
+    Friend Function LastCheckedAt() As DateTime?
+        Return _checkedAt
+    End Function
+
     Public Function HasStagedUpdate() As Boolean
         Return _staged IsNot Nothing
     End Function
@@ -46,10 +64,17 @@ Module Updater
             Dim mgr As New UpdateManager(New GithubSource(RepoUrl, Nothing, False))
 
             ' Jalan dari bin/dev (bukan instalasi Velopack) → tak ada yang bisa di-update. Lewati.
-            If Not mgr.IsInstalled Then Return Nothing
+            If Not mgr.IsInstalled Then
+                _state = UpdateState.NotInstalled
+                Return Nothing
+            End If
 
             Dim info As UpdateInfo = Await mgr.CheckForUpdatesAsync()
-            If info Is Nothing Then Return Nothing   ' sudah versi terbaru
+            _checkedAt = DateTime.Now
+            If info Is Nothing Then   ' sudah versi terbaru
+                _state = UpdateState.UpToDate
+                Return Nothing
+            End If
 
             Await mgr.DownloadUpdatesAsync(info)
             mgr.WaitExitThenApplyUpdates(info)       ' pasang saat keluar/restart berikutnya
@@ -59,6 +84,7 @@ Module Updater
             Return "Update " & info.TargetFullRelease.Version.ToString() & " siap — dipasang saat agent menganggur."
         Catch ex As Exception
             Console.WriteLine("Update check error: " & ex.Message)
+            _state = UpdateState.CheckFailed
             Return Nothing
         End Try
     End Function
