@@ -322,6 +322,106 @@ Perhitungan sisa item halaman terakhir memakai
 item halaman terakhir. Jangan mengembalikannya ke perhitungan `Mod` yang
 dahulu menghasilkan halaman terakhir tanpa item.
 
+### Surat jalan schema 2 (`delivery_note`) — P-645 / CO-11, 12 Oktober 2026
+
+> **Status: BELUM diuji fisik.** Pemilik belum punya LX-310. Pengukuran pada
+> kertas continuous form 9,5 × 5,5 in **wajib** sebelum rilis agent yang
+> membawa jenis ini dan sebelum CO-11 dicentang. Build, schema gate, smoke
+> CI, dan respons sukses bukan bukti hasil kertas.
+
+Dasar: amandemen K-02 12 Okt 2026 di `gamapos-go-2/docs/constitution.md`
+(satu jenis cetak v2 baru untuk surat jalan pesanan pelanggan, peran
+`DELIVERY`). Kontrak = validator Go
+`internal/platform/printagent/v2_delivery.go`; keempat contoh
+`testdata/delivery_note*.sample.json` disalin apa adanya ke `fixtures/v2/`.
+Tata letak mengikuti mockup yang disetujui pemilik 12 Okt 2026.
+
+`delivery_order` v1 (bagian di atas, [DeliveryOrder.vb](../src/SpikeTransport/DeliveryOrder.vb))
+**tidak berubah**: amplop schema 1 tetap dirutekan ke formatter v1, 82
+kolom, 17 item. Jalur v2 terpisah total: `SelectV2Family("delivery_note")`
+= `DELIVERY`; `/health` mengiklankan `delivery_note` di
+`supportedPrintJobTypesV2`.
+
+Sumber:
+
+- [DeliveryNoteV2Parser.vb](../src/SpikeTransport/DeliveryNoteV2Parser.vb) —
+  parser seketat validator Go (kunci asing/hilang/ganda, tipe, panjang,
+  `copies` 1..5, `pickedUp` tanpa sopir/kendaraan). Cacat = `BAD_PAYLOAD`.
+- [DeliveryNoteV2Layout.vb](../src/SpikeTransport/DeliveryNoteV2Layout.vb) —
+  fungsi murni `BuildDeliveryNotePages` (satu salinan),
+  `BuildDeliveryNotePrintSequence` (diulang `copies` kali) dan preflight
+  `CheckDeliveryNotePages`. Tanpa PowerPacks/`TextWidth`; diuji di
+  `ci/SchemaGateTests/DeliveryNoteTests.vb`.
+- [DeliveryNoteV2Renderer.vb](../src/SpikeTransport/DeliveryNoteV2Renderer.vb) —
+  renderer PowerPacks.
+
+Kertas, font, dan mekanisme:
+
+- Kertas continuous form **9,5 × 5,5 in**, area logis **80 kolom × 32
+  baris** per halaman. Tanpa harga/uang (K-19) dan **tanpa kolom satuan**
+  (satuan ada di nama barang, sama dengan nota).
+- Courier New **12 pt Regular**, sama dengan v1 (sasaran 10 cpi; 80 kolom ×
+  0,1 in = 8,0 in).
+- Mekanisme kolom v1 dipertahankan: tiap baris teks dicetak apa adanya lewat
+  `printer.Print(T(1), line)`; penempatan kolom = spasi di dalam baris
+  (setara `TAB` v1, Courier monospace), **bukan** `CurrentX`/`TextWidth`.
+- `EndDoc` setiap halaman seperti v1; seluruh dokumen diulang `copies` kali
+  (salinan 1: hal. 1..n, salinan 2: hal. 1..n, ...).
+- Font: objek `Font` **baru** tiap halaman seperti v1; tidak ada objek Font
+  yang disimpan atau dipakai ulang (aturan kepemilikan Font PowerPacks).
+- Preflight sebelum printer peran dipilih dan sebelum `Printer.Print`
+  pertama: setiap halaman tepat 32 baris, setiap baris ≤ 80 karakter dan
+  tanpa karakter kendali. Gagal = `PRINT_FAILED` tanpa kertas.
+
+Susunan per halaman (kolom 1-based; blok kiri header maksimal 45 kolom,
+blok kanan mulai kolom 47; semua baris dipotong ≤ 80):
+
+| Baris | Isi |
+|---|---|
+| 1 | `store.name`; judul rata kanan berakhir kolom 80: `SURAT JALAN` / `SURAT JALAN RETUR` / `SURAT JALAN PENGGANTI`, + `  CETAK ULANG` bila `reprint` |
+| 2–3 | `store.address` / `store.contact`; kolom 47 `No. DO   : ` / `Tanggal  : DD-MM-YYYY` |
+| 4 | 80 × `-` |
+| 5 | `Kepada  : ` + nama pelanggan (maks 35); kolom 47 `No. SO   : ` + `soNo` (+ ` R<revisi>` bila revisi ≠ 0) |
+| 6–8 | alamat pelanggan dipecah per kata ke lebar 35, maks 3 baris (`Alamat  : ` lalu indentasi 10); kolom 47: `No. PO   : ` (kosong → `-`), lalu `Sopir    : ` dan `Kendaraan: ` (kosong → 21 × `_`), atau `DIAMBIL PELANGGAN` bila `pickedUp` |
+| 9 | `Penerima: ` + nama + dua spasi + kontak; keduanya kosong → 30 × `_` |
+| 10–12 | 80 × `=`, ` No     QTY  NAMA BARANG`, 80 × `-` |
+| 13–22 | 10 barang: nomor urut rata kanan lebar 3, qty rata kanan lebar 7, nama mulai kolom 14; halaman terakhir diisi baris kosong |
+| 23–24 | 80 × `-`, `Catatan : ` + catatan (kosong → `-`) |
+| 25–31 | ruang tanda tangan Pengirim / Sopir / Penerima, kurung tanda tangan, `Tgl:` |
+| 32 | `Barang diterima dalam keadaan baik dan jumlah sesuai.` + `Halaman i / n` rata kanan kolom 80 |
+
+Header (1–12) dan footer (23–32) diulang tiap halaman; n = ceil(barang/10),
+maksimal 500 barang = 50 halaman per salinan.
+
+Aturan teks yang tidak tampak di mockup:
+
+- Qty = `quantity100`/100, koma desimal tanpa nol di belakang dan tanpa
+  pemisah ribuan (`79`, `2,5`, `0,25`). Angka **tidak pernah dipotong**:
+  qty lebih dari 7 karakter menggeser nama barang ke kanan (lalu nama
+  dipotong di kolom 80).
+- Spasi/karakter kendali di dalam teks (tab, baris baru) menjadi satu spasi
+  dan karakter format tak terlihat (mis. zero-width space) dibuang, agar
+  jumlah baris tetap 32. Potongan kanan tidak memecah pasangan surrogate.
+- Kata alamat lebih dari 35 karakter dipotong keras dan dilanjutkan di baris
+  alamat berikutnya; sisa sesudah 3 baris dibuang.
+
+Yang wajib diukur di LX-310 sebelum rilis (belum terbukti):
+
+1. **Tinggi 32 baris pada 5,5 in.** Mockup menganggap 6 lpi (32 baris ≈
+   5,33 in). PowerPacks memajukan baris menurut tinggi font Windows, bukan
+   6 lpi tetap; untuk Courier New 12 pt perkiraan dari metrik font ≈ 13,6 pt
+   per baris (≈ 6,0 in untuk 32 baris). Perkiraan ini belum diukur. v1
+   `delivery_order` juga 32 baris per halaman, tetapi ukuran kertas v1 tidak
+   tercatat. Bila ternyata melewati 5,5 in, putusan perbaikannya milik
+   pemilik (mis. jumlah baris atau pengaturan kertas), bukan diubah diam-diam.
+2. Lebar 80 kolom di area cetak kertas 9,5 in (dikurangi strip lubang
+   traktor) dan posisi kolom 47 / 14 / 80 di kertas.
+3. Form feed sesudah `EndDoc` mengikuti ukuran kertas yang disetel di driver
+   (harus 9,5 × 5,5 in); salinan berurutan tidak bergeser.
+4. Alat `ci/V2PhysicalProbe` belum mendukung `delivery_note`; uji fisik
+   memakai agent kandidat (bukan rilis armada) atau probe yang diperluas
+   lebih dulu.
+
 ## 3. XPrinter — Label 4 × 3 cm
 
 ### Fungsi dan mekanisme

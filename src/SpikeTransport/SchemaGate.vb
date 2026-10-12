@@ -15,6 +15,9 @@ Module SchemaGate
                 Return "RECEIVABLE"
             Case "return_note"
                 Return "RETURN"
+            Case "delivery_note"
+                ' P-645 (CO-11): surat jalan pesanan, printer DELIVERY; bukan delivery_order v1.
+                Return "DELIVERY"
             Case Else
                 Return "UNSUPPORTED_JOBTYPE"
         End Select

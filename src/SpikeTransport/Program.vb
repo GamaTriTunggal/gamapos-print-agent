@@ -572,6 +572,8 @@ Module Program
                 Return DispatchReceivableV2(body)
             Case "RETURN"
                 Return DispatchReturnV2(body)
+            Case "DELIVERY"
+                Return DispatchDeliveryNoteV2(body)
             Case Else
                 Return "{""ok"":false,""error"":""UNSUPPORTED_JOBTYPE"",""message"":""Jenis nota v2 belum didukung.""}"
         End Select
@@ -631,6 +633,26 @@ Module Program
         Catch ex As Exception
             Console.WriteLine("   PRINT_FAILED v2: " & ex.GetType().Name)
             Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":""Cetak retur v2 gagal.""}"
+        End Try
+    End Function
+
+    ' P-645 (CO-11): surat jalan v2. Seluruh halaman/salinan direncanakan dan
+    ' diperiksa sebelum printer peran dipilih; galat layout = tanpa kertas.
+    Private Function DispatchDeliveryNoteV2(body As String) As String
+        Dim root As JObject
+        Try
+            root = ParseDeliveryNoteV2(body)
+        Catch
+            Return "{""ok"":false,""error"":""BAD_PAYLOAD"",""message"":""Surat jalan v2 tidak sah.""}"
+        End Try
+        Try
+            Dim deliveryNo As String = CStr(root("payload")("doNo"))
+            Dim sequence As List(Of List(Of String)) = PlanDeliveryNoteV2(root)
+            WithRolePrinter(CStr(root("printerRole")), Sub() PrintDeliveryNoteV2(sequence))
+            Return "{""ok"":true,""jobType"":""delivery_note"",""doNo"":" & JsonString(deliveryNo) & "}"
+        Catch ex As Exception
+            Console.WriteLine("   PRINT_FAILED v2: " & ex.GetType().Name)
+            Return "{""ok"":false,""error"":""PRINT_FAILED"",""message"":""Cetak surat jalan v2 gagal.""}"
         End Try
     End Function
 

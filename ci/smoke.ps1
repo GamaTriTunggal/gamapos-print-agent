@@ -149,16 +149,21 @@ try {
         if ($v2.ok -ne $false -or $v2.error -ne "BAD_PAYLOAD") { Fail "schema 2 cacat tidak ditolak parser v2: $($v2 | ConvertTo-Json -Compress)" } else { Ok "schema 2 cacat -> BAD_PAYLOAD" }
         $v3 = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":3,"jobType":"cashier_receipt","payload":{}}' -TimeoutSec 10
         if ($v3.ok -ne $false -or $v3.error -ne "UNSUPPORTED_SCHEMA") { Fail "schema 3 tidak ditahan: $($v3 | ConvertTo-Json -Compress)" } else { Ok "schema 3 -> UNSUPPORTED_SCHEMA" }
-        # 1.3.0: 17 fixture v2 (penjualan/kasbon/campuran, piutang, retur, salinan) ke printer virtual.
+        # 1.3.0: fixture v2 (penjualan/kasbon/campuran, piutang, retur, salinan) ke printer virtual.
+        # P-645 (CO-11): + 4 surat jalan delivery_note ke peran DELIVERY (printer virtual yang sama).
         $v2fixtures = Get-ChildItem (Join-Path $PSScriptRoot "..\fixtures\v2\*.sample.json")
-        if ($v2fixtures.Count -lt 17) { Fail "fixtures v2 < 17 (ada $($v2fixtures.Count))" }
+        if ($v2fixtures.Count -lt 21) { Fail "fixtures v2 < 21 (ada $($v2fixtures.Count))" }
         foreach ($f in $v2fixtures) {
             $body = Get-Content $f.FullName -Raw
             try {
                 $r = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body $body -TimeoutSec 90
-                if ($r.ok -ne $true) { Fail "v2 $($f.Name): $($r | ConvertTo-Json -Compress)" } else { Ok "v2 $($f.Name)" }
+                if ($r.ok -ne $true) { Fail "v2 $($f.Name): $($r | ConvertTo-Json -Compress)" }
+                elseif ($f.Name -like "delivery_note*" -and ($r.jobType -ne "delivery_note" -or $r.doNo -notmatch '^DO-[0-9]{4}-[0-9]{5}$')) { Fail "v2 $($f.Name): balasan surat jalan tidak sesuai: $($r | ConvertTo-Json -Compress)" }
+                else { Ok "v2 $($f.Name)" }
             } catch { Fail "v2 $($f.Name): $($_.Exception.Message)" }
         }
+        $badDelivery = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":2,"jobType":"delivery_note","printerRole":"DELIVERY","payload":{}}' -TimeoutSec 10
+        if ($badDelivery.ok -ne $false -or $badDelivery.error -ne "BAD_PAYLOAD") { Fail "surat jalan v2 cacat tidak BAD_PAYLOAD: $($badDelivery | ConvertTo-Json -Compress)" } else { Ok "surat jalan v2 cacat -> BAD_PAYLOAD" }
         $duplicate = Invoke-RestMethod "$base/print" -Method Post -ContentType "application/json" -Body '{"schemaVersion":2,"schemaVersion":1,"jobType":"cashier_receipt","payload":{}}' -TimeoutSec 10
         if ($duplicate.ok -ne $false -or $duplicate.error -ne "BAD_PAYLOAD") { Fail "schema duplikat tidak ditahan: $($duplicate | ConvertTo-Json -Compress)" } else { Ok "schema duplikat -> BAD_PAYLOAD" }
     } else {
@@ -169,7 +174,8 @@ try {
     if (-not ($h.deviceId -match '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')) { Fail "/health deviceId bukan GUID: $($h.deviceId)" } else { Ok "/health deviceId GUID" }
     if ($h.osArch -notin @("x64", "x86", "arm64")) { Fail "/health osArch aneh: $($h.osArch)" } else { Ok "/health osArch=$($h.osArch)" }
     # 1.3.0 (P-604): kemampuan v2 diiklankan (web hanya mengirim v2 bila ini ada).
-    if (-not (@($h.supportedPrintSchemas) -contains 2) -or @($h.supportedPrintJobTypesV2).Count -ne 7 -or -not (@($h.supportedPrintJobTypesV2) -contains "return_note")) { Fail "/health kemampuan v2 tidak sesuai: $($h | ConvertTo-Json -Compress)" } else { Ok "/health schema [1,2] + 7 job v2" }
+    # P-645 (CO-11): delivery_note = job v2 kedelapan.
+    if (-not (@($h.supportedPrintSchemas) -contains 2) -or @($h.supportedPrintJobTypesV2).Count -ne 8 -or -not (@($h.supportedPrintJobTypesV2) -contains "return_note") -or -not (@($h.supportedPrintJobTypesV2) -contains "delivery_note")) { Fail "/health kemampuan v2 tidak sesuai: $($h | ConvertTo-Json -Compress)" } else { Ok "/health schema [1,2] + 8 job v2 (termasuk delivery_note)" }
     # 1.4.0 (P-625): fitur v2 aditif — server mengirim depositSen hanya bila ini terbaca.
     if (-not (@($h.supportedPrintFeaturesV2) -contains "sale_correction_deposit")) { Fail "/health tanpa fitur sale_correction_deposit: $($h | ConvertTo-Json -Compress)" } else { Ok "/health fitur v2 sale_correction_deposit" }
     if ($h.catalogVersion -ne 0 -or $h.catalogSource -notin @("seed", "server")) { Fail "/health katalog awal bukan v0 benih/server: $($h.catalogSource)/$($h.catalogVersion)" } else { Ok "/health katalog v0 ($($h.catalogSource))" }

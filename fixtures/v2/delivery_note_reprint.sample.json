@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 2,
+  "jobId": "DO-2610-00013:2",
+  "jobType": "delivery_note",
+  "printerRole": "DELIVERY",
+  "copies": 1,
+  "store": {
+    "name": "VIN JAYA",
+    "address": "JL. RAYA SERANG KM 12, BALARAJA",
+    "contact": "0812-8888-1234"
+  },
+  "payload": {
+    "kind": "normal",
+    "doNo": "DO-2610-00013",
+    "soNo": "SO-2610-00008",
+    "revision": "0",
+    "poNo": "PO-ASB-0930",
+    "date": "2026-10-12",
+    "customer": {
+      "name": "PT. ARTHA SINAR BAJA",
+      "address": "JL. INDUSTRI RAYA III NO. 8, JATAKE, GUDANG B (MASUK GERBANG 2), TANGERANG"
+    },
+    "recipient": {
+      "name": "PAK RUDI",
+      "contact": "0812 1234 567"
+    },
+    "driverName": "BUDI",
+    "vehicleNumber": "B 9123 KX",
+    "pickedUp": false,
+    "note": "BONGKAR DI GUDANG B, TELEPON DULU",
+    "reprint": true,
+    "items": [
+      {
+        "name": "SEMEN DYNAMIX 40KG",
+        "quantity100": "7900"
+      },
+      {
+        "name": "PAKU 10CM (1 KG)",
+        "quantity100": "6000"
+      },
+      {
+        "name": "BESI BETON 10MM SNI 12M",
+        "quantity100": "1800"
+      },
+      {
+        "name": "CAT TEMBOK AVITEX 25KG PUTIH",
+        "quantity100": "300"
+      },
+      {
+        "name": "PASIR BANGKA CURAH",
+        "quantity100": "250"
+      }
+    ]
+  }
+}
