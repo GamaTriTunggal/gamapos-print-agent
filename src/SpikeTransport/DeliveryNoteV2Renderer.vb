@@ -4,7 +4,8 @@
 ' berbasis kolom dari kolom 1, `EndDoc` tiap halaman. Seluruh halaman dan
 ' salinan direncanakan serta diperiksa (PlanDeliveryNoteV2) SEBELUM printer
 ' dipilih dan sebelum Printer.Print pertama; gagal = galat tanpa kertas.
-' BELUM diuji fisik: LX-310 dan kertas 9,5 × 5,5 in belum tersedia.
+' Diuji fisik 17 Okt 2026 (LX-310, 9,5 × 5,5 in): tinggi baris PowerPacks ikut
+' resolusi driver; 32 baris muat satu lembar hanya pada Print Quality 120 x 144 dpi.
 Option Strict On
 Option Explicit On
 

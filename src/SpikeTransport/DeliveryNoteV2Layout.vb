@@ -5,7 +5,12 @@
 ' renderer mencetak tiap baris apa adanya di kolom 1 sehingga spasi = posisi
 ' kolom, sama seperti TAB pada `delivery_order` v1. Modul ini tidak memakai
 ' PowerPacks/TextWidth agar dapat diuji lintas-platform di SchemaGateTests.
-' BELUM diuji fisik di LX-310.
+' Uji fisik LX-310 17 Okt 2026: 32 baris muat satu lembar HANYA dengan setelan
+' driver Print Quality 120 x 144 dpi + form 9,5 × 5,5 in di Tractor (lihat
+' docs/printer-v1-formatting.md). Ralat susunan pemilik 17 Okt 2026: No. PO
+' (maks 50) di baris sendiri karena blok kanan hanya muat 23 karakter; kolom
+' kanan Sopir/Kendaraan, diambil sendiri = `DIAMBIL SENDIRI` / `-`; baris kosong
+' di atas kolom tanda tangan dihapus agar tetap 32 baris.
 Option Strict On
 Option Explicit On
 
@@ -76,7 +81,6 @@ Module DeliveryNoteV2Layout
             Next
             lines.Add(New String("-"c, DeliveryNoteColumns))
             lines.Add(noteLine)
-            lines.Add("")
             lines.Add(SignCaptions)
             lines.Add("")
             lines.Add("")
@@ -179,8 +183,9 @@ Module DeliveryNoteV2Layout
         Dim pickedUp As Boolean = CBool(payload("pickedUp"))
         Dim driver As String = Flatten(CStr(payload("driverName")))
         Dim vehicle As String = Flatten(CStr(payload("vehicleNumber")))
-        Dim driverText As String = If(pickedUp, "DIAMBIL PELANGGAN", "Sopir    : " & If(driver.Length = 0, blank, driver))
-        Dim vehicleText As String = If(pickedUp, "", "Kendaraan: " & If(vehicle.Length = 0, blank, vehicle))
+        ' Diambil sendiri tetap berlabel Sopir/Kendaraan agar tidak terbaca sebagai lanjutan alamat.
+        Dim driverText As String = "Sopir    : " & If(pickedUp, "DIAMBIL SENDIRI", If(driver.Length = 0, blank, driver))
+        Dim vehicleText As String = "Kendaraan: " & If(pickedUp, "-", If(vehicle.Length = 0, blank, vehicle))
         Dim recipientName As String = Flatten(CStr(recipient("name")))
         Dim recipientContact As String = Flatten(CStr(recipient("contact")))
         Dim recipientLine As String
@@ -196,10 +201,11 @@ Module DeliveryNoteV2Layout
             TwoBlocks(Flatten(CStr(store("contact"))), "Tanggal  : " & printedDate),
             rule,
             TwoBlocks("Kepada  : " & Clip(Flatten(CStr(customer("name"))), AddressWidth), "No. SO   : " & orderNo),
-            TwoBlocks("Alamat  : " & address(0), "No. PO   : " & If(poNo.Length = 0, "-", poNo)),
-            TwoBlocks(indent & address(1), driverText),
-            TwoBlocks(indent & address(2), vehicleText),
+            TwoBlocks("Alamat  : " & address(0), driverText),
+            TwoBlocks(indent & address(1), vehicleText),
+            FitLine(indent & address(2)),
             FitLine(recipientLine),
+            FitLine("No. PO  : " & If(poNo.Length = 0, "-", poNo)),
             New String("="c, DeliveryNoteColumns),
             ItemHeader,
             rule}

@@ -324,10 +324,9 @@ dahulu menghasilkan halaman terakhir tanpa item.
 
 ### Surat jalan schema 2 (`delivery_note`) — P-645 / CO-11, 12 Oktober 2026
 
-> **Status: BELUM diuji fisik.** Pemilik belum punya LX-310. Pengukuran pada
-> kertas continuous form 9,5 × 5,5 in **wajib** sebelum rilis agent yang
-> membawa jenis ini dan sebelum CO-11 dicentang. Build, schema gate, smoke
-> CI, dan respons sukses bukan bukti hasil kertas.
+> **Status: diuji fisik 17 Okt 2026** di LX-310 dengan kertas 9,5 × 5,5 in
+> (hasil dan setelan driver wajib di bawah); belum dirilis. Build, schema
+> gate, smoke CI, dan respons sukses bukan bukti hasil kertas.
 
 Dasar: amandemen K-02 12 Okt 2026 di `gamapos-go-2/docs/constitution.md`
 (satu jenis cetak v2 baru untuk surat jalan pesanan pelanggan, peran
@@ -382,16 +381,24 @@ blok kanan mulai kolom 47; semua baris dipotong ≤ 80):
 | 2–3 | `store.address` / `store.contact`; kolom 47 `No. DO   : ` / `Tanggal  : DD-MM-YYYY` |
 | 4 | 80 × `-` |
 | 5 | `Kepada  : ` + nama pelanggan (maks 35); kolom 47 `No. SO   : ` + `soNo` (+ ` R<revisi>` bila revisi ≠ 0) |
-| 6–8 | alamat pelanggan dipecah per kata ke lebar 35, maks 3 baris (`Alamat  : ` lalu indentasi 10); kolom 47: `No. PO   : ` (kosong → `-`), lalu `Sopir    : ` dan `Kendaraan: ` (kosong → 21 × `_`), atau `DIAMBIL PELANGGAN` bila `pickedUp` |
+| 6–8 | alamat pelanggan dipecah per kata ke lebar 35, maks 3 baris (`Alamat  : ` lalu indentasi 10); kolom 47 baris 6–7: `Sopir    : ` dan `Kendaraan: ` (kosong → 21 × `_`), atau `Sopir    : DIAMBIL SENDIRI` dan `Kendaraan: -` bila `pickedUp` |
 | 9 | `Penerima: ` + nama + dua spasi + kontak; keduanya kosong → 30 × `_` |
-| 10–12 | 80 × `=`, ` No     QTY  NAMA BARANG`, 80 × `-` |
-| 13–22 | 10 barang: nomor urut rata kanan lebar 3, qty rata kanan lebar 7, nama mulai kolom 14; halaman terakhir diisi baris kosong |
-| 23–24 | 80 × `-`, `Catatan : ` + catatan (kosong → `-`) |
-| 25–31 | ruang tanda tangan Pengirim / Sopir / Penerima, kurung tanda tangan, `Tgl:` |
+| 10 | `No. PO  : ` + `poNo` utuh (maks 50; kosong → `-`) |
+| 11–13 | 80 × `=`, ` No     QTY  NAMA BARANG`, 80 × `-` |
+| 14–23 | 10 barang: nomor urut rata kanan lebar 3, qty rata kanan lebar 7, nama mulai kolom 14; halaman terakhir diisi baris kosong |
+| 24–25 | 80 × `-`, `Catatan : ` + catatan (kosong → `-`) |
+| 26–31 | Pengirim / Sopir / Penerima, tiga baris kosong ruang tanda tangan, kurung tanda tangan, `Tgl:` |
 | 32 | `Barang diterima dalam keadaan baik dan jumlah sesuai.` + `Halaman i / n` rata kanan kolom 80 |
 
-Header (1–12) dan footer (23–32) diulang tiap halaman; n = ceil(barang/10),
+Header (1–13) dan footer (24–32) diulang tiap halaman; n = ceil(barang/10),
 maksimal 500 barang = 50 halaman per salinan.
+
+Ralat susunan 17 Oktober 2026 (pemilik, sesudah cetak fisik pertama): No. PO
+pindah dari blok kanan baris 6 ke baris 10 sendiri karena blok kanan hanya
+muat 23 karakter (PO 50 karakter tercetak `PO/VJ2/2026-10/PABRIK-W`);
+`DIAMBIL PELANGGAN` tanpa label di blok kanan terbaca sebagai lanjutan alamat,
+diganti `Sopir    : DIAMBIL SENDIRI` + `Kendaraan: -`; baris kosong antara
+Catatan dan Pengirim dihapus agar tetap 32 baris.
 
 Aturan teks yang tidak tampak di mockup:
 
@@ -405,22 +412,40 @@ Aturan teks yang tidak tampak di mockup:
 - Kata alamat lebih dari 35 karakter dipotong keras dan dilanjutkan di baris
   alamat berikutnya; sisa sesudah 3 baris dibuang.
 
-Yang wajib diukur di LX-310 sebelum rilis (belum terbukti):
+Uji fisik LX-310 — 17 Oktober 2026 (PC uji pemilik: VM Windows 11 x64, driver
+resmi `EPSON LX-310 ESC/P` port USB, agent kandidat dari cabang ini, contoh
+`fixtures/v2/delivery_note*.sample.json`):
 
-1. **Tinggi 32 baris pada 5,5 in.** Mockup menganggap 6 lpi (32 baris ≈
-   5,33 in). PowerPacks memajukan baris menurut tinggi font Windows, bukan
-   6 lpi tetap; untuk Courier New 12 pt perkiraan dari metrik font ≈ 13,6 pt
-   per baris (≈ 6,0 in untuk 32 baris). Perkiraan ini belum diukur. v1
-   `delivery_order` juga 32 baris per halaman, tetapi ukuran kertas v1 tidak
-   tercatat. Bila ternyata melewati 5,5 in, putusan perbaikannya milik
-   pemilik (mis. jumlah baris atau pengaturan kertas), bukan diubah diam-diam.
-2. Lebar 80 kolom di area cetak kertas 9,5 in (dikurangi strip lubang
-   traktor) dan posisi kolom 47 / 14 / 80 di kertas.
-3. Form feed sesudah `EndDoc` mengikuti ukuran kertas yang disetel di driver
-   (harus 9,5 × 5,5 in); salinan berurutan tidak bergeser.
-4. Alat `ci/V2PhysicalProbe` belum mendukung `delivery_note`; uji fisik
-   memakai agent kandidat (bukan rilis armada) atau probe yang diperluas
-   lebih dulu.
+1. **Tinggi 32 baris bergantung setelan driver.** Dengan Print Quality bawaan
+   driver, huruf dan jarak baris tercetak ±1,7× lebih tinggi (32 baris ≈
+   10 in = dua lembar) sementara lebar tetap 10 cpi: PowerPacks memajukan
+   baris menurut resolusi yang tidak persegi. Dengan **Print Quality
+   120 x 144 dots per inch** (setelan toko sejak era VB.NET, tutorial
+   pemilik "Installation guidelines") 32 baris muat satu lembar 5,5 in dan
+   bentuk huruf normal. Setelan ini WAJIB di panduan pemasangan LX-310.
+2. Lebar 80 kolom muat di kertas 9,5 in: judul `SURAT JALAN` berakhir di
+   kolom 80 tanpa terpotong (pada setelan 120 x 144).
+3. Form feed mengikuti form kustom 9,5 × 5,5 in yang dipasang di
+   **Device Settings → Form To Tray Assignment → Tractor** dan dipilih di
+   Printing preferences → Advanced → Paper Size. Contoh panjang (3 halaman ×
+   3 salinan = 9 lembar) tidak bergeser dari lembar 1 sampai 9.
+4. Cetakan pertama memperlihatkan PO 50 karakter terpotong dan
+   `DIAMBIL PELANGGAN` menempel ke alamat → ralat susunan di atas; susunan
+   baru MENUNGGU cetak ulang contoh panjang di LX-310.
+
+Setelan driver yang dipakai (Windows 11):
+
+- `printui /s` → Forms → Create a new form → nama `SJ 9.5x5.5`, English,
+  9.50 × 5.50 in, margin 0 → Save Form.
+- Printer properties → Device Settings → Tractor = `SJ 9.5x5.5` (Manual Feed
+  tetap A4).
+- Printing preferences → Advanced → Paper Size `SJ 9.5x5.5`, Print Quality
+  `120 x 144 dots per inch`, Print Speed High Speed.
+- Periksa dari PowerShell: `System.Drawing.Printing.PrinterSettings`
+  printer `EPSON LX-310` → `DefaultPageSettings.PaperSize` = 950 × 550.
+
+`ci/V2PhysicalProbe` belum mendukung `delivery_note`; uji fisik memakai agent
+kandidat (bukan rilis armada) dan contoh JSON lewat `POST /print`.
 
 ## 3. XPrinter — Label 4 × 3 cm
 

@@ -1,8 +1,9 @@
 ' P-645 (CO-11): surat jalan schema 2 `delivery_note`. Parser harus seketat
 ' validator Go (internal/platform/printagent/v2_delivery.go), dan layout murni
 ' harus menghasilkan halaman 80 kolom × 32 baris sesuai mockup pemilik 12 Okt
-' 2026. Murni (tanpa printer) sehingga jalan di CI Linux/Windows; bukan bukti
-' hasil kertas LX-310.
+' 2026 dengan ralat susunan 17 Okt 2026 (No. PO baris sendiri, DIAMBIL SENDIRI).
+' Murni (tanpa printer) sehingga jalan di CI Linux/Windows; bukan bukti hasil
+' kertas LX-310.
 Option Strict On
 Option Explicit On
 
@@ -71,10 +72,11 @@ Module DeliveryNoteTests
             "0812-8888-1234" & S(32) & "Tanggal  : 12-10-2026",
             New String("-"c, 80),
             "Kepada  : PT. ARTHA SINAR BAJA" & S(16) & "No. SO   : SO-2610-00008",
-            "Alamat  : JL. INDUSTRI RAYA III NO. 8," & S(8) & "No. PO   : PO-ASB-0930",
-            S(10) & "JATAKE, GUDANG B (MASUK GERBANG 2)," & S(1) & "Sopir    : " & blank21,
-            S(10) & "TANGERANG" & S(27) & "Kendaraan: " & blank21,
+            "Alamat  : JL. INDUSTRI RAYA III NO. 8," & S(8) & "Sopir    : " & blank21,
+            S(10) & "JATAKE, GUDANG B (MASUK GERBANG 2)," & S(1) & "Kendaraan: " & blank21,
+            S(10) & "TANGERANG",
             "Penerima: PAK RUDI  0812 1234 567",
+            "No. PO  : PO-ASB-0930",
             New String("="c, 80),
             " No     QTY  NAMA BARANG",
             New String("-"c, 80),
@@ -86,7 +88,6 @@ Module DeliveryNoteTests
             "", "", "", "", "",
             New String("-"c, 80),
             "Catatan : BONGKAR DI GUDANG B, TELEPON DULU",
-            "",
             "        Pengirim,                  Sopir,                   Penerima,",
             "", "", "",
             "   (___________________)    (___________________)    (___________________)",
@@ -96,9 +97,9 @@ Module DeliveryNoteTests
         ExpectLines("delivery_note.sample.json halaman 1", pages(0), expected)
         ' Kolom penting dari mockup: blok kanan header di kolom 47, nama barang di kolom 14.
         If pages(0)(1).IndexOf("No. DO", StringComparison.Ordinal) <> 46 OrElse
-           pages(0)(6).IndexOf("Sopir", StringComparison.Ordinal) <> 46 OrElse
-           pages(0)(12).IndexOf("SEMEN", StringComparison.Ordinal) <> 13 OrElse
-           pages(0)(10).IndexOf("NAMA", StringComparison.Ordinal) <> 13 OrElse
+           pages(0)(5).IndexOf("Sopir", StringComparison.Ordinal) <> 46 OrElse
+           pages(0)(13).IndexOf("SEMEN", StringComparison.Ordinal) <> 13 OrElse
+           pages(0)(11).IndexOf("NAMA", StringComparison.Ordinal) <> 13 OrElse
            pages(0)(0).Length <> 80 OrElse pages(0)(31).Length <> 80 Then
             Throw New InvalidOperationException("Kolom surat jalan bergeser dari mockup.")
         End If
@@ -113,9 +114,9 @@ Module DeliveryNoteTests
         If pages.Count <> 3 Then Throw New InvalidOperationException("23 barang harus 3 halaman, dapat " & pages.Count)
         For index As Integer = 0 To 2
             Dim page As List(Of String) = pages(index)
-            ' Header (1–12) dan footer (23–31) identik di tiap halaman.
-            If Not page.Take(12).SequenceEqual(pages(0).Take(12)) OrElse
-               Not page.Skip(22).Take(9).SequenceEqual(pages(0).Skip(22).Take(9)) Then
+            ' Header (1–13) dan footer (24–31) identik di tiap halaman.
+            If Not page.Take(13).SequenceEqual(pages(0).Take(13)) OrElse
+               Not page.Skip(23).Take(8).SequenceEqual(pages(0).Skip(23).Take(8)) Then
                 Throw New InvalidOperationException("Header/footer surat jalan tidak diulang sama.")
             End If
             Expect("halaman " & (index + 1), page(31),
@@ -124,17 +125,19 @@ Module DeliveryNoteTests
         Dim first As List(Of String) = pages(0)
         Expect("judul long", first(0), "VIN JAYA" & S(61) & "SURAT JALAN")
         Expect("SO revisi", first(4), "Kepada  : PT. ARTHA SINAR BAJA" & S(16) & "No. SO   : SO-2610-00008 R1")
-        Expect("PO dipotong", first(5), "Alamat  : JL. INDUSTRI RAYA III NO. 8," & S(8) & "No. PO   : PO/VJ2/2026-10/PABRIK-W")
-        Expect("diambil", first(6), S(10) & "JATAKE, GUDANG B (MASUK GERBANG 2)," & S(1) & "DIAMBIL PELANGGAN")
-        Expect("tanpa kendaraan", first(7), S(10) & "TANGERANG")
-        If first.Any(Function(line) line.Contains("Sopir    :") OrElse line.Contains("Kendaraan:")) Then
-            Throw New InvalidOperationException("Diambil pelanggan masih mencetak sopir/kendaraan.")
+        ' Ralat 17 Okt 2026: PO 50 karakter utuh di baris sendiri (dulu terpotong 23 karakter).
+        Expect("PO utuh", first(9), "No. PO  : PO/VJ2/2026-10/PABRIK-WANAHERANG/PURCHASING/A00012")
+        Expect("diambil sendiri", first(5), "Alamat  : JL. INDUSTRI RAYA III NO. 8," & S(8) & "Sopir    : DIAMBIL SENDIRI")
+        Expect("kendaraan diambil", first(6), S(10) & "JATAKE, GUDANG B (MASUK GERBANG 2)," & S(1) & "Kendaraan: -")
+        Expect("alamat baris 3", first(7), S(10) & "TANGERANG")
+        If first.Take(13).Any(Function(line) line.Contains("_____")) Then
+            Throw New InvalidOperationException("Diambil sendiri masih mencetak garis isian sopir/kendaraan.")
         End If
-        Expect("barang 1", first(12), "  1       1  BARANG UJI PANJANG NOMOR 01 DENGAN NAMA YANG SANGAT PANJANG SEKALI")
-        Expect("barang 10", first(21), " 10      10  BARANG UJI PANJANG NOMOR 10 DENGAN NAMA YANG SANGAT PANJANG SEKALI")
-        Expect("barang 11", pages(1)(12), " 11      11  BARANG UJI PANJANG NOMOR 11 DENGAN NAMA YANG SANGAT PANJANG SEKALI")
-        Expect("barang 23", pages(2)(14), " 23      23  BARANG UJI PANJANG NOMOR 23 DENGAN NAMA YANG SANGAT PANJANG SEKALI")
-        If Not pages(2).Skip(15).Take(7).All(Function(line) line.Length = 0) Then
+        Expect("barang 1", first(13), "  1       1  BARANG UJI PANJANG NOMOR 01 DENGAN NAMA YANG SANGAT PANJANG SEKALI")
+        Expect("barang 10", first(22), " 10      10  BARANG UJI PANJANG NOMOR 10 DENGAN NAMA YANG SANGAT PANJANG SEKALI")
+        Expect("barang 11", pages(1)(13), " 11      11  BARANG UJI PANJANG NOMOR 11 DENGAN NAMA YANG SANGAT PANJANG SEKALI")
+        Expect("barang 23", pages(2)(15), " 23      23  BARANG UJI PANJANG NOMOR 23 DENGAN NAMA YANG SANGAT PANJANG SEKALI")
+        If Not pages(2).Skip(16).Take(7).All(Function(line) line.Length = 0) Then
             Throw New InvalidOperationException("Halaman terakhir tidak diisi baris kosong sampai 10 barang.")
         End If
         If pages.Any(Function(page) page.Any(Function(line) line.Length > 80)) Then
@@ -153,8 +156,8 @@ Module DeliveryNoteTests
     Private Sub CheckReprintAndReturn(reprint As JObject, returned As JObject)
         Dim page As List(Of String) = BuildDeliveryNotePages(reprint)(0)
         Expect("judul cetak ulang", page(0), "VIN JAYA" & S(48) & "SURAT JALAN  CETAK ULANG")
-        Expect("sopir", page(6), S(10) & "JATAKE, GUDANG B (MASUK GERBANG 2)," & S(1) & "Sopir    : BUDI")
-        Expect("kendaraan", page(7), S(10) & "TANGERANG" & S(27) & "Kendaraan: B 9123 KX")
+        Expect("sopir", page(5), "Alamat  : JL. INDUSTRI RAYA III NO. 8," & S(8) & "Sopir    : BUDI")
+        Expect("kendaraan", page(6), S(10) & "JATAKE, GUDANG B (MASUK GERBANG 2)," & S(1) & "Kendaraan: B 9123 KX")
         Dim original As List(Of String) = BuildDeliveryNotePages(CType(reprint.DeepClone(), JObject))(0)
         Dim back As JObject = CType(reprint.DeepClone(), JObject)
         back("payload")("reprint") = False
@@ -165,9 +168,9 @@ Module DeliveryNoteTests
 
         Dim r As List(Of String) = BuildDeliveryNotePages(returned)(0)
         Expect("judul retur", r(0), "VIN JAYA" & S(55) & "SURAT JALAN RETUR")
-        Expect("barang retur", r(12), "  1       2  SEMEN DYNAMIX 40KG")
-        Expect("catatan kosong", r(23), "Catatan : -")
-        If Not r.Skip(13).Take(9).All(Function(line) line.Length = 0) Then
+        Expect("barang retur", r(13), "  1       2  SEMEN DYNAMIX 40KG")
+        Expect("catatan kosong", r(24), "Catatan : -")
+        If Not r.Skip(14).Take(9).All(Function(line) line.Length = 0) Then
             Throw New InvalidOperationException("Retur satu barang tidak diisi baris kosong.")
         End If
     End Sub
@@ -243,11 +246,11 @@ Module DeliveryNoteTests
         Expect("nama toko dipotong", page(0), New String("T"c, 45) & S(24) & "SURAT JALAN")
         Expect("alamat toko dipotong", page(1), New String("J"c, 45) & S(1) & "No. DO   : DO-2610-00013")
         Expect("pelanggan dipotong", page(4), "Kepada  : " & New String("P"c, 35) & S(1) & "No. SO   : SO-2610-00008 R999")
-        Expect("PO kosong", page(5), "Alamat  : JL. INDUSTRI RAYA III NO. 8," & S(8) & "No. PO   : -")
+        Expect("PO kosong", page(9), "No. PO  : -")
         Expect("penerima kosong", page(8), "Penerima: " & New String("_"c, 30))
-        Expect("catatan dipotong", page(23), "Catatan : " & New String("C"c, 70))
-        Expect("nama barang diratakan", page(12), "  1      79  SEMEN DYNAMIX 40KG")
-        Expect("qty besar utuh", page(13), "  2 9999999999,99  PAKU 10CM (1 KG)")
+        Expect("catatan dipotong", page(24), "Catatan : " & New String("C"c, 70))
+        Expect("nama barang diratakan", page(13), "  1      79  SEMEN DYNAMIX 40KG")
+        Expect("qty besar utuh", page(14), "  2 9999999999,99  PAKU 10CM (1 KG)")
 
         ' Karakter format tak terlihat dibuang; emoji tidak dipotong di tengah pasangan surrogate.
         Dim unicode As JObject = CType(sample.DeepClone(), JObject)
@@ -256,8 +259,8 @@ Module DeliveryNoteTests
         unicode("payload")("vehicleNumber") = String.Concat(Enumerable.Repeat(truck, 15))
         ParseDeliveryNoteV2(unicode.ToString(Formatting.None))
         Dim unicodePage As List(Of String) = BuildDeliveryNotePages(unicode)(0)
-        Expect("format dibuang", unicodePage(14), "  3      18  BESI BETON")
-        Expect("emoji utuh", unicodePage(7), S(10) & "TANGERANG" & S(27) & "Kendaraan: " & String.Concat(Enumerable.Repeat(truck, 11)))
+        Expect("format dibuang", unicodePage(15), "  3      18  BESI BETON")
+        Expect("emoji utuh", unicodePage(6), S(10) & "JATAKE, GUDANG B (MASUK GERBANG 2)," & S(1) & "Kendaraan: " & String.Concat(Enumerable.Repeat(truck, 11)))
 
         Dim contactOnly As JObject = CType(sample.DeepClone(), JObject)
         contactOnly("payload")("recipient")("name") = ""
@@ -274,7 +277,7 @@ Module DeliveryNoteTests
         Dim pages As List(Of List(Of String)) = BuildDeliveryNotePages(crowded)
         If pages.Count <> 50 Then Throw New InvalidOperationException("500 barang harus 50 halaman.")
         Expect("halaman 50", pages(49)(31), "Barang diterima dalam keadaan baik dan jumlah sesuai." & S(12) & "Halaman 50 / 50")
-        Expect("barang 500", pages(49)(21), "500       1  BARANG 500")
+        Expect("barang 500", pages(49)(22), "500       1  BARANG 500")
         Dim sequence As List(Of List(Of String)) = BuildDeliveryNotePrintSequence(crowded)
         If sequence.Count <> 250 Then Throw New InvalidOperationException("5 salinan × 50 halaman harus 250.")
         CheckDeliveryNotePages(sequence)
