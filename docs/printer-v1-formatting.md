@@ -322,6 +322,133 @@ Perhitungan sisa item halaman terakhir memakai
 item halaman terakhir. Jangan mengembalikannya ke perhitungan `Mod` yang
 dahulu menghasilkan halaman terakhir tanpa item.
 
+### Surat jalan schema 2 (`delivery_note`) — P-645 / CO-11, 12 Oktober 2026
+
+> **Status: diuji fisik 17 Okt 2026** di LX-310 dengan kertas 9,5 × 5,5 in
+> (hasil dan setelan driver wajib di bawah); belum dirilis. Build, schema
+> gate, smoke CI, dan respons sukses bukan bukti hasil kertas.
+
+Dasar: amandemen K-02 12 Okt 2026 di `gamapos-go-2/docs/constitution.md`
+(satu jenis cetak v2 baru untuk surat jalan pesanan pelanggan, peran
+`DELIVERY`). Kontrak = validator Go
+`internal/platform/printagent/v2_delivery.go`; keempat contoh
+`testdata/delivery_note*.sample.json` disalin apa adanya ke `fixtures/v2/`.
+Tata letak mengikuti mockup yang disetujui pemilik 12 Okt 2026.
+
+`delivery_order` v1 (bagian di atas, [DeliveryOrder.vb](../src/SpikeTransport/DeliveryOrder.vb))
+**tidak berubah**: amplop schema 1 tetap dirutekan ke formatter v1, 82
+kolom, 17 item. Jalur v2 terpisah total: `SelectV2Family("delivery_note")`
+= `DELIVERY`; `/health` mengiklankan `delivery_note` di
+`supportedPrintJobTypesV2`.
+
+Sumber:
+
+- [DeliveryNoteV2Parser.vb](../src/SpikeTransport/DeliveryNoteV2Parser.vb) —
+  parser seketat validator Go (kunci asing/hilang/ganda, tipe, panjang,
+  `copies` 1..5, `pickedUp` tanpa sopir/kendaraan). Cacat = `BAD_PAYLOAD`.
+- [DeliveryNoteV2Layout.vb](../src/SpikeTransport/DeliveryNoteV2Layout.vb) —
+  fungsi murni `BuildDeliveryNotePages` (satu salinan),
+  `BuildDeliveryNotePrintSequence` (diulang `copies` kali) dan preflight
+  `CheckDeliveryNotePages`. Tanpa PowerPacks/`TextWidth`; diuji di
+  `ci/SchemaGateTests/DeliveryNoteTests.vb`.
+- [DeliveryNoteV2Renderer.vb](../src/SpikeTransport/DeliveryNoteV2Renderer.vb) —
+  renderer PowerPacks.
+
+Kertas, font, dan mekanisme:
+
+- Kertas continuous form **9,5 × 5,5 in**, area logis **80 kolom × 32
+  baris** per halaman. Tanpa harga/uang (K-19) dan **tanpa kolom satuan**
+  (satuan ada di nama barang, sama dengan nota).
+- Courier New **12 pt Regular**, sama dengan v1 (sasaran 10 cpi; 80 kolom ×
+  0,1 in = 8,0 in).
+- Mekanisme kolom v1 dipertahankan: tiap baris teks dicetak apa adanya lewat
+  `printer.Print(T(1), line)`; penempatan kolom = spasi di dalam baris
+  (setara `TAB` v1, Courier monospace), **bukan** `CurrentX`/`TextWidth`.
+- `EndDoc` setiap halaman seperti v1; seluruh dokumen diulang `copies` kali
+  (salinan 1: hal. 1..n, salinan 2: hal. 1..n, ...).
+- Font: objek `Font` **baru** tiap halaman seperti v1; tidak ada objek Font
+  yang disimpan atau dipakai ulang (aturan kepemilikan Font PowerPacks).
+- Preflight sebelum printer peran dipilih dan sebelum `Printer.Print`
+  pertama: setiap halaman tepat 32 baris, setiap baris ≤ 80 karakter dan
+  tanpa karakter kendali. Gagal = `PRINT_FAILED` tanpa kertas.
+
+Susunan per halaman (kolom 1-based; blok kiri header maksimal 45 kolom,
+blok kanan mulai kolom 47; semua baris dipotong ≤ 80):
+
+| Baris | Isi |
+|---|---|
+| 1 | `store.name`; judul rata kanan berakhir kolom 80: `SURAT JALAN` / `SURAT JALAN RETUR` / `SURAT JALAN PENGGANTI`, + `  CETAK ULANG` bila `reprint` |
+| 2–3 | `store.address` / `store.contact`; kolom 47 `No. DO   : ` / `Tanggal  : DD-MM-YYYY` |
+| 4 | 80 × `-` |
+| 5 | `Kepada  : ` + nama pelanggan (maks 35); kolom 47 `No. SO   : ` + `soNo` (+ ` R<revisi>` bila revisi ≠ 0) |
+| 6–8 | alamat pelanggan dipecah per kata ke lebar 35, maks 3 baris (`Alamat  : ` lalu indentasi 10); kolom 47 baris 6–7: `Sopir    : ` dan `Kendaraan: ` (kosong → 21 × `_`), atau `Sopir    : DIAMBIL SENDIRI` dan `Kendaraan: -` bila `pickedUp` |
+| 9 | `Penerima: ` + nama + dua spasi + kontak; keduanya kosong → 30 × `_` |
+| 10 | `No. PO  : ` + `poNo` utuh (maks 50; kosong → `-`) |
+| 11–13 | 80 × `=`, ` No     QTY  NAMA BARANG`, 80 × `-` |
+| 14–23 | 10 barang: nomor urut rata kanan lebar 3, qty rata kanan lebar 7, nama mulai kolom 14; halaman terakhir diisi baris kosong |
+| 24–25 | 80 × `-`, `Catatan : ` + catatan (kosong → `-`) |
+| 26–31 | Pengirim / Sopir / Penerima, tiga baris kosong ruang tanda tangan, kurung tanda tangan, `Tgl:` |
+| 32 | `Barang diterima dalam keadaan baik dan jumlah sesuai.` + `Halaman i / n` rata kanan kolom 80 |
+
+Header (1–13) dan footer (24–32) diulang tiap halaman; n = ceil(barang/10),
+maksimal 500 barang = 50 halaman per salinan.
+
+Ralat susunan 17 Oktober 2026 (pemilik, sesudah cetak fisik pertama): No. PO
+pindah dari blok kanan baris 6 ke baris 10 sendiri karena blok kanan hanya
+muat 23 karakter (PO 50 karakter tercetak `PO/VJ2/2026-10/PABRIK-W`);
+`DIAMBIL PELANGGAN` tanpa label di blok kanan terbaca sebagai lanjutan alamat,
+diganti `Sopir    : DIAMBIL SENDIRI` + `Kendaraan: -`; baris kosong antara
+Catatan dan Pengirim dihapus agar tetap 32 baris.
+
+Aturan teks yang tidak tampak di mockup:
+
+- Qty = `quantity100`/100, koma desimal tanpa nol di belakang dan tanpa
+  pemisah ribuan (`79`, `2,5`, `0,25`). Angka **tidak pernah dipotong**:
+  qty lebih dari 7 karakter menggeser nama barang ke kanan (lalu nama
+  dipotong di kolom 80).
+- Spasi/karakter kendali di dalam teks (tab, baris baru) menjadi satu spasi
+  dan karakter format tak terlihat (mis. zero-width space) dibuang, agar
+  jumlah baris tetap 32. Potongan kanan tidak memecah pasangan surrogate.
+- Kata alamat lebih dari 35 karakter dipotong keras dan dilanjutkan di baris
+  alamat berikutnya; sisa sesudah 3 baris dibuang.
+
+Uji fisik LX-310 — 17 Oktober 2026 (PC uji pemilik: VM Windows 11 x64, driver
+resmi `EPSON LX-310 ESC/P` port USB, agent kandidat dari cabang ini, contoh
+`fixtures/v2/delivery_note*.sample.json`):
+
+1. **Tinggi 32 baris bergantung setelan driver.** Dengan Print Quality bawaan
+   driver, huruf dan jarak baris tercetak ±1,7× lebih tinggi (32 baris ≈
+   10 in = dua lembar) sementara lebar tetap 10 cpi: PowerPacks memajukan
+   baris menurut resolusi yang tidak persegi. Dengan **Print Quality
+   120 x 144 dots per inch** (setelan toko sejak era VB.NET, tutorial
+   pemilik "Installation guidelines") 32 baris muat satu lembar 5,5 in dan
+   bentuk huruf normal. Setelan ini WAJIB di panduan pemasangan LX-310.
+2. Lebar 80 kolom muat di kertas 9,5 in: judul `SURAT JALAN` berakhir di
+   kolom 80 tanpa terpotong (pada setelan 120 x 144).
+3. Form feed mengikuti form kustom 9,5 × 5,5 in yang dipasang di
+   **Device Settings → Form To Tray Assignment → Tractor** dan dipilih di
+   Printing preferences → Advanced → Paper Size. Contoh panjang (3 halaman ×
+   3 salinan = 9 lembar) tidak bergeser dari lembar 1 sampai 9.
+4. Cetakan pertama memperlihatkan PO 50 karakter terpotong dan
+   `DIAMBIL PELANGGAN` menempel ke alamat → ralat susunan di atas. Cetak ulang
+   contoh panjang dengan agent 9da84e4 (1 salinan, 3 lembar): PO 50 karakter
+   utuh di baris 10, `Sopir    : DIAMBIL SENDIRI` / `Kendaraan: -`, tiap
+   halaman satu lembar — diterima pemilik ("Sudah sesuai").
+
+Setelan driver yang dipakai (Windows 11):
+
+- `printui /s` → Forms → Create a new form → nama `SJ 9.5x5.5`, English,
+  9.50 × 5.50 in, margin 0 → Save Form.
+- Printer properties → Device Settings → Tractor = `SJ 9.5x5.5` (Manual Feed
+  tetap A4).
+- Printing preferences → Advanced → Paper Size `SJ 9.5x5.5`, Print Quality
+  `120 x 144 dots per inch`, Print Speed High Speed.
+- Periksa dari PowerShell: `System.Drawing.Printing.PrinterSettings`
+  printer `EPSON LX-310` → `DefaultPageSettings.PaperSize` = 950 × 550.
+
+`ci/V2PhysicalProbe` belum mendukung `delivery_note`; uji fisik memakai agent
+kandidat (bukan rilis armada) dan contoh JSON lewat `POST /print`.
+
 ## 3. XPrinter — Label 4 × 3 cm
 
 ### Fungsi dan mekanisme

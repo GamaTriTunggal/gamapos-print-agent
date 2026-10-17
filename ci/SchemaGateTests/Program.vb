@@ -48,13 +48,17 @@ Module Program
                 Throw New InvalidOperationException(scenario.Name & ": " & actual & " != " & scenario.Expected)
             End If
         Next
-        ' 1.3.0: health mengiklankan v1+v2 dan tepat tujuh jenis job v2 yang punya
+        ' 1.3.0: health mengiklankan v1+v2 dan jenis job v2 yang punya
         ' parser/renderer teruji; Dispatch merutekan v2 lewat MaxPrintSchema.
+        ' P-645 (CO-11): delivery_note = jenis kedelapan (surat jalan LX-310).
         Dim capabilities As JObject = JObject.FromObject(HealthPrintCapabilities())
         If Not JToken.DeepEquals(capabilities("supportedPrintSchemas"), New JArray(1, 2)) OrElse
            Not JToken.DeepEquals(capabilities("supportedPrintJobTypesV2"), New JArray("cashier_receipt", "kasbon_receipt", "split_receipt",
-               "receivable_selected", "receivable_selected_card", "receivable_proof", "return_note")) OrElse
+               "receivable_selected", "receivable_selected_card", "receivable_proof", "return_note",
+               "delivery_note")) OrElse
            RoutePrintSchema("{""schemaVersion"":2,""jobType"":""return_note""}", MaxPrintSchema) <> "V2" OrElse
+           RoutePrintSchema("{""schemaVersion"":2,""jobType"":""delivery_note""}", MaxPrintSchema) <> "V2" OrElse
+           RoutePrintSchema("{""schemaVersion"":1,""jobType"":""delivery_order""}", MaxPrintSchema) <> "V1" OrElse
            RoutePrintSchema("{""schemaVersion"":1,""jobType"":""cashier_receipt""}", MaxPrintSchema) <> "V1" Then
             Throw New InvalidOperationException("Kemampuan v2 1.3.0 tidak sesuai.")
         End If
@@ -72,6 +76,9 @@ Module Program
             (Name:="receivable_selected_card", Family:="RECEIVABLE"),
             (Name:="receivable_proof", Family:="RECEIVABLE"),
             (Name:="return_note", Family:="RETURN"),
+            (Name:="delivery_note", Family:="DELIVERY"),
+            (Name:="delivery_order", Family:="UNSUPPORTED_JOBTYPE"),
+            (Name:="Delivery_Note", Family:="UNSUPPORTED_JOBTYPE"),
             (Name:="Cashier_Receipt", Family:="UNSUPPORTED_JOBTYPE")}
             If SelectV2Family(scenario.Name) <> scenario.Family Then
                 Throw New InvalidOperationException("Keluarga job v2 salah: " & scenario.Name)
@@ -92,6 +99,7 @@ Module Program
         CheckReceivableV2(IO.Path.Combine(args(0), "v2"))
         CheckReturnV2(IO.Path.Combine(args(0), "v2", "return_note.sample.json"))
         CheckPhysicalSamples(IO.Path.Combine(args(0), "v2"))
+        DeliveryNoteTests.Run(IO.Path.Combine(args(0), "v2"), args(0))
         StatusModelTests.Run()
         StagingBridgeTests.Run(IO.Path.Combine(args(0), "v2"))
         If args.Length >= 2 Then CheckGoReceivableV2(args(1))
@@ -106,7 +114,7 @@ Module Program
         CheckTenderChangeNotPrinted(IO.Path.Combine(args(0), "v2"))
         Console.WriteLine("Schema gate: " & cases.Length & " cases + " & routes.Length & " routes + " & fixtures.Length & " fixtures v1 + " &
                           IO.Directory.GetFiles(IO.Path.Combine(args(0), "v2"), "*.sample.json").Length &
-                          " fixtures v2 passed; sale/receivable/return v2 parser accepted/rejected; sale sample and return core/layout passed; sale and receivable/return footer column planning passed (not physical).")
+                          " fixtures v2 passed; sale/receivable/return/delivery v2 parser accepted/rejected; sale sample, return core/layout and delivery note pages passed; sale and receivable/return footer column planning passed (not physical).")
     End Sub
 
     Private Sub CheckPhysicalSamples(folder As String)
@@ -117,7 +125,9 @@ Module Program
             "sale_corrected_reprint_simple.sample.json", "receivable_fifo_edc.sample.json",
             "receivable_selected.sample.json", "receivable_selected_card.sample.json",
             "receivable_selected_reprint.sample.json", "receivable_proof.sample.json",
-            "return_note.sample.json", "return_reprint.sample.json"}
+            "return_note.sample.json", "return_reprint.sample.json",
+            "delivery_note.sample.json", "delivery_note_long.sample.json",
+            "delivery_note_reprint.sample.json", "delivery_note_return.sample.json"}
         Dim files As String() = IO.Directory.GetFiles(folder, "*.sample.json")
         If files.Length <> expected.Length OrElse
            Not expected.All(Function(name) files.Any(Function(path) IO.Path.GetFileName(path) = name)) Then
@@ -203,6 +213,9 @@ Module Program
                        Not plan.ReprintName.SequenceEqual(scaled.ReprintName) OrElse parsed.ToString(Formatting.None) <> before Then
                         Throw New InvalidOperationException("Nama retur bergantung metrik driver atau memutasi payload.")
                     End If
+                Case "DELIVERY"
+                    ' P-645: layout surat jalan murni kolom (tanpa metrik driver).
+                    CheckDeliveryNotePages(BuildDeliveryNotePrintSequence(ParseDeliveryNoteV2(body)))
                 Case Else
                     Throw New InvalidOperationException("Keluarga fixture uji kertas tidak dikenal: " & kind)
             End Select

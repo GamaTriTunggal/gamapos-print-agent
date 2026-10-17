@@ -1,6 +1,8 @@
 ' Kemampuan cetak yang benar-benar boleh diumumkan oleh build ini.
 ' 1.3.0 (D-024 adendum 9 Okt 2026, putusan pemilik C): v2 dibuka untuk semua
 ' keluarga yang parser/renderer-nya teruji; v1 tetap diterima apa adanya.
+' P-645 (CO-11, amandemen K-02 12 Okt 2026): `delivery_note` = surat jalan
+' pesanan pelanggan (LX-310). Belum dirilis; uji fisik LX-310 syarat rilis.
 Option Strict On
 Option Explicit On
 
@@ -14,7 +16,8 @@ Module PrintCapabilities
     Friend ReadOnly V2JobTypes As String() = {
         "cashier_receipt", "kasbon_receipt", "split_receipt",
         "receivable_selected", "receivable_selected_card", "receivable_proof",
-        "return_note"}
+        "return_note",
+        "delivery_note"}
 
     ' Kemampuan di dalam job v2 yang sudah ada (aditif). Server hanya mengirim
     ' field opsional bila nama di sini terbaca dari /health.

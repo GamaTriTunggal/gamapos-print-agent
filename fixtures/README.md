@@ -15,3 +15,7 @@ Konvensi nama: `<jobType>.sample.json` (mis. `cashier_receipt.sample.json`, `ret
 untuk tes parser murni, bukan job yang boleh dikirim ke agent rilis. Seluruh
 fixture di akar folder tetap v1; smoke Windows saat ini mengharapkan 17 job
 v1 dan menolak schema 2. Jangan memasukkan fixture v2 ke putaran cetak v1.
+
+`v2/delivery_note*.sample.json` (P-645 / CO-11) adalah salinan apa adanya dari
+`gamapos-go-2/internal/platform/printagent/testdata/` — sumber kebenaran
+kontraknya di repo Go. Ubah di sana dulu, lalu salin ulang ke sini.

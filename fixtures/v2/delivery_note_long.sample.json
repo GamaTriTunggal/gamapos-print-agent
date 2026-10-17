@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 2,
+  "jobId": "DO-2610-00014:1",
+  "jobType": "delivery_note",
+  "printerRole": "DELIVERY",
+  "copies": 3,
+  "store": {
+    "name": "VIN JAYA",
+    "address": "JL. RAYA SERANG KM 12, BALARAJA",
+    "contact": "0812-8888-1234"
+  },
+  "payload": {
+    "kind": "normal",
+    "doNo": "DO-2610-00014",
+    "soNo": "SO-2610-00008",
+    "revision": "1",
+    "poNo": "PO/VJ2/2026-10/PABRIK-WANAHERANG/PURCHASING/A00012",
+    "date": "2026-10-12",
+    "customer": {
+      "name": "PT. ARTHA SINAR BAJA",
+      "address": "JL. INDUSTRI RAYA III NO. 8, JATAKE, GUDANG B (MASUK GERBANG 2), TANGERANG"
+    },
+    "recipient": {
+      "name": "PAK RUDI",
+      "contact": "0812 1234 567"
+    },
+    "driverName": "",
+    "vehicleNumber": "",
+    "pickedUp": true,
+    "note": "BONGKAR DI GUDANG B, TELEPON DULU",
+    "reprint": false,
+    "items": [
+      {
+        "name": "BARANG UJI PANJANG NOMOR 01 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "100"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 02 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "200"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 03 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "300"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 04 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "400"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 05 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "500"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 06 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "600"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 07 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "700"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 08 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "800"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 09 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "900"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 10 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "1000"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 11 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "1100"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 12 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "1200"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 13 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "1300"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 14 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "1400"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 15 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "1500"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 16 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "1600"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 17 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "1700"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 18 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "1800"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 19 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "1900"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 20 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "2000"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 21 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "2100"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 22 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "2200"
+      },
+      {
+        "name": "BARANG UJI PANJANG NOMOR 23 DENGAN NAMA YANG SANGAT PANJANG SEKALI SAMPAI TERPOTONG DI KANAN",
+        "quantity100": "2300"
+      }
+    ]
+  }
+}
