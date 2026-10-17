@@ -430,8 +430,10 @@ resmi `EPSON LX-310 ESC/P` port USB, agent kandidat dari cabang ini, contoh
    Printing preferences → Advanced → Paper Size. Contoh panjang (3 halaman ×
    3 salinan = 9 lembar) tidak bergeser dari lembar 1 sampai 9.
 4. Cetakan pertama memperlihatkan PO 50 karakter terpotong dan
-   `DIAMBIL PELANGGAN` menempel ke alamat → ralat susunan di atas; susunan
-   baru MENUNGGU cetak ulang contoh panjang di LX-310.
+   `DIAMBIL PELANGGAN` menempel ke alamat → ralat susunan di atas. Cetak ulang
+   contoh panjang dengan agent 9da84e4 (1 salinan, 3 lembar): PO 50 karakter
+   utuh di baris 10, `Sopir    : DIAMBIL SENDIRI` / `Kendaraan: -`, tiap
+   halaman satu lembar — diterima pemilik ("Sudah sesuai").
 
 Setelan driver yang dipakai (Windows 11):
 
