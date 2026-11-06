@@ -21,7 +21,6 @@ Module SaleV2Parser
     Private ReadOnly EventIdPattern As New Regex("\A[0-9a-f]{32}\z", RegexOptions.CultureInvariant)
     Private ReadOnly CorrectionDatePattern As New Regex("\A[0-9]{4}-[0-9]{2}-[0-9]{2}\z", RegexOptions.CultureInvariant)
     Private ReadOnly CorrectionTimePattern As New Regex("\A[0-9]{2}:[0-9]{2}:[0-9]{2}\z", RegexOptions.CultureInvariant)
-    Private ReadOnly CorrectionCustomerPattern As New Regex("\A[A-Z0-9]{1,6}\z", RegexOptions.CultureInvariant)
 
     Friend Function ParseSaleV2(body As String) As JObject
         If body Is Nothing OrElse Encoding.UTF8.GetByteCount(body) > 1048576 Then
@@ -156,7 +155,9 @@ Module SaleV2Parser
                     seenCustomer = True
                     correction = Exact(entry, "correction.customer", "kind,eventId,date,time,actorName,customerId,customerName")
                     Dim customerId As String = Text(correction, "customerId", True)
-                    If Not CorrectionCustomerPattern.IsMatch(customerId) OrElse customerId = "CS0001" Then
+                    ' P-022 (gamapos-go-2, IC-15): 1..12 karakter (CodeLength.vb);
+                    ' sentinel CS0001 tetap ditolak.
+                    If Not CodePattern.IsMatch(customerId) OrElse customerId = "CS0001" Then
                         Throw New ArgumentException("Kode pelanggan koreksi tidak sah.")
                     End If
                     Dim customerName As String = Text(correction, "customerName", False)

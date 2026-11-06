@@ -151,8 +151,9 @@ try {
         if ($v3.ok -ne $false -or $v3.error -ne "UNSUPPORTED_SCHEMA") { Fail "schema 3 tidak ditahan: $($v3 | ConvertTo-Json -Compress)" } else { Ok "schema 3 -> UNSUPPORTED_SCHEMA" }
         # 1.3.0: fixture v2 (penjualan/kasbon/campuran, piutang, retur, salinan) ke printer virtual.
         # P-645 (CO-11): + 4 surat jalan delivery_note ke peran DELIVERY (printer virtual yang sama).
+        # IC-15 (P-022 gamapos-go-2): + 3 fixture kode 7 karakter / nota 9 digit (retur, koreksi, piutang).
         $v2fixtures = Get-ChildItem (Join-Path $PSScriptRoot "..\fixtures\v2\*.sample.json")
-        if ($v2fixtures.Count -lt 21) { Fail "fixtures v2 < 21 (ada $($v2fixtures.Count))" }
+        if ($v2fixtures.Count -lt 24) { Fail "fixtures v2 < 24 (ada $($v2fixtures.Count))" }
         foreach ($f in $v2fixtures) {
             $body = Get-Content $f.FullName -Raw
             try {
