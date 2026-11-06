@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "jobId": "return-long-code-1",
+  "jobType": "return_note",
+  "printerRole": "CASHIER",
+  "copies": 1,
+  "store": {"name": "", "address": "", "contact": ""},
+  "payload": {
+    "transactionId": "IN/261110/000001",
+    "receiptNo": "261110000",
+    "date": "2026-11-10",
+    "time": "10:11:12",
+    "customer": {"id": "CS10000", "name": "PELANGGAN KODE PANJANG", "address": "JL. SATU", "contact": "0812"},
+    "items": [
+      {"itemId": "VJ10000", "name": "BARANG A", "quantity100": "150", "priceSen": "101", "totalSen": "152"},
+      {"itemId": "TN10000", "name": "CAT TINTING B", "quantity100": "100", "priceSen": "100", "totalSen": "100"}
+    ],
+    "totalSen": "252",
+    "originalProcessor": {"userId": "42", "name": "KASIR ASAL"}
+  }
+}

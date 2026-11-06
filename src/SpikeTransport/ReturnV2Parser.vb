@@ -17,7 +17,6 @@ Module ReturnV2Parser
     Private Const MaxQuantity As Long = 999999999999L
     Private ReadOnly Canonical As New Regex("\A(0|[1-9][0-9]{0,13})\z", RegexOptions.CultureInvariant)
     Private ReadOnly TransactionPattern As New Regex("\AIN/[0-9]{6}/[0-9]{6}\z", RegexOptions.CultureInvariant)
-    Private ReadOnly DomainID As New Regex("\A[A-Z0-9]{1,6}\z", RegexOptions.CultureInvariant)
     Private ReadOnly DatePattern As New Regex("\A[0-9]{4}-[0-9]{2}-[0-9]{2}\z", RegexOptions.CultureInvariant)
     Private ReadOnly TimePattern As New Regex("\A[0-9]{2}:[0-9]{2}:[0-9]{2}\z", RegexOptions.CultureInvariant)
 
@@ -53,7 +52,9 @@ Module ReturnV2Parser
         Positive(payload, "receiptNo", Integer.MaxValue)
         DateTimeFields(payload, "payload")
         Dim customer As JObject = Exact(payload("customer"), "customer", "id,name,address,contact")
-        If Not DomainID.IsMatch(Text(customer, "id", True)) Then Throw New ArgumentException("Kode pelanggan salah.")
+        ' P-022 (gamapos-go-2, IC-15): kode pelanggan dan barang 1..12 karakter
+        ' (CodeLength.vb); kode baru tumbuh sesudah CS9999/VJ9999, kode lama tetap.
+        If Not CodePattern.IsMatch(Text(customer, "id", True)) Then Throw New ArgumentException("Kode pelanggan salah.")
         PrintedName(customer, "name")
         Text(customer, "address", False)
         Text(customer, "contact", False)
@@ -72,7 +73,7 @@ Module ReturnV2Parser
         Dim lineSum As Decimal = 0D
         For Each token As JToken In items
             Dim item As JObject = Exact(token, "item", "itemId,name,quantity100,priceSen,totalSen")
-            If Not DomainID.IsMatch(Text(item, "itemId", True)) Then Throw New ArgumentException("Kode barang salah.")
+            If Not CodePattern.IsMatch(Text(item, "itemId", True)) Then Throw New ArgumentException("Kode barang salah.")
             PrintedName(item, "name")
             Dim qty As Long = Positive(item, "quantity100", MaxQuantity)
             Dim price As Long = Cent(item, "priceSen")

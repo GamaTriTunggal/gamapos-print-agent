@@ -102,6 +102,7 @@ Module Program
         DeliveryNoteTests.Run(IO.Path.Combine(args(0), "v2"), args(0))
         StatusModelTests.Run()
         StagingBridgeTests.Run(IO.Path.Combine(args(0), "v2"))
+        CodeLengthTests.Run(IO.Path.Combine(args(0), "v2"))
         If args.Length >= 2 Then CheckGoReceivableV2(args(1))
         If args.Length >= 3 Then CheckGoSaleV2(args(2))
         If args.Length = 4 Then CheckGoReturnV2(args(3))
@@ -126,6 +127,8 @@ Module Program
             "receivable_selected.sample.json", "receivable_selected_card.sample.json",
             "receivable_selected_reprint.sample.json", "receivable_proof.sample.json",
             "return_note.sample.json", "return_reprint.sample.json",
+            "return_long_code.sample.json", "sale_corrected_reprint_long_code.sample.json",
+            "receivable_long_code.sample.json",
             "delivery_note.sample.json", "delivery_note_long.sample.json",
             "delivery_note_reprint.sample.json", "delivery_note_return.sample.json"}
         Dim files As String() = IO.Directory.GetFiles(folder, "*.sample.json")

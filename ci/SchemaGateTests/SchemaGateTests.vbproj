@@ -11,6 +11,7 @@
     <Compile Include="../V2PhysicalProbe/V2StagingBridge.vb" Link="V2StagingBridge.vb" />
     <Compile Include="../../src/SpikeTransport/SchemaGate.vb" Link="SchemaGate.vb" />
     <Compile Include="../../src/SpikeTransport/PrintCapabilities.vb" Link="PrintCapabilities.vb" />
+    <Compile Include="../../src/SpikeTransport/CodeLength.vb" Link="CodeLength.vb" />
     <Compile Include="../../src/SpikeTransport/SaleV2Parser.vb" Link="SaleV2Parser.vb" />
     <Compile Include="../../src/SpikeTransport/ReceivableV2Parser.vb" Link="ReceivableV2Parser.vb" />
     <Compile Include="../../src/SpikeTransport/ReturnV2Parser.vb" Link="ReturnV2Parser.vb" />
